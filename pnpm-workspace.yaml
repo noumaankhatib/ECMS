@@ -1,0 +1,10 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# Native build scripts must be allow-listed explicitly rather than run blindly.
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  prisma: true
+  unrs-resolver: true

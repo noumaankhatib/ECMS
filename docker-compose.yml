@@ -1,0 +1,22 @@
+# Local development infrastructure only. Not a deployment artifact.
+services:
+  postgres:
+    build: ./docker/postgres
+    container_name: ecms-postgres
+    environment:
+      POSTGRES_DB: ecms
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - '5432:5432'
+    volumes:
+      - ecms-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Probe the real path a client uses, not just whether the process is up.
+      test: ['CMD-SHELL', 'psql -U postgres -d ecms -c "SELECT 1" || exit 1']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  ecms-pgdata:

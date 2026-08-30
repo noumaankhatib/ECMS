@@ -1,0 +1,384 @@
+// Datasource note — read this before changing it.
+//
+// This block is consumed by the Prisma CLI, which is what runs migrations, so
+// it points at MIGRATION_DATABASE_URL (the ecms_owner account that owns the
+// schema).
+//
+// The running application does NOT use this URL. It constructs its client with
+// DATABASE_URL (the ecms_app account) explicitly. That account cannot alter the
+// schema and cannot edit audit history.
+//
+// Keeping the two apart is what makes PRD §10 and §14 enforceable rather than
+// aspirational. Do not "simplify" this to a single URL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("MIGRATION_DATABASE_URL")
+}
+
+/// The append-only record of who did what (PRD §10).
+///
+/// Deliberately has NO foreign key to users. Archiving or removing a person
+/// must never damage the history of what they did.
+model AuditEntry {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  /// Correlation id shared with the application logs for this same request, so
+  /// a support question can be traced across both in one step.
+  requestId String @map("request_id") @db.Uuid
+
+  /// Null for system-initiated actions (scheduled jobs, migrations).
+  actorUserId String? @map("actor_user_id") @db.Uuid
+
+  action     String  @db.VarChar(100)
+  entityType String  @map("entity_type") @db.VarChar(100)
+  /// Null when the action targets something that does not exist — most often a
+  /// sign-in attempt against an unknown email address.
+  entityId   String? @map("entity_id") @db.Uuid
+  /// Which project this happened under. Null only for records that sit outside
+  /// any project, such as user administration.
+  projectId  String? @map("project_id") @db.Uuid
+
+  before Json? @db.JsonB
+  after  Json? @db.JsonB
+
+  /// SUCCEEDED or REJECTED. Rejections are recorded too — a refused approval or
+  /// a blocked edit is exactly the kind of event an audit trail exists for.
+  outcome String @db.VarChar(20)
+
+  @@index([entityType, entityId])
+  @@index([projectId, occurredAt])
+  @@index([actorUserId, occurredAt])
+  @@index([requestId])
+  @@map("audit_entry")
+}
+
+
+/// A person who can sign in.
+///
+/// Roles and project membership arrive in the next step; this model covers
+/// identity and credentials only.
+model User {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// Stored lower-cased. The unique index is therefore genuinely
+  /// case-insensitive without needing a citext extension.
+  email       String @unique @db.VarChar(320)
+  displayName String @map("display_name") @db.VarChar(200)
+
+  /// Argon2id. The plaintext password is never stored, never logged, and never
+  /// leaves the request that carried it.
+  passwordHash String @map("password_hash") @db.VarChar(255)
+
+  /// DISABLED users keep all their history but cannot sign in.
+  status String @default("ACTIVE") @db.VarChar(20)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  /// Archived rather than deleted, so historic records still resolve a name.
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  sessions    Session[]
+  roles       UserRole[]
+  memberships ProjectMember[]
+
+  @@index([deletedAt])
+  @@map("user")
+}
+
+/// One of the seven roles from PRD §3.
+///
+/// Reference data, seeded by migration. A role says what KIND of work someone
+/// does; where they may do it is decided by project membership.
+model Role {
+  code        String @id @db.VarChar(50)
+  name        String @db.VarChar(100)
+  description String @db.VarChar(500)
+  /// Display order in administration screens.
+  sortOrder   Int    @map("sort_order")
+
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@map("role")
+}
+
+/// Which permissions a role carries, and whether globally or only within
+/// projects the person belongs to.
+///
+/// This is DATA, not code, and that is the point. The client has not yet
+/// finalised who may do what in each module; when they do, the answer is rows
+/// in this table changed by a migration — not logic rewritten across the
+/// application.
+model RolePermission {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  roleCode String @map("role_code") @db.VarChar(50)
+  role     Role   @relation(fields: [roleCode], references: [code], onDelete: Cascade)
+
+  /// "<resource>:<action>", e.g. "project:edit". Validated against the
+  /// catalogue in @ecms/contracts by a test, so a typo cannot sit here unnoticed.
+  permission String @map("permission") @db.VarChar(100)
+
+  /// GLOBAL  — applies across the whole portfolio.
+  /// PROJECT — applies only to projects the person is a member of.
+  scope String @db.VarChar(20)
+
+  @@unique([roleCode, permission])
+  @@index([roleCode])
+  @@map("role_permission")
+}
+
+/// A person's global role. Several are allowed — someone may be both a Director
+/// and run projects of their own — and their grants are combined.
+model UserRole {
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  roleCode String @map("role_code") @db.VarChar(50)
+  role     Role   @relation(fields: [roleCode], references: [code], onDelete: Restrict)
+
+  grantedAt DateTime @default(now()) @map("granted_at") @db.Timestamptz(6)
+  /// Who granted it. Null only for roles created during initial setup.
+  grantedBy String?  @map("granted_by") @db.Uuid
+
+  @@id([userId, roleCode])
+  @@index([roleCode])
+  @@map("user_role")
+}
+
+/// A signed-in session.
+///
+/// Sessions are held server-side rather than encoded into a self-contained
+/// token. That means signing out genuinely revokes access, an administrator can
+/// end someone's sessions immediately, and there is no token floating around
+/// that stays valid until it happens to expire.
+model Session {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// SHA-256 of the cookie value. The raw token exists only in the user's
+  /// cookie, so a leaked database backup does not hand over live sessions.
+  tokenHash String @unique @map("token_hash") @db.Char(64)
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  lastUsedAt DateTime  @default(now()) @map("last_used_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("session")
+}
+
+/// An organisation or individual receiving consultancy services (PRD §4).
+model Client {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  name String @db.VarChar(200)
+  /// The consultancy's own reference for this client. Optional, but unique
+  /// among live clients when present — see the partial index in the migration.
+  reference String? @db.VarChar(50)
+  notes     String? @db.Text
+
+  /// Incremented on every change. A caller sends the version it read; if the
+  /// record has moved on since, the write is refused rather than silently
+  /// overwriting somebody else's edit.
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+
+  /// Archived, never deleted. PRD §6 forbids destructive removal where
+  /// dependent history exists, and §12 requires archival for historical records.
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+  archivedBy String?   @map("archived_by") @db.Uuid
+
+  contacts   Contact[]
+  properties Property[]
+  projects   Project[]
+
+  @@index([archivedAt])
+  @@index([name])
+  @@map("client")
+}
+
+/// A named person at a client organisation.
+model Contact {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  clientId String @map("client_id") @db.Uuid
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  name     String  @db.VarChar(200)
+  position String? @db.VarChar(150)
+  email    String? @db.VarChar(320)
+  phone    String? @db.VarChar(50)
+  /// The default person to contact. At most one per client, enforced by a
+  /// partial unique index rather than by application logic.
+  isPrimary Boolean @default(false) @map("is_primary")
+
+  version Int @default(1)
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+
+  @@index([clientId, archivedAt])
+  @@map("contact")
+}
+
+/// A physical property or site belonging to a client (PRD §4).
+model Property {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  clientId String @map("client_id") @db.Uuid
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  name      String  @db.VarChar(200)
+  reference String? @db.VarChar(50)
+
+  addressLine1 String? @map("address_line_1") @db.VarChar(200)
+  addressLine2 String? @map("address_line_2") @db.VarChar(200)
+  city         String? @db.VarChar(100)
+  postcode     String? @db.VarChar(20)
+  country      String? @db.VarChar(100)
+  notes        String? @db.Text
+
+  version Int @default(1)
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy  String?   @map("created_by") @db.Uuid
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+  archivedBy String?   @map("archived_by") @db.Uuid
+
+  projects Project[]
+
+  @@index([clientId, archivedAt])
+  @@index([archivedAt])
+  @@map("property")
+}
+
+/// A piece of work for a client, at a property (PRD §4).
+///
+/// The project is the unit of authorization for the whole system. Every
+/// project-scoped record resolves to exactly one project, and permission is
+/// decided against it — so this model, and `ProjectMember` below, are what make
+/// "view authorized projects" mean something concrete.
+///
+/// There is no `archived_at`. `CLOSED` is the terminal, read-only state, and a
+/// project that has been closed is the historical record — hiding it behind a
+/// second, independent "archived" flag would give two ways to express the same
+/// idea and two places to get the filtering wrong.
+model Project {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  clientId String @map("client_id") @db.Uuid
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  propertyId String   @map("property_id") @db.Uuid
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+
+  /// The consultancy's own project number. Unique across the portfolio,
+  /// case-insensitively — see the index in the migration.
+  code        String  @db.VarChar(50)
+  name        String  @db.VarChar(200)
+  description String? @db.Text
+
+  /// PLANNING, SUPERVISION or BOTH. Decides which workstreams the project opens
+  /// with, so it is not merely a label.
+  type String @db.VarChar(20)
+
+  /// DRAFT, ACTIVE, ON_HOLD, COMPLETED or CLOSED (decision 2, confirmed by the
+  /// client). Never written directly — it moves only through a named transition
+  /// that is checked against the table in @ecms/contracts.
+  status String @default("DRAFT") @db.VarChar(20)
+
+  startDate     DateTime? @map("start_date") @db.Date
+  targetEndDate DateTime? @map("target_end_date") @db.Date
+  /// Set when the project is completed, cleared by nothing.
+  actualEndDate DateTime? @map("actual_end_date") @db.Date
+
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+
+  members     ProjectMember[]
+  workstreams Workstream[]
+
+  @@index([clientId])
+  @@index([propertyId])
+  @@index([status])
+  @@map("project")
+}
+
+/// Who is on a project.
+///
+/// This table is what turns the authorization rule into rows: a PROJECT-scoped
+/// permission is granted by the person's role and then narrowed to the projects
+/// they appear in here.
+///
+/// `role_code` records what the person does ON THIS PROJECT. It is deliberately
+/// NOT what decides their permissions — that comes from their global role
+/// (docs/phase-1-plan.md §5, decision 3: job title says what kind of work you
+/// do, membership says where you may do it).
+model ProjectMember {
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  roleCode String @map("role_code") @db.VarChar(50)
+
+  grantedAt DateTime @default(now()) @map("granted_at") @db.Timestamptz(6)
+  /// Who added them. Null only for the membership created with the project
+  /// itself, where the creator is recorded on the project instead.
+  grantedBy String?  @map("granted_by") @db.Uuid
+
+  @@id([projectId, userId])
+  @@index([userId])
+  @@map("project_member")
+}
+
+/// A stream of work inside a project — planning, supervision, or both.
+///
+/// Opened automatically from the project's type, so a Supervision project
+/// cannot silently contain no supervision work.
+model Workstream {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// PLANNING or SUPERVISION. At most one of each per project.
+  type String @db.VarChar(20)
+
+  name  String  @db.VarChar(200)
+  notes String? @db.Text
+
+  /// NOT_STARTED, IN_PROGRESS, ON_HOLD or COMPLETED. As with the project, this
+  /// moves only through a checked transition.
+  status String @default("NOT_STARTED") @db.VarChar(20)
+
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([projectId, type])
+  @@index([projectId])
+  @@map("workstream")
+}
