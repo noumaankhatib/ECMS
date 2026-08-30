@@ -124,5 +124,18 @@ export default tseslint.config(
     rules: { '@typescript-eslint/no-non-null-assertion': 'off' },
   },
 
+  // Tooling that runs on a bare machine: the setup script and this config.
+  //
+  // These are plain JavaScript on purpose. The setup script has to run BEFORE
+  // `pnpm install` has ever been run, so it cannot be compiled and cannot use a
+  // dependency — including @types/node, which is why Node's own globals have to
+  // be declared here for it.
+  {
+    files: ['scripts/**/*.mjs', 'eslint.config.mjs'],
+    languageOptions: {
+      globals: { process: 'readonly', console: 'readonly', URL: 'readonly' },
+    },
+  },
+
   prettier,
 );

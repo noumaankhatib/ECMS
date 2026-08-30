@@ -14,8 +14,8 @@ Updated at the end of every step.
 | 4    | Roles, permissions, authorization choke point          | ✅ Done |
 | 5    | Clients, contacts, properties                          | ✅ Done |
 | 6    | Projects and membership                                | ✅ Done |
-| 7    | Environment setup script                               | ⬜ Next |
-| 8    | Web interface                                          | ⬜      |
+| 7    | Environment setup script                               | ✅ Done |
+| 8    | Web interface                                          | ⬜ Next |
 
 ---
 
@@ -334,6 +334,100 @@ the plan's definition of done and it is the safe direction to be wrong in, but
 tidying away a customer from ten years ago is a reasonable thing to want. Added
 to the open questions below.
 
+---
+
+## Step 7 — Environment setup script ✅
+
+**Built:** `scripts/setup.mjs` — one command that takes an empty machine to a
+working one. `pnpm run bootstrap`, or `node scripts/setup.mjs` on a machine that
+does not have pnpm yet.
+
+Nine steps, each of which checks the world before it changes it: preflight,
+environment file, dependencies, Prisma client, database container, migrations,
+build, first administrator, verify.
+
+**Verified — every claim run for real, not reasoned about:**
+
+| Case                                                                      | Result                        |
+| ------------------------------------------------------------------------- | ----------------------------- |
+| **Empty machine** — no `.env`, no `node_modules`, no container, no volume | ✅ working in 28 seconds      |
+| The administrator it created can actually **sign in**                     | ✅ `200` on `/auth/login`     |
+| **Run a second time**, unchanged machine                                  | ✅ nothing touched, exit `0`  |
+| `--dry-run`                                                               | ✅ full plan, no changes      |
+| `--env=production` **without** `--production`                             | ✅ refused, exit `2`          |
+| `NODE_ENV=production` alone                                               | ✅ refused, exit `2`          |
+| `--production` given but the target is local                              | ✅ refused, exit `2`          |
+| Production with required variables absent from the environment            | ✅ refused, names them        |
+| **`.env` pointing at a remote host while the target is local**            | ✅ refused before any change  |
+| Production dry run                                                        | ✅ no Docker, frozen lockfile |
+
+**Decisions:**
+
+- **Plain JavaScript, zero dependencies.** It has to run before `pnpm install`
+  has ever run, on a machine where `node_modules` does not exist. That single
+  constraint is why this one file is not TypeScript like everything else — a
+  setup script that needs installing first is not a setup script.
+
+- **Every change goes through one function.** `change()` is the only thing that
+  alters the machine, which is what makes `--dry-run` worth trusting: there is no
+  second path that could slip past it.
+
+- **`migrate deploy`, never `migrate dev`.** `dev` offers to reset the database
+  when it thinks history has diverged. That is a data-loss prompt, and prompts
+  get answered "yes" by people in a hurry. No path through this script can reach
+  it.
+
+- **It never edits an existing `.env`.** It creates one from `.env.example` when
+  there is none, and otherwise reports what is missing. A script that rewrites
+  the file holding your local credentials is one people stop running.
+
+- **Two independent locks on production**, because they fail differently.
+  Naming the target is not enough — `--production` must be passed too, and
+  `NODE_ENV` can be set by a shell profile or a CI runner without anyone
+  meaning it.
+
+- **The guard that matters most is the other one.** The realistic accident is
+  not a mistyped flag; it is a _local_ setup run against a live database because
+  `.env` was still pointed at one. So a local run refuses outright if
+  `DATABASE_URL` names a host that is not this machine — and it refuses in the
+  second step, before installing, before Docker, before migrations.
+
+- **It verifies rather than assumes.** The last step re-proves the guarantee
+  from steps 1–2: the application's database account is refused an `UPDATE` on
+  `audit_entry`. A privilege that has quietly gone missing looks exactly like
+  one that is working, right up until it matters. The `UPDATE` it attempts
+  carries `WHERE false`, so it cannot alter a row even if the lock were gone.
+
+- **A first administrator, on local machines only.** Otherwise the setup
+  finishes with a system nobody can log into. Elsewhere it only reports —
+  generating a credential for a real environment and printing it into somebody's
+  scrollback, or a CI log, is not a thing it should do on your behalf.
+
+- **Named `bootstrap`, not `setup`.** `pnpm setup` is pnpm's own command for
+  installing pnpm; a script by that name would be shadowed and a new developer
+  would silently run the wrong thing.
+
+**Bugs found by running it, which reading it would not have caught:**
+
+- **The wrong success string.** The script looked for `No pending migrations`;
+  Prisma actually says `Database schema is up to date!`. Harmless in the migrate
+  step — deploy is idempotent — but the _verification_ step would have failed a
+  perfectly good environment. Both callers now ask one shared function.
+
+- **`@prisma/client` would not resolve.** It is a dependency of `apps/api`, not
+  of the workspace root, and pnpm does not flatten packages into a shared
+  `node_modules`. The verification failed on a genuinely fresh machine and the
+  user count failed silently for the same reason — one bug wearing two faces.
+  Both checks now run from the API's own directory, and the count reports why it
+  failed instead of shrugging.
+
+Both of these only appeared because the script was run against a machine
+actually torn down to nothing. Neither was visible in review.
+
+**Also:** `.env.example` now lists `PORT`, `CORS_ORIGINS` and `LOG_LEVEL` with
+their defaults. Setup validates against that file, so anything undocumented
+there is invisible to it.
+
 ## Open — with the client
 
 | #   | Question                                                              | Blocks                                                                   |
@@ -346,7 +440,7 @@ to the open questions below.
 
 ## Not yet done
 
-- **Nothing is committed to git.** Six completed steps sit uncommitted.
+- **The repository has no remote.** Work is committed locally only, so a commit protects against editing mistakes but is not a backup. Nothing is pushed anywhere.
 - User administration in the interface — the CLI (`pnpm user:create`) is the only way to create a user. Becomes a break-glass tool once step 8 lands.
 - User administration through the API — adding someone to a project needs their user id, which today comes from the database or the CLI. Step 8 closes this.
 - Project membership is done. `AuthorizationService.isMemberOf` and `visibleProjectIds` read real rows; the step-4 note about everything denying no longer applies.

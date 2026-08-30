@@ -9,6 +9,8 @@
   "packageManager": "pnpm@11.5.1",
   "scripts": {
     "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck",
+    "bootstrap": "node scripts/setup.mjs",
+    "bootstrap:dry": "node scripts/setup.mjs --dry-run",
     "lint": "eslint .",
     "typecheck": "tsc -b --pretty",
     "format": "prettier --write .",
