@@ -1,4 +1,4 @@
-import { loginRequestSchema, type LoginRequest } from '@ecms/contracts';
+import { loginRequestSchema, type CurrentUserResponse, type LoginRequest } from '@ecms/contracts';
 import { Body, Controller, Get, HttpCode, Post, Req, Res, UsePipes } from '@nestjs/common';
 import type { Request, Response } from 'express';
 
@@ -9,12 +9,14 @@ import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import { clearSessionCookie, SESSION_COOKIE, sessionCookieOptions } from './auth.cookie';
 import { AuthService } from './auth.service';
 import type { AuthenticatedUser } from './auth.types';
+import { AuthorizationService } from './authorization.service';
 import { Public } from './public.decorator';
 
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly auth: AuthService,
+    private readonly authorization: AuthorizationService,
     private readonly rateLimiter: RateLimiter,
   ) {}
 
@@ -59,10 +61,24 @@ export class AuthController {
     clearSessionCookie(res);
   }
 
+  /**
+   * Who is signed in, and what they may do.
+   *
+   * The grants are sent so the interface can hide what the person cannot do.
+   * That is a courtesy and nothing more — every one of them is enforced again
+   * by the API on the way in. A hidden button prevents confusion; the server
+   * check is what prevents access (PRD §8, §16).
+   */
   @Get('me')
-  me(@Req() req: Request): { user: AuthenticatedUser } {
+  async me(@Req() req: Request): Promise<CurrentUserResponse> {
     // The guard has already run, so this is defensive only.
     if (!req.currentUser) throw appError('UNAUTHENTICATED');
-    return { user: req.currentUser };
+
+    const grants = await this.authorization.grantsFor(req.currentUser.id);
+
+    return {
+      user: req.currentUser,
+      grants: { global: [...grants.global], project: [...grants.project] },
+    };
   }
 }

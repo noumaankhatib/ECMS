@@ -13,6 +13,7 @@ export { AuthorizationService } from './authorization.service';
 export type { Grants } from './authorization.service';
 export { PasswordService } from './password.service';
 export { SessionService } from './session.service';
+export { UserService } from './user.service';
 export { Public } from './public.decorator';
 export { RequirePermission, RequirePermissionAnywhere } from './require-permission.decorator';
 export type { AuthenticatedUser, LoginResult } from './auth.types';

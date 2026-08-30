@@ -3,6 +3,7 @@ import {
   createContactSchema,
   createPropertySchema,
   listQuerySchema,
+  propertyListQuerySchema,
   updateClientSchema,
   updateContactSchema,
   updatePropertySchema,
@@ -10,6 +11,7 @@ import {
   type CreateContact,
   type CreateProperty,
   type ListQuery,
+  type PropertyListQuery,
   type Page,
   type UpdateClient,
   type UpdateContact,
@@ -140,10 +142,9 @@ export class PropertyController {
   @Get()
   @RequirePermission('property:view')
   list(
-    @Query(new ZodValidationPipe(listQuerySchema)) query: ListQuery,
-    @Query('clientId') clientId?: string,
+    @Query(new ZodValidationPipe(propertyListQuerySchema)) query: PropertyListQuery,
   ): Promise<Page<Property>> {
-    return this.properties.list(query, clientId);
+    return this.properties.list(query, query.clientId);
   }
 
   @Get(':id')

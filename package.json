@@ -12,7 +12,7 @@
     "bootstrap": "node scripts/setup.mjs",
     "bootstrap:dry": "node scripts/setup.mjs --dry-run",
     "lint": "eslint .",
-    "typecheck": "tsc -b --pretty",
+    "typecheck": "tsc -b --pretty && pnpm --filter @ecms/web run typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:up": "docker compose up -d --build",
@@ -23,9 +23,11 @@
     "db:status": "prisma migrate status --schema=apps/api/prisma/schema.prisma",
     "db:generate": "prisma generate --schema=apps/api/prisma/schema.prisma",
     "test": "pnpm -r --if-present run test",
+    "e2e": "node scripts/e2e.mjs",
     "verify": "pnpm run check && pnpm run test",
     "dev": "node --watch apps/api/dist/main.js",
-    "user:create": "node apps/api/dist/tools/create-user.js"
+    "user:create": "node apps/api/dist/tools/create-user.js",
+    "dev:web": "pnpm --filter @ecms/web run dev"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

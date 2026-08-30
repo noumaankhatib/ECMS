@@ -15,12 +15,16 @@ import { appError, type FieldIssue } from '../errors/app-error';
 export class ZodValidationPipe<T> implements PipeTransform {
   constructor(private readonly schema: ZodType<T>) {}
 
-  transform(value: unknown, _metadata: ArgumentMetadata): T {
+  transform(value: unknown, metadata: ArgumentMetadata): T {
     const result = this.schema.safeParse(value);
 
     if (!result.success) {
+      // Named after where it actually came from. Reporting a rejected query
+      // string as "(body)" once sent a diagnosis off in entirely the wrong
+      // direction.
+      const location = `(${metadata.type})`;
       const fields: FieldIssue[] = result.error.issues.map((issue) => ({
-        field: issue.path.join('.') || '(body)',
+        field: issue.path.join('.') || location,
         reason: issue.message,
       }));
       // Field names and reasons are safe to return. The submitted values are

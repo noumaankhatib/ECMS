@@ -1,0 +1,563 @@
+/*
+ * The whole visual language, in one file.
+ *
+ * COLOUR IS DECLARED ONCE, in :root below, and referenced by name everywhere
+ * else. No component contains a hex value. That is deliberate: PRD §18 defines
+ * the consultancy's palette and we have not been given it yet, so the values
+ * here are a restrained placeholder. When the real palette arrives it is a
+ * change to twelve declarations and nothing else — the same reasoning that put
+ * the permission matrix in the database rather than in code.
+ *
+ * If you are that person: replace the values under "Brand" and "Status", check
+ * the contrast pairs still pass, and you are done.
+ */
+
+:root {
+  /* Brand ------------------------------------------------------------------ */
+  --brand-700: #1d4ed8;
+  --brand-800: #1e40af;
+  --brand-50: #eff6ff;
+
+  /* Neutrals --------------------------------------------------------------- */
+  --slate-900: #0f172a;
+  --slate-700: #334155;
+  --slate-600: #475569;
+  --slate-400: #94a3b8;
+  --slate-200: #e2e8f0;
+  --slate-100: #f1f5f9;
+  --slate-50: #f8fafc;
+  --white: #ffffff;
+
+  /* Status — the five project states.
+   *
+   * These carry meaning, so they are never the only signal: every status is
+   * shown as a word as well as a colour. Roughly eight percent of men cannot
+   * reliably separate the green from the amber. */
+  --status-draft: #64748b;
+  --status-active: #047857;
+  --status-hold: #b45309;
+  --status-complete: #1d4ed8;
+  --status-closed: #334155;
+
+  --danger: #b91c1c;
+  --danger-bg: #fef2f2;
+
+  /* Everything below is derived from the above. */
+  --page-bg: var(--slate-50);
+  --surface: var(--white);
+  --border: var(--slate-200);
+  --text: var(--slate-900);
+  --text-muted: var(--slate-600);
+  --text-faint: var(--slate-400);
+
+  --radius: 6px;
+  --radius-sm: 4px;
+  --shadow: 0 1px 2px rgb(15 23 42 / 6%), 0 1px 3px rgb(15 23 42 / 4%);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --font:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--page-bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+h1 {
+  font-size: 22px;
+  font-weight: 600;
+}
+h2 {
+  font-size: 17px;
+  font-weight: 600;
+}
+h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+a {
+  color: var(--brand-700);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+/* Every interactive element shows where the keyboard is. Removing this without
+ * providing something equivalent makes the application unusable without a
+ * mouse. */
+:focus-visible {
+  outline: 2px solid var(--brand-700);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Layout ------------------------------------------------------------------- */
+
+.shell {
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  background: var(--slate-900);
+  color: var(--slate-200);
+  padding: var(--space-5) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.sidebar__brand {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--white);
+  letter-spacing: -0.01em;
+}
+.sidebar__brand span {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--slate-400);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nav a {
+  color: var(--slate-200);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+}
+.nav a:hover {
+  background: rgb(255 255 255 / 8%);
+  text-decoration: none;
+}
+.nav a[aria-current='page'] {
+  background: var(--brand-700);
+  color: var(--white);
+  font-weight: 500;
+}
+
+.sidebar__footer {
+  margin-top: auto;
+  font-size: 12px;
+  color: var(--slate-400);
+  border-top: 1px solid rgb(255 255 255 / 10%);
+  padding-top: var(--space-4);
+}
+.sidebar__footer strong {
+  display: block;
+  color: var(--slate-200);
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.main {
+  padding: var(--space-6);
+  max-width: 1180px;
+  width: 100%;
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+.page-head p {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.breadcrumb {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
+}
+
+/* Surfaces ----------------------------------------------------------------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.card__head {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.card__body {
+  padding: var(--space-4);
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* Tables ------------------------------------------------------------------- */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+thead th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--slate-50);
+}
+tbody td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+tbody tr:last-child td {
+  border-bottom: none;
+}
+tbody tr:hover {
+  background: var(--slate-50);
+}
+
+.definition {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: var(--space-3) var(--space-4);
+  font-size: 14px;
+  margin: 0;
+}
+.definition dt {
+  color: var(--text-muted);
+}
+.definition dd {
+  margin: 0;
+}
+
+/* Controls ----------------------------------------------------------------- */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 7px 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: var(--brand-700);
+  color: var(--white);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.button:hover {
+  background: var(--brand-800);
+  text-decoration: none;
+  color: var(--white);
+}
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.button--secondary {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+}
+.button--secondary:hover {
+  background: var(--slate-100);
+  color: var(--text);
+}
+.button--danger {
+  background: var(--surface);
+  color: var(--danger);
+  border-color: var(--border);
+}
+.button--danger:hover {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.button--small {
+  padding: 4px 9px;
+  font-size: 13px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.field label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.field .hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+input,
+select,
+textarea {
+  font: inherit;
+  font-size: 14px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  width: 100%;
+}
+textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+input:disabled,
+select:disabled {
+  background: var(--slate-100);
+  color: var(--text-muted);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+.form-grid .field--wide {
+  grid-column: 1 / -1;
+}
+
+.form-actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+/* Feedback ----------------------------------------------------------------- */
+
+/* An error tells the person what to do next, and is announced to a screen
+ * reader rather than only appearing. */
+.alert {
+  background: var(--danger-bg);
+  border: 1px solid #fecaca;
+  border-left: 3px solid var(--danger);
+  color: #7f1d1d;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+}
+.alert ul {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-4);
+}
+
+.empty {
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.empty strong {
+  display: block;
+  color: var(--text);
+  font-size: 15px;
+  margin-bottom: var(--space-1);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--slate-50);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.badge--draft {
+  color: var(--status-draft);
+}
+.badge--active {
+  color: var(--status-active);
+}
+.badge--hold {
+  color: var(--status-hold);
+}
+.badge--complete {
+  color: var(--status-complete);
+}
+.badge--closed {
+  color: var(--status-closed);
+}
+.badge--plain::before {
+  display: none;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+.faint {
+  color: var(--text-faint);
+}
+.mono {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.right {
+  text-align: right;
+}
+.nowrap {
+  white-space: nowrap;
+}
+
+/* Login -------------------------------------------------------------------- */
+
+.login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+}
+.login__card {
+  width: 100%;
+  max-width: 380px;
+}
+.login__brand {
+  text-align: center;
+  margin-bottom: var(--space-5);
+}
+.login__brand strong {
+  display: block;
+  font-size: 18px;
+  color: var(--text);
+}
+.login__brand span {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Small screens ------------------------------------------------------------ */
+
+/* PRD §19 asks for the key workflows to work on a tablet. The sidebar becomes a
+ * horizontal bar and the two-column layouts collapse; nothing is hidden. */
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    overflow-x: auto;
+  }
+  .nav {
+    flex-direction: row;
+  }
+  .sidebar__footer {
+    margin: 0 0 0 auto;
+    border: none;
+    padding: 0;
+    white-space: nowrap;
+  }
+  .main {
+    padding: var(--space-4);
+  }
+  .grid-2,
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .definition {
+    grid-template-columns: 1fr;
+    gap: var(--space-1) 0;
+  }
+  .definition dt {
+    font-size: 12px;
+  }
+  .definition dd {
+    margin-bottom: var(--space-2);
+  }
+}

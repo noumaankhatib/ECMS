@@ -181,6 +181,20 @@ export const listQuerySchema = z
 
 export type ListQuery = z.infer<typeof listQuerySchema>;
 
+/**
+ * Properties are usually browsed from a client, so the list takes one.
+ *
+ * It has to be part of THIS schema rather than a separate parameter on the
+ * handler: the schema is strict, so a query string carrying a key it does not
+ * know about is refused. Reading the parameter separately and leaving it out of
+ * the schema meant `?clientId=` was rejected before the handler ever saw it.
+ */
+export const propertyListQuerySchema = listQuerySchema.extend({
+  clientId: z.string().uuid().optional(),
+});
+
+export type PropertyListQuery = z.infer<typeof propertyListQuerySchema>;
+
 export const createClientSchema = z
   .object({
     name: z.string().trim().min(1, 'A name is required').max(200),
@@ -461,3 +475,105 @@ export const addProjectMemberSchema = z
   .strict();
 
 export type AddProjectMember = z.infer<typeof addProjectMemberSchema>;
+
+// ---------------------------------------------------------------------------
+// User administration
+//
+// Until now the only way to create a user was the break-glass CLI. These are
+// what the administration screens talk to.
+// ---------------------------------------------------------------------------
+
+export const USER_STATUSES = ['ACTIVE', 'DISABLED'] as const;
+export type UserStatus = (typeof USER_STATUSES)[number];
+
+/**
+ * Password rules, in one place, applied wherever a password is SET.
+ *
+ * Deliberately not applied at sign-in: telling an attacker which guesses were
+ * not even worth trying is a gift. Length is the rule that actually matters —
+ * NIST dropped the composition requirements years ago because they push people
+ * towards `Passw0rd!` and nothing else.
+ */
+export const passwordSchema = z
+  .string()
+  .min(12, 'Use at least 12 characters')
+  .max(1024, 'That is longer than 1024 characters');
+
+export const createUserSchema = z
+  .object({
+    email: z.string().trim().toLowerCase().email('Must be a valid email address').max(320),
+    displayName: z.string().trim().min(1, 'A name is required').max(200),
+    password: passwordSchema,
+    roleCode: z.enum(ROLES),
+  })
+  .strict();
+
+export type CreateUser = z.infer<typeof createUserSchema>;
+
+/**
+ * Editing a user never touches their password. Setting someone else's password
+ * is a separate, deliberate act with its own endpoint, so it cannot happen as a
+ * side effect of correcting a typo in a name.
+ */
+export const updateUserSchema = z
+  .object({
+    displayName: z.string().trim().min(1).max(200).optional(),
+    status: z.enum(USER_STATUSES).optional(),
+  })
+  .strict();
+
+export type UpdateUser = z.infer<typeof updateUserSchema>;
+
+export const setPasswordSchema = z.object({ password: passwordSchema }).strict();
+export type SetPassword = z.infer<typeof setPasswordSchema>;
+
+export const assignRoleSchema = z.object({ roleCode: z.enum(ROLES) }).strict();
+export type AssignRole = z.infer<typeof assignRoleSchema>;
+
+/** What the interface is told about a user. Never includes the password hash. */
+export interface UserSummary {
+  readonly id: string;
+  readonly email: string;
+  readonly displayName: string;
+  readonly status: UserStatus;
+  readonly roles: readonly Role[];
+  readonly createdAt: string;
+}
+
+/**
+ * What the signed-in person may do, sent to the browser so the interface can
+ * hide what they cannot.
+ *
+ * This is a COURTESY, not a control. Every one of these is enforced again by
+ * the API, which is the only thing standing between a determined caller and the
+ * data (PRD §8, §16). Hiding a button prevents confusion; it prevents nothing
+ * else.
+ */
+export interface CurrentUserGrants {
+  readonly global: readonly Permission[];
+  /** Held only within projects the person belongs to. */
+  readonly project: readonly Permission[];
+}
+
+export interface CurrentUserResponse {
+  readonly user: CurrentUser;
+  readonly grants: CurrentUserGrants;
+}
+
+/**
+ * Answers "should I show this?" the same way the server answers "may they?".
+ *
+ * `projectId` is required for a project-scoped permission, and its absence
+ * means hidden — which mirrors the API refusing a project-scoped permission
+ * with no project named, rather than quietly widening it.
+ */
+export function grantsAllow(
+  grants: CurrentUserGrants,
+  permission: Permission,
+  options: { projectId?: string; memberOf?: readonly string[] } = {},
+): boolean {
+  if (grants.global.includes(permission)) return true;
+  if (!grants.project.includes(permission)) return false;
+  if (!options.projectId) return false;
+  return (options.memberOf ?? []).includes(options.projectId);
+}

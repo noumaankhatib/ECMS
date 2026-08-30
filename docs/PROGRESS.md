@@ -15,7 +15,7 @@ Updated at the end of every step.
 | 5    | Clients, contacts, properties                          | ✅ Done |
 | 6    | Projects and membership                                | ✅ Done |
 | 7    | Environment setup script                               | ✅ Done |
-| 8    | Web interface                                          | ⬜ Next |
+| 8    | Web interface                                          | ✅ Done |
 
 ---
 
@@ -428,6 +428,118 @@ actually torn down to nothing. Neither was visible in review.
 their defaults. Setup validates against that file, so anything undocumented
 there is invisible to it.
 
+---
+
+## Step 8 — Web interface ✅
+
+The last step of Phase 1, and the one that makes everything before it usable by
+somebody who is not holding a terminal.
+
+**Built:** a Next.js 16 application — sign in and out, a navigation shell, and
+list/detail/create/edit screens for clients (with contacts), properties,
+projects (with workstreams and membership) and users. Eighteen routes.
+
+**Also built, because the definition of done needs it:** user administration in
+the API. Until now the only way to create an account was the break-glass CLI.
+`/users` and `/roles`, with create, edit, enable/disable, set password, and
+grant/revoke role. `/auth/me` now also returns what the caller may do, so the
+interface can hide what they cannot.
+
+**Verified — 12 tests in a real browser, plus 71 API tests:**
+
+| Behaviour                                                              | Result        |
+| ---------------------------------------------------------------------- | ------------- |
+| A wrong password and an unknown address give the **identical** message | ✅            |
+| A signed-out visitor is sent to sign in                                | ✅            |
+| An admin creates a client, a property and a project                    | ✅            |
+| The project opens with the workstreams its type calls for              | ✅            |
+| An admin creates a user and grants them a second role                  | ✅            |
+| **A non-member sees no row for a project**                             | ✅            |
+| **…and typing its address gets them nowhere**                          | ✅ HTTP ≥ 400 |
+| A planner, a member of nothing, gets an empty list                     | ✅            |
+| …and is offered no New project button, and no Users link               | ✅            |
+| Adding them to a project opens **that one** and no other               | ✅            |
+| …and still does **not** let them edit it                               | ✅            |
+| Only the legal transitions are offered, and they work                  | ✅            |
+| A workstream moves only through its own legal transitions              | ✅            |
+| Archiving is refused while a project depends on it, and says why       | ✅            |
+| Signing out genuinely ends the session                                 | ✅            |
+
+`pnpm e2e` builds both applications, starts them, runs the browser suite and
+shuts them down. It was run twice in a row against the same database to prove it
+does not depend on a fresh one.
+
+**Decisions:**
+
+- **Every API call is made from the server, never the browser.** The session
+  cookie is httpOnly, so browser JavaScript cannot read it and a scripting flaw
+  cannot carry it away. Fetching server-side and forwarding the cookie keeps that
+  property rather than trading it for convenience. It also means the API's
+  address is never published, so a deployment where the API is not publicly
+  routable works unchanged.
+
+- **The interface hides; the API refuses.** Grants are sent to the browser so
+  buttons and navigation can be hidden, and that is _all_ they do. Every one is
+  enforced again on the way in. A hidden button prevents confusion; the server
+  check is what prevents access.
+
+- **Forms work without JavaScript.** Every one is a real `<form>` posting to a
+  server action. The client-side part adds the pending state and the error
+  banner on top of something already functional.
+
+- **A refusal is a value, not an exception.** Server actions return the error
+  rather than throwing, so a rejected save shows the reason above the form the
+  person is still looking at, instead of replacing the page and losing what they
+  typed. One helper turns API codes into sentences that say what to do next —
+  `STALE_RECORD` becomes "Somebody else changed this while you were editing",
+  not "That change conflicts with the current state".
+
+- **Which transition buttons appear comes from `PROJECT_TRANSITIONS`** in shared
+  contracts — the same table the API checks. The interface cannot drift into
+  offering a move the server would refuse, because both read one definition.
+
+- **Colour is declared once.** PRD §18 defines the consultancy's palette and we
+  have not been given it; `globals.css` holds a restrained placeholder and no
+  component contains a hex value. When the real palette arrives it is twelve
+  declarations and nothing else. Status is always shown as a word as well as a
+  colour — roughly one man in twelve cannot reliably separate the green from the
+  amber, and status is the most important thing on a project row.
+
+- **Playwright, not request-level tests, for this step.** Forms, redirects,
+  sessions and the interface's own permission decisions only meet each other in
+  a browser. The claim being made is that an administrator can complete every
+  Phase 1 task through one, and nothing short of a browser demonstrates it.
+
+**Bugs found, both by running it:**
+
+- **`/properties?clientId=…` had never worked.** The controller read `clientId`
+  as a separate parameter while validating the whole query string against a
+  **strict** schema that did not include it — so every such request was refused
+  before the handler saw it. Step 5's tests called the service directly and
+  never went through HTTP, so nothing caught it. There is now one schema that
+  knows about the parameter.
+
+- **A rejected query string reported itself as `(body)`.** That sent the
+  diagnosis above off in entirely the wrong direction for several minutes. The
+  validation pipe now names where the value actually came from.
+
+**And one in the tests themselves:** the browser suite passed the first time and
+failed the second. It used fixed accounts, and the first run had added those
+people to a project — so "they are a member of nothing" was no longer true. It
+now creates its own users per run. A test that only passes on a fresh database
+is a test that quietly stops being run.
+
+**Known limits, recorded rather than discovered later:**
+
+- **Lists fetch up to 100 rows and do not page.** Correct at this scale (under
+  50 users, and a portfolio in the hundreds), and the API paginates properly
+  already — this is a screen to add, not a design to revisit. It should be added
+  before the portfolio passes a few hundred projects.
+- **No search-as-you-type.** Search is a form submission. Fewer moving parts,
+  and it works without JavaScript.
+- **A person cannot change their own password.** Only an administrator can set
+  one. Worth adding early in Phase 2.
+
 ## Open — with the client
 
 | #   | Question                                                              | Blocks                                                                   |
@@ -437,10 +549,16 @@ there is invisible to it.
 | 3   | Is anyone placing files into the shared drive by hand?                | Phase 3. Ask early — a "yes" changes the design materially               |
 | 4   | Should a closed project still block archiving its client?             | Nothing. Currently it does. Easy to loosen to "only live projects block" |
 | 5   | May someone be on a project _without_ their full role's rights there? | Nothing yet. Today membership grants their whole role on that project    |
+| 6   | **The PRD §18 palette and §19 UI direction** — we do not have them    | Nothing. A placeholder palette sits in one file; swapping it is 12 lines |
 
 ## Not yet done
 
+**Phase 1 is complete.** Every line of §7's definition of done is demonstrated by
+an automated test, not by inspection.
+
+Carried into Phase 2:
+
 - **The repository has no remote.** Work is committed locally only, so a commit protects against editing mistakes but is not a backup. Nothing is pushed anywhere.
-- User administration in the interface — the CLI (`pnpm user:create`) is the only way to create a user. Becomes a break-glass tool once step 8 lands.
-- User administration through the API — adding someone to a project needs their user id, which today comes from the database or the CLI. Step 8 closes this.
-- Project membership is done. `AuthorizationService.isMemberOf` and `visibleProjectIds` read real rows; the step-4 note about everything denying no longer applies.
+- **No CI yet.** §7 asks for the tests to gate merges. `pnpm verify` and `pnpm e2e` are the two commands a pipeline needs to run; nothing hosts them.
+- **The PRD palette is still a placeholder** (open question 6).
+- **Lists do not page in the interface**, and nobody can change their own password. Both noted under step 8.
