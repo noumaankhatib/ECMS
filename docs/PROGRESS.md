@@ -3,7 +3,9 @@
 Running record of what has been built, what was verified, and what changed along the way.
 Updated at the end of every step.
 
-**Phase 1 — Foundation** (PRD §20): authentication, users, roles, clients, properties, projects.
+**Phase 1 — Foundation** (PRD §20): authentication, users, roles, clients, properties, projects. Complete.
+
+**Phase 2 — Core Operations** (PRD §20): planning, supervision, site visits, observations, instructions and issues. See `docs/phase-2-plan.md`.
 
 | Step | Track point                                            | Status  |
 | ---- | ------------------------------------------------------ | ------- |
@@ -542,23 +544,68 @@ is a test that quietly stops being run.
 
 ## Open — with the client
 
-| #   | Question                                                              | Blocks                                                                   |
-| --- | --------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| 1   | ~~Confirm project stage names~~                                       | **Answered: `Draft → Active → On Hold → Completed → Closed`, built**     |
-| 2   | ~~May a Project Manager add members?~~                                | **Answered: yes — Admin and PM both, PM only on their own projects**     |
-| 3   | Is anyone placing files into the shared drive by hand?                | Phase 3. Ask early — a "yes" changes the design materially               |
-| 4   | Should a closed project still block archiving its client?             | Nothing. Currently it does. Easy to loosen to "only live projects block" |
-| 5   | May someone be on a project _without_ their full role's rights there? | Nothing yet. Today membership grants their whole role on that project    |
-| 6   | **The PRD §18 palette and §19 UI direction** — we do not have them    | Nothing. A placeholder palette sits in one file; swapping it is 12 lines |
+| #   | Question                                                              | Blocks                                                                                 |
+| --- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| 1   | ~~Confirm project stage names~~                                       | **Answered: `Draft → Active → On Hold → Completed → Closed`, built**                   |
+| 2   | ~~May a Project Manager add members?~~                                | **Answered: yes — Admin and PM both, PM only on their own projects**                   |
+| 3   | Is anyone placing files into the shared drive by hand?                | Phase 3. Ask early — a "yes" changes the design materially                             |
+| 4   | Should a closed project still block archiving its client?             | Nothing. Currently it does. Easy to loosen to "only live projects block"               |
+| 5   | May someone be on a project _without_ their full role's rights there? | Nothing yet. Today membership grants their whole role on that project                  |
+| 6   | ~~The PRD §18 palette and §19 UI direction — we do not have them~~    | **Answered: the PRD document was located on disk; the real eight colours are applied** |
 
 ## Not yet done
 
 **Phase 1 is complete.** Every line of §7's definition of done is demonstrated by
-an automated test, not by inspection.
+an automated test, not by inspection. The repository now has a remote
+(`github.com/noumaankhatib/ECMS`) and a CI workflow (`.github/workflows/ci.yml`)
+that runs `pnpm verify` and `pnpm e2e` on every push — it still needs a branch
+protection rule turned on to actually gate merges, which is a repository
+setting rather than something committed to the tree.
 
 Carried into Phase 2:
 
-- **The repository has no remote.** Work is committed locally only, so a commit protects against editing mistakes but is not a backup. Nothing is pushed anywhere.
-- **No CI yet.** §7 asks for the tests to gate merges. `pnpm verify` and `pnpm e2e` are the two commands a pipeline needs to run; nothing hosts them.
-- **The PRD palette is still a placeholder** (open question 6).
+- **CI runs but does not yet gate.** The branch protection rule that makes it
+  required needs the workflow to have run at least once on the remote first.
 - **Lists do not page in the interface**, and nobody can change their own password. Both noted under step 8.
+
+## Mid-session correction
+
+The real PRD document (`Final_PRD_Engineering_Consultancy_Management_System.docx`)
+was on disk in `~/Downloads` the entire time — not in the repository, and not
+noticed before now. Everything written about the PRD's palette, UI direction and
+phase breakdown up to this point was reasoning from
+`docs/architecture-discussion.md`'s **commentary about** the PRD, not the PRD
+itself. That document turns out to be accurate everywhere it was checked, so
+nothing built so far needed correcting — except the palette, which was a stated
+placeholder precisely because the real one was believed unavailable. It is
+believed unavailable no longer; see step 8's revision below and
+`docs/phase-2-plan.md`.
+
+### Step 8, revised — the real PRD §18 palette
+
+`apps/web/src/app/globals.css` now carries the client's actual eight colours
+(Deep Ink Blue `#17324D`, Professional Blue `#2F6FAE`, Soft Blue `#EAF2F8`, and
+the five neutrals) instead of the placeholder blue-and-slate ramp. The swap
+was exactly the twelve declarations promised at the time — plus two new
+tokens, `--nav-bg` and `--nav-text`, because a flat eight-swatch brand palette
+has no entry for "light text on a dark sidebar" and the placeholder ramp had
+been quietly reusing one token (`--slate-900`) for both body text and the
+sidebar background, which the real palette gives two different colours.
+
+Every foreground/background pairing was checked against WCAG AA (4.5:1) before
+being written, not after:
+
+| Pairing                                   | Ratio     |
+| ----------------------------------------- | --------- |
+| Charcoal text on white                    | 7.56 : 1  |
+| Secondary-grey text on white              | 4.83 : 1  |
+| Action-blue link/button text on white     | 5.24 : 1  |
+| White sidebar brand text on Deep Ink Blue | 13.13 : 1 |
+| Border-grey nav text on Deep Ink Blue     | 9.67 : 1  |
+
+The one pairing that failed — the PRD's own Secondary Text grey directly on
+Deep Ink Blue, at 2.72 : 1 — is why `--nav-text` exists rather than reusing
+`--text-muted` for the sidebar's on-dark captions. Verified against the built
+application, not only the stylesheet: screenshotted signed in as an
+administrator and confirmed the sidebar, buttons and status badges render as
+intended.
