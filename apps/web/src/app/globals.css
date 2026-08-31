@@ -2,42 +2,53 @@
  * The whole visual language, in one file.
  *
  * COLOUR IS DECLARED ONCE, in :root below, and referenced by name everywhere
- * else. No component contains a hex value. That is deliberate: PRD §18 defines
- * the consultancy's palette and we have not been given it yet, so the values
- * here are a restrained placeholder. When the real palette arrives it is a
- * change to twelve declarations and nothing else — the same reasoning that put
- * the permission matrix in the database rather than in code.
+ * else. No component contains a hex value. These are PRD §18's exact eight —
+ * this was a placeholder ramp until the real PRD document was located; every
+ * value below is now the one the client specified, not a guess.
  *
- * If you are that person: replace the values under "Brand" and "Status", check
- * the contrast pairs still pass, and you are done.
+ * The variable names keep their original tailwind-style suffixes (--slate-900
+ * and so on) even though the palette is no longer a tailwind ramp — renaming
+ * everywhere it is consumed would be a large, purely cosmetic diff for no
+ * behavioural gain. Read the value, not the name.
+ *
+ * Two roles needed a colour PRD §18 does not give, because a brand palette of
+ * eight flat swatches has no "light text on a dark sidebar" entry: --nav-bg
+ * and --nav-text. Both are still built only from the given eight — --nav-bg
+ * reuses Deep Ink Blue, --nav-text reuses Borders, chosen because it measures
+ * 9.67:1 contrast against Deep Ink Blue (WCAG AA needs 4.5:1). Every other
+ * pairing below was checked the same way before this was written.
  */
 
 :root {
-  /* Brand ------------------------------------------------------------------ */
-  --brand-700: #1d4ed8;
-  --brand-800: #1e40af;
-  --brand-50: #eff6ff;
+  /* Brand — PRD §18. ------------------------------------------------------- */
+  --brand-700: #2f6fae; /* Primary Action Blue */
+  --brand-800: #17324d; /* Deep Ink Blue, reused as the pressed/hover shade */
+  --brand-50: #eaf2f8; /* Soft Blue — selected and informational emphasis, §19 */
 
-  /* Neutrals --------------------------------------------------------------- */
-  --slate-900: #0f172a;
-  --slate-700: #334155;
-  --slate-600: #475569;
-  --slate-400: #94a3b8;
-  --slate-200: #e2e8f0;
-  --slate-100: #f1f5f9;
-  --slate-50: #f8fafc;
-  --white: #ffffff;
+  /* Neutrals — PRD §18, plus the two on-dark exceptions above. ------------- */
+  --slate-900: #4b5563; /* Primary Text (charcoal) */
+  --slate-600: #6b7280; /* Secondary Text (slate grey) */
+  --slate-400: #94a3b8; /* Not in §18 — faint placeholder glyphs on light surfaces only */
+  --slate-200: #d7dee5; /* Borders */
+  --slate-100: #f3f5f7; /* Page Background, reused as a light-surface hover tint */
+  --slate-50: #f3f5f7; /* Page Background */
+  --white: #ffffff; /* Main Surface */
+
+  --nav-bg: #17324d; /* Deep Ink Blue — primary navigation, §19 */
+  --nav-text: #d7dee5; /* Borders, reused: light enough to read on --nav-bg */
 
   /* Status — the five project states.
    *
-   * These carry meaning, so they are never the only signal: every status is
-   * shown as a word as well as a colour. Roughly eight percent of men cannot
-   * reliably separate the green from the amber. */
-  --status-draft: #64748b;
+   * §18/§19 give no status colours; the PRD is silent here, so these are an
+   * engineering choice, not a client one. They carry meaning, so they are
+   * never the only signal: every status is shown as a word as well as a
+   * colour. Roughly eight percent of men cannot reliably separate the green
+   * from the amber. */
+  --status-draft: #6b7280;
   --status-active: #047857;
   --status-hold: #b45309;
-  --status-complete: #1d4ed8;
-  --status-closed: #334155;
+  --status-complete: #2f6fae;
+  --status-closed: #17324d;
 
   --danger: #b91c1c;
   --danger-bg: #fef2f2;
@@ -136,8 +147,8 @@ a:hover {
 }
 
 .sidebar {
-  background: var(--slate-900);
-  color: var(--slate-200);
+  background: var(--nav-bg);
+  color: var(--nav-text);
   padding: var(--space-5) var(--space-4);
   display: flex;
   flex-direction: column;
@@ -154,7 +165,7 @@ a:hover {
   display: block;
   font-size: 11px;
   font-weight: 400;
-  color: var(--slate-400);
+  color: var(--nav-text);
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
@@ -165,7 +176,7 @@ a:hover {
   gap: 2px;
 }
 .nav a {
-  color: var(--slate-200);
+  color: var(--nav-text);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   font-size: 14px;
@@ -183,13 +194,13 @@ a:hover {
 .sidebar__footer {
   margin-top: auto;
   font-size: 12px;
-  color: var(--slate-400);
+  color: var(--nav-text);
   border-top: 1px solid rgb(255 255 255 / 10%);
   padding-top: var(--space-4);
 }
 .sidebar__footer strong {
   display: block;
-  color: var(--slate-200);
+  color: var(--white);
   font-weight: 500;
   font-size: 13px;
 }
