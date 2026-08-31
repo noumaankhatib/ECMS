@@ -15,11 +15,13 @@ import { expect, test, type Page } from '@playwright/test';
  * its address.
  */
 
-const PASSWORD = 'correct-horse-battery';
-
 /**
- * The administrator is the only account this suite expects to already exist —
- * `pnpm run bootstrap` creates one on a fresh machine.
+ * The administrator is the only account this suite expects to already exist.
+ * Locally that is whatever `pnpm run bootstrap` created; in CI the workflow
+ * creates one with these same values before this suite runs. Reading them from
+ * the environment, rather than writing the same string in both places, is
+ * what stops the two from silently drifting apart — the workflow is the one
+ * place either value is decided.
  *
  * Everyone else is created BY the suite, per run. An earlier version reused
  * fixed accounts and passed only once: the second run found the "member of
@@ -27,7 +29,8 @@ const PASSWORD = 'correct-horse-battery';
  * that their list was empty was suddenly false. A test that depends on the
  * database being fresh is a test that quietly stops being run.
  */
-const ADMIN = 'ada@ecms.local';
+const ADMIN = process.env['E2E_ADMIN_EMAIL'] ?? 'ada@ecms.local';
+const PASSWORD = process.env['E2E_ADMIN_PASSWORD'] ?? 'correct-horse-battery';
 
 /** Distinct per run, so repeated runs do not collide on unique references. */
 const tag = Math.random().toString(36).slice(2, 8).toUpperCase();

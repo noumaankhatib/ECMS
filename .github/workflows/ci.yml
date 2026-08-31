@@ -1,0 +1,128 @@
+name: CI
+
+# Every push and every pull request. This is the check a branch protection
+# rule points at to gate merges into main — see docs/phase-1-plan.md §7,
+# "Integration tests run in CI and gate merges." Nothing enforces that on its
+# own; a repository setting has to name this workflow as required. Recorded in
+# docs/PROGRESS.md until that setting exists.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push to the same branch supersedes the run already in flight, rather
+# than queuing behind it.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # DATABASE_URL and MIGRATION_DATABASE_URL match .env.example exactly.
+    # These are the same local-development defaults that live in that
+    # committed file and in docker/postgres/init.sql — not a secret, and
+    # deliberately not one: this account can be created on any machine from
+    # the repository alone.
+    env:
+      DATABASE_URL: postgresql://ecms_app:ecms_local_password@localhost:5432/ecms
+      MIGRATION_DATABASE_URL: postgresql://ecms_owner:ecms_local_password@localhost:5432/ecms
+      API_URL: http://localhost:3001
+      # Read by apps/web/tests/e2e/phase-1.spec.ts. Set once here rather than
+      # written again inside the spec, so the account the workflow creates
+      # below and the one the suite signs in as cannot drift apart.
+      E2E_ADMIN_EMAIL: ci-admin@ecms.local
+      E2E_ADMIN_PASSWORD: a-perfectly-fine-ci-password
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the pinned version from package.json's "packageManager" field,
+      # so the runner uses the exact pnpm this repository was built against
+      # rather than whatever "latest" happens to mean that day.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # --frozen-lockfile: CI verifies the committed lockfile is honoured, and
+      # refuses rather than silently updating it. The bootstrap script relaxes
+      # this for a human on a local machine; CI is not that case.
+      - run: pnpm install --frozen-lockfile
+
+      # The database container is built from docker/postgres, not pulled as a
+      # plain image — it is what creates the two-account privilege model
+      # (ecms_owner / ecms_app) that PRD §10 and §14 depend on. That rules out
+      # a GitHub Actions `services:` entry, which only pulls images; it cannot
+      # run our Dockerfile's init script.
+      - name: Start the database
+        run: pnpm run db:up
+
+      - name: Wait for the database to be healthy
+        run: |
+          for i in $(seq 1 60); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' ecms-postgres 2>/dev/null || true)
+            if [ "$status" = "healthy" ]; then
+              echo "Database is healthy."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Database did not become healthy within 120 seconds." >&2
+          exit 1
+
+      - run: pnpm run db:deploy
+
+      # There is no postinstall hook that does this, so it is explicit here.
+      # Without it, typecheck fails on a fresh checkout with errors that look
+      # nothing like a missing Prisma client — confirmed by running this
+      # workflow's steps against an empty checkout before committing it.
+      - run: pnpm run db:generate
+
+      # Format, lint, typecheck (both apps), then the 71 API integration
+      # tests. Everything here runs against the real database — no mocked
+      # Prisma — because the behaviour under test is a database privilege and
+      # a transaction boundary, neither of which a mock can prove.
+      - run: pnpm run verify
+
+      # The browser suite expects one administrator to already exist, the
+      # way a real machine would have one from `pnpm run bootstrap`. Built
+      # explicitly rather than relying on typecheck's incidental emit, so this
+      # step keeps working even if `tsc -b` is ever changed to --noEmit.
+      #
+      # Caught by running this workflow's steps against an empty checkout
+      # before committing it: without this step, the first browser test fails
+      # trying to sign in as an account that was never created.
+      - run: pnpm --filter @ecms/api run build
+      - name: Create the first administrator
+        run: |
+          node apps/api/dist/tools/create-user.js             "$E2E_ADMIN_EMAIL" "CI Administrator" "$E2E_ADMIN_PASSWORD" SYSTEM_ADMINISTRATOR
+
+      # The browser used by the 12 end-to-end tests. Installed with its
+      # system dependencies, which a bare runner does not have.
+      - run: pnpm --filter @ecms/web exec playwright install --with-deps chromium
+
+      # Builds both applications, starts them, runs the browser suite against
+      # them, and shuts them down again — the same command a developer runs
+      # locally, so CI cannot drift into checking something different.
+      - run: pnpm run e2e
+
+      # Kept only on failure. A trace of what the browser actually saw is
+      # worth far more than the assertion that failed.
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 7
+
+      - name: Stop the database
+        if: always()
+        run: pnpm run db:down
