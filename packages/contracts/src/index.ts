@@ -700,3 +700,174 @@ export const submissionTransitionSchema = z
   .strict();
 
 export type SubmissionTransition = z.infer<typeof submissionTransitionSchema>;
+
+// ---------------------------------------------------------------------------
+// Supervision — site visits, observations and instructions
+//
+// docs/phase-2-plan.md §4. None of the three carries a status: PRD §6 gives
+// observations and instructions no lifecycle of its own ("assign owners and
+// due dates" is closer to a simple task than a workflow), and a site visit is
+// simply a fact once it has happened. None is archived either, for the same
+// reason Submission is not — there is nothing to hide a historical record
+// from. `supervisionListQuerySchema` therefore drops `includeArchived`, the
+// one field of `listQuerySchema` that would have nothing to filter on.
+// ---------------------------------------------------------------------------
+
+export const supervisionListQuerySchema = z
+  .object({
+    search: z.string().trim().max(200).optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  })
+  .strict();
+
+export type SupervisionListQuery = z.infer<typeof supervisionListQuerySchema>;
+
+export const createSiteVisitSchema = z
+  .object({
+    visitDate: z.coerce.date(),
+    attendees: optionalText(2000),
+    notes: optionalText(5000),
+  })
+  .strict();
+
+export type CreateSiteVisit = z.infer<typeof createSiteVisitSchema>;
+
+export const updateSiteVisitSchema = createSiteVisitSchema.partial().extend({
+  version: z.number().int().min(1),
+});
+
+export type UpdateSiteVisit = z.infer<typeof updateSiteVisitSchema>;
+
+export const createObservationSchema = z
+  .object({
+    description: z.string().trim().min(1, 'A description is required').max(5000),
+    category: optionalText(100),
+  })
+  .strict();
+
+export type CreateObservation = z.infer<typeof createObservationSchema>;
+
+export const updateObservationSchema = createObservationSchema.partial().extend({
+  version: z.number().int().min(1),
+});
+
+export type UpdateObservation = z.infer<typeof updateObservationSchema>;
+
+export const createInstructionSchema = z
+  .object({
+    directiveText: z.string().trim().min(1, 'Directive text is required').max(5000),
+    assigneeId: z.string().uuid().nullish(),
+    dueDate: optionalDate,
+  })
+  .strict();
+
+export type CreateInstruction = z.infer<typeof createInstructionSchema>;
+
+export const updateInstructionSchema = createInstructionSchema.partial().extend({
+  /** Set once, when the instruction has been carried out — a completion mark,
+   *  not a status, the same treatment `Milestone.achievedDate` gets. */
+  actionedAt: optionalDate,
+  version: z.number().int().min(1),
+});
+
+export type UpdateInstruction = z.infer<typeof updateInstructionSchema>;
+
+// ---------------------------------------------------------------------------
+// Issues — the fourth state machine in the system (phase-1-plan.md §5a).
+//
+// docs/phase-2-plan.md §4-§5. An issue is optionally raised from an
+// observation, carries severity and priority as catalogues rather than fixed
+// enums, and moves Open → In Progress → Resolved → Closed, with reopening
+// from either Resolved or Closed recorded back to Open.
+// ---------------------------------------------------------------------------
+
+export const ISSUE_STATUSES = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'] as const;
+export type IssueStatus = (typeof ISSUE_STATUSES)[number];
+
+/**
+ * Not archived — same reasoning as `supervisionListQuerySchema` — but an
+ * issue does have a status worth filtering a list by, which neither
+ * supervision entity does.
+ */
+export const issueListQuerySchema = z
+  .object({
+    search: z.string().trim().max(200).optional(),
+    status: z.enum(ISSUE_STATUSES).optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  })
+  .strict();
+
+export type IssueListQuery = z.infer<typeof issueListQuerySchema>;
+
+export const ISSUE_SEVERITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
+export type IssueSeverity = (typeof ISSUE_SEVERITIES)[number];
+
+export const ISSUE_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH'] as const;
+export type IssuePriority = (typeof ISSUE_PRIORITIES)[number];
+
+export const ISSUE_TRANSITIONS = {
+  OPEN: ['IN_PROGRESS'],
+  IN_PROGRESS: ['RESOLVED'],
+  RESOLVED: ['CLOSED', 'OPEN'],
+  CLOSED: ['OPEN'],
+} as const satisfies Record<IssueStatus, readonly IssueStatus[]>;
+
+/**
+ * The named actions a caller may take, and where each one leads — the same
+ * shape `PROJECT_ACTIONS` uses, and for the same reason: there is no generic
+ * "set status" operation for any of the four state machines in this system.
+ * `reopen` covers both starting points ISSUE_TRANSITIONS already allows.
+ */
+export const ISSUE_ACTIONS = {
+  start: 'IN_PROGRESS',
+  resolve: 'RESOLVED',
+  close: 'CLOSED',
+  reopen: 'OPEN',
+} as const satisfies Record<string, IssueStatus>;
+
+export type IssueAction = keyof typeof ISSUE_ACTIONS;
+
+export const ISSUE_ACTION_NAMES = Object.keys(ISSUE_ACTIONS) as readonly IssueAction[];
+
+export function canTransitionIssue(from: IssueStatus, to: IssueStatus): boolean {
+  return (ISSUE_TRANSITIONS[from] as readonly IssueStatus[]).includes(to);
+}
+
+export const createIssueSchema = z
+  .object({
+    title: z.string().trim().min(1, 'A title is required').max(200),
+    description: optionalText(5000),
+    /** Set once, at creation — the same treatment `Property.clientId` gets;
+     *  an issue does not move to a different observation afterward. */
+    observationId: z.string().uuid().nullish(),
+    severity: z.enum(ISSUE_SEVERITIES).default('MEDIUM'),
+    priority: z.enum(ISSUE_PRIORITIES).default('MEDIUM'),
+    ownerId: z.string().uuid().nullish(),
+    dueDate: optionalDate,
+  })
+  .strict();
+
+export type CreateIssue = z.infer<typeof createIssueSchema>;
+
+export const updateIssueSchema = createIssueSchema
+  .omit({ observationId: true })
+  .partial()
+  .extend({
+    /** Closure evidence (PRD §6). Free text, editable independently of the
+     *  close transition — not required to close, and not tied to it. */
+    closureNotes: optionalText(5000),
+    version: z.number().int().min(1),
+  });
+
+export type UpdateIssue = z.infer<typeof updateIssueSchema>;
+
+export const issueTransitionSchema = z
+  .object({
+    version: z.number().int().min(1),
+    reason: optionalText(1000),
+  })
+  .strict();
+
+export type IssueTransition = z.infer<typeof issueTransitionSchema>;

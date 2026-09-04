@@ -349,6 +349,132 @@ model Submission {
   @@map("submission")
 }
 
+/// A recorded site visit (PRD §6, "Supervision Workflow"). Not archived and
+/// never deleted — a visit that happened is simply a fact from here on, the
+/// same posture Submission takes and for the same reason: there is nothing to
+/// hide it from once it exists.
+model SiteVisit {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  visitDate DateTime @map("visit_date") @db.Date
+  attendees String?  @db.Text
+  notes     String?  @db.Text
+
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+
+  observations Observation[]
+  instructions Instruction[]
+
+  @@index([projectId])
+  @@map("site_visit")
+}
+
+/// Something seen on a site visit. PRD §6 gives this no lifecycle of its own —
+/// it is a record, not a task. An Issue (below) is what an observation turns
+/// into when it needs to be tracked to closure.
+model Observation {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  siteVisitId String    @map("site_visit_id") @db.Uuid
+  siteVisit   SiteVisit @relation(fields: [siteVisitId], references: [id], onDelete: Restrict)
+
+  description String  @db.Text
+  category    String? @db.VarChar(100)
+
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+
+  issues Issue[]
+
+  @@index([siteVisitId])
+  @@map("observation")
+}
+
+/// A directive given on a site visit, with an owner and a due date (PRD §6).
+/// `actionedAt` is a completion mark, not a status column — the same
+/// treatment `Milestone.achievedDate` gives "reached": either it has
+/// happened or it has not, and that is the whole state.
+model Instruction {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  siteVisitId String    @map("site_visit_id") @db.Uuid
+  siteVisit   SiteVisit @relation(fields: [siteVisitId], references: [id], onDelete: Restrict)
+
+  directiveText String  @map("directive_text") @db.Text
+  /// No foreign key to user, deliberately — the same reasoning as
+  /// PlanningActivity.assigneeId.
+  assigneeId    String? @map("assignee_id") @db.Uuid
+  dueDate       DateTime? @map("due_date") @db.Date
+  actionedAt    DateTime? @map("actioned_at") @db.Timestamptz(6)
+
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+
+  @@index([siteVisitId])
+  @@map("instruction")
+}
+
+/// The fourth state machine in the system (phase-1-plan.md §5a), and the
+/// third of Phase 2's three modules. Optionally raised from an Observation —
+/// that is how something seen on a visit becomes something tracked to
+/// resolution — but an issue does not require one; PRD §6's "Site Visits and
+/// Issues" section treats Issue as its own entity.
+model Issue {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  observationId String?      @map("observation_id") @db.Uuid
+  observation   Observation? @relation(fields: [observationId], references: [id], onDelete: Restrict)
+
+  title       String  @db.VarChar(200)
+  description String? @db.Text
+
+  /// LOW, MEDIUM, HIGH or CRITICAL (docs/phase-2-plan.md §5) — a catalogue,
+  /// not a fixed set; adding a fifth is a migration, not a rewrite.
+  severity String @default("MEDIUM") @db.VarChar(20)
+  /// LOW, MEDIUM or HIGH. No SLA is enforced against it — escalation is a
+  /// notification, and notifications are Phase 5.
+  priority String @default("MEDIUM") @db.VarChar(20)
+
+  /// No foreign key to user, deliberately — the same reasoning as
+  /// PlanningActivity.assigneeId.
+  ownerId String?   @map("owner_id") @db.Uuid
+  dueDate DateTime? @map("due_date") @db.Date
+
+  /// OPEN, IN_PROGRESS, RESOLVED or CLOSED. Moves only through a named
+  /// action, never a direct field write — the same rule as every status
+  /// column in this system.
+  status String @default("OPEN") @db.VarChar(20)
+  /// Closure evidence (PRD §6). Not required to close — a title-only issue
+  /// closed with no notes is unusual, not invalid (docs/phase-2-plan.md §5).
+  closureNotes String? @map("closure_notes") @db.Text
+
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+
+  @@index([projectId, status])
+  @@index([observationId])
+  @@map("issue")
+}
+
 /// A piece of work for a client, at a property (PRD §4).
 ///
 /// The project is the unit of authorization for the whole system. Every
@@ -400,6 +526,8 @@ model Project {
   planningActivities PlanningActivity[]
   milestones         Milestone[]
   submissions        Submission[]
+  siteVisits         SiteVisit[]
+  issues             Issue[]
 
   @@index([clientId])
   @@index([propertyId])

@@ -3,8 +3,10 @@ import { Module, type MiddlewareConsumer, type NestModule } from '@nestjs/common
 import { AccessModule } from './modules/access';
 import { AuditModule } from './modules/audit';
 import { DirectoryModule } from './modules/directory';
+import { IssuesModule } from './modules/issues';
 import { PlanningModule } from './modules/planning';
 import { ProjectsModule } from './modules/projects';
+import { SupervisionModule } from './modules/supervision';
 import { DatabaseModule } from './shared/database/database.module';
 import { HealthController } from './shared/http/health.controller';
 import { HttpLoggerMiddleware } from './shared/http/http-logger.middleware';
@@ -20,6 +22,8 @@ import { LOGGER } from './shared/logging/logger.token';
     DirectoryModule,
     ProjectsModule,
     PlanningModule,
+    SupervisionModule,
+    IssuesModule,
   ],
   controllers: [HealthController],
   providers: [HttpLoggerMiddleware, { provide: LOGGER, useFactory: (): Logger => createLogger() }],

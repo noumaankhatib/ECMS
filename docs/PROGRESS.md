@@ -19,9 +19,9 @@ Updated at the end of every step.
 | 7    | Environment setup script                               | ✅ Done |
 | 8    | Web interface                                          | ✅ Done |
 | 9    | Planning — activities, milestones, submissions         | ✅ Done |
-| 10   | Supervision — site visits, observations, instructions  | ⬜ Next |
-| 11   | Issues — the fourth state machine                      | ⬜      |
-| 12   | Web interface for Phase 2                              | ⬜      |
+| 10   | Supervision — site visits, observations, instructions  | ✅ Done |
+| 11   | Issues — the fourth state machine                      | ✅ Done |
+| 12   | Web interface for Phase 2                              | ⬜ Next |
 
 ---
 
@@ -694,3 +694,165 @@ caused by anything in this repository. Restarting it needed a password only
 the user has, which the sandbox does not. Recorded because it is exactly the
 kind of interruption `scripts/setup.mjs`'s Docker check (step 7) exists to
 give a clear message for, rather than an obscure connection-refused error.
+
+---
+
+## Step 10 — Supervision: site visits, observations, instructions ✅
+
+The second of Phase 2's three modules (`docs/phase-2-plan.md`). Unlike
+planning's activities and milestones, none of the three entities here is
+archived, and none carries a status column at all — PRD §6 gives observations
+and instructions no lifecycle of their own, and a site visit is simply a fact
+once it has happened. The one structural difference from every module so far:
+observations and instructions are reached through a site visit, not the
+project directly, so they are the first records in the system checked against
+**two** levels of nesting.
+
+**Built:** `site_visit`, `observation` and `instruction` tables; list/create/
+edit for site visits (belonging to a project); list/create/edit for
+observations and instructions (belonging to a site visit). The Phase 2
+permission catalogue needed no changes — `supervision:view/create/edit` was
+already seeded in step 9's migration, ahead of this module, the same approach
+step 4 used for the whole Phase 1 matrix.
+
+**Endpoints:** `/projects/:projectId/supervision/site-visits`,
+`.../site-visits/:siteVisitId/observations`,
+`.../site-visits/:siteVisitId/instructions`.
+
+**Verified — 10 tests, all against the real database:**
+
+| Behaviour                                                               | Result                  |
+| ----------------------------------------------------------------------- | ----------------------- |
+| A non-member holds neither `supervision:view` nor `supervision:create`  | ✅                      |
+| The project member holds both                                           | ✅                      |
+| Create, list and edit a site visit                                      | ✅                      |
+| A stale edit to a site visit is refused                                 | ✅ `STALE_RECORD`       |
+| A site visit reached through the **wrong project** in the URL           | ✅ `NOT_FOUND`          |
+| Create and list an observation on a site visit                          | ✅                      |
+| An observation reached through a site visit from the **wrong project**  | ✅ `NOT_FOUND`          |
+| An instruction is marked actioned by setting `actionedAt`, not a status | ✅                      |
+| Creating an instruction is audited                                      | ✅                      |
+| **No supervision record can be created on a closed project**            | ✅ `ILLEGAL_TRANSITION` |
+
+**Decisions:**
+
+- **No `archived_at` on any of the three tables, and no archive endpoint.**
+  PRD §6 gives none of them a reason to be hidden — a completed site visit is
+  a historical record the same way a closed project is, not a task that gets
+  tidied away. This is a deliberate difference from planning's activities and
+  milestones, which are archived because they behave like a to-do list.
+- **`instruction.actionedAt` is set through the normal edit endpoint**,
+  exactly the treatment `Milestone.achievedDate` got in step 9 — a date is
+  either present or it is not, and that is the whole state, so a dedicated
+  "action" route would be a transition table for something that isn't a
+  transition.
+- **Observations and instructions are checked against two levels of
+  nesting**, not one: `requireSiteVisit` confirms the site visit named in the
+  URL belongs to the project also named in the URL, and each service then
+  confirms the observation or instruction belongs to that site visit. This is
+  the same shape of bug step 6 found and fixed for workstreams — a nested
+  route can reach into the wrong parent if only one level is checked — applied
+  here before it had the chance to appear rather than after.
+- **`requireOpenProject` is duplicated from the planning module, not
+  imported.** A module may only reach into another module's `index`, and this
+  helper is deliberately not part of either module's public surface — the
+  same module-boundary discipline step 0 built CI around.
+- **`supervisionListQuerySchema` drops `includeArchived`** rather than reusing
+  `listQuerySchema`, because none of these three tables has anything for that
+  field to filter. Sending a query parameter with nothing behind it would
+  have been a silently-ignored option, not a real one.
+
+**Known limit, recorded rather than discovered later:** an observation has no
+link forward to the issue it may turn into — PRD §6's "record observations and
+instructions" and the separate "Site Visits and Issues" section describe
+Issue as its own entity, and step 11 will decide whether `Issue.observationId`
+is worth adding as an optional reference. Nothing here forecloses it; the
+column simply does not exist yet.
+
+---
+
+## Step 11 — Issues: the fourth state machine ✅
+
+The third and last of Phase 2's three modules, and the one named directly in
+`phase-1-plan.md` §5a alongside Project, Approval and Drawing revision. It
+resolved step 10's open item: `Issue.observationId` is a real, optional
+foreign key, so something seen on a site visit can be tracked forward to
+closure without a rewrite of either module.
+
+**Built:** `issue` table; list/create/edit; the four named transitions
+(`start`, `resolve`, `close`, `reopen`) enforced the same three-layer way
+`ProjectService.transition` established in step 6 — a named action, a
+transition table, and a write conditional on the state actually still being
+what was read. No permission or migration work was needed for the catalogue;
+`issue:view/create/edit/close` was seeded in step 9, three steps ahead of this
+module, the same pattern used throughout Phase 1 and 2.
+
+**Endpoints:** `/projects/:projectId/issues`,
+`.../issues/:id/{start,resolve,close,reopen}`.
+
+**Verified — 15 tests, all against the real database:**
+
+| Behaviour                                                                 | Result                  |
+| ------------------------------------------------------------------------- | ----------------------- |
+| A non-member holds neither `issue:view` nor `issue:create`                | ✅                      |
+| The project member holds `view`, `create` **and `close`**                 | ✅                      |
+| The Director holds `view` only, no `create` or `close`                    | ✅                      |
+| An issue is created at `OPEN` with the seeded default severity/priority   | ✅                      |
+| An issue is created carrying an observation from the **same** project     | ✅                      |
+| An issue pointed at an observation from **another** project is refused    | ✅ `CONFLICT`           |
+| A stale edit to an issue is refused                                       | ✅ `STALE_RECORD`       |
+| An issue reached through the **wrong project** in the URL                 | ✅ `NOT_FOUND`          |
+| The full walk: `Open → In Progress → Resolved → Closed → Open` (reopened) | ✅                      |
+| Reopening **directly from Resolved**, skipping Closed                     | ✅                      |
+| Skipping straight from `Open` to `Resolved` is refused                    | ✅ `ILLEGAL_TRANSITION` |
+| The refused transition is recorded, not only the ones that happened       | ✅                      |
+| A transition made from a stale version is refused                         | ✅ `STALE_RECORD`       |
+| **No issue can be created on a closed project**                           | ✅ `ILLEGAL_TRANSITION` |
+| Every seeded issue permission exists in the shared catalogue              | ✅                      |
+
+**Decisions:**
+
+- **`issue:close` guards exactly the `close` route, nothing else.** `start`,
+  `resolve` and `reopen` all sit behind `issue:edit`. This is the identical
+  split `project:close` already established in step 6 — PRD §3 names issue
+  closure as Supervision Team's specific responsibility, separate from
+  general editing, and the seeded matrix (step 9) already gives Project
+  Manager and Supervision Team both permissions together, so the split has no
+  observable effect yet but is the correct shape for the day a role holds one
+  without the other.
+- **`Issue.observationId` is a real foreign key, checked against the project
+  in the URL at create time** — not merely stored. An observation belongs to
+  a site visit, which belongs to a project; accepting an observation id
+  without checking its project would let a caller raise an issue against one
+  project while quietly linking evidence from another's site work. Refused
+  with `CONFLICT`, the same code `Property`/`Client` mismatches use in
+  step 6, because this is the same shape of problem: a reference that exists,
+  just not where the caller claimed.
+- **Severity and priority default to `MEDIUM`** rather than being required
+  choices, per `phase-2-plan.md` §5's "starts permissive" rule — nothing
+  forces a caller to classify urgency before a record can exist at all.
+  Both are still database `CHECK` constraints against the catalogue, the
+  same discipline every status-shaped column in this system gets.
+- **`closureNotes` is an ordinary field, set through the normal edit
+  endpoint, not through the `close` transition.** PRD §6 does not require
+  closure evidence to close an issue, so tying the two together would make a
+  transition responsible for validating content it does not need to. The
+  transition's own `reason` field (mirroring `ProjectTransition`) covers the
+  ad hoc "why this move, right now" case; `closureNotes` is the durable
+  record on the issue itself.
+- **`requireOpenProject` is duplicated a third time**, in this module too.
+  Three copies of an eight-line function is the price module-boundary
+  enforcement charges for not letting modules share internals — paid
+  knowingly, the same trade step 10 already made explicit.
+
+**Bug caught while writing the tests, not the code:** the first version of
+the stale-version test called the same named action (`start`) twice in a row
+to simulate two callers racing. The second call legitimately hit
+`ILLEGAL_TRANSITION` instead of `STALE_RECORD`, because by the time it ran the
+issue's real status had already moved to `IN_PROGRESS` — `start`'s own target
+is no longer reachable from there, regardless of which version was named. The
+transition check reads status fresh, not the version the caller last saw, so
+a repeated action and a genuinely stale write are different failures and need
+different actions to tell them apart: the fixed test races `start` against
+`resolve`, which is legal from the fresh state, so the conflict it hits is the
+version check, not the transition table.
