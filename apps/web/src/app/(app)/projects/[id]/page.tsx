@@ -135,6 +135,26 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         </div>
       ) : null}
 
+      <div className="row" style={{ marginBottom: 'var(--space-4)' }}>
+        {(project.type === 'PLANNING' || project.type === 'BOTH') &&
+        session.can('planning:view', id) ? (
+          <Link href={`/projects/${id}/planning`} className="button button--secondary">
+            Planning
+          </Link>
+        ) : null}
+        {(project.type === 'SUPERVISION' || project.type === 'BOTH') &&
+        session.can('supervision:view', id) ? (
+          <Link href={`/projects/${id}/supervision`} className="button button--secondary">
+            Supervision
+          </Link>
+        ) : null}
+        {session.can('issue:view', id) ? (
+          <Link href={`/projects/${id}/issues`} className="button button--secondary">
+            Issues
+          </Link>
+        ) : null}
+      </div>
+
       <div className="grid-2">
         <div className="stack">
           {available.length > 0 ? (

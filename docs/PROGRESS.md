@@ -21,7 +21,7 @@ Updated at the end of every step.
 | 9    | Planning — activities, milestones, submissions         | ✅ Done |
 | 10   | Supervision — site visits, observations, instructions  | ✅ Done |
 | 11   | Issues — the fourth state machine                      | ✅ Done |
-| 12   | Web interface for Phase 2                              | ⬜ Next |
+| 12   | Web interface for Phase 2                              | ✅ Done |
 
 ---
 
@@ -856,3 +856,88 @@ a repeated action and a genuinely stale write are different failures and need
 different actions to tell them apart: the fixed test races `start` against
 `resolve`, which is legal from the fresh state, so the conflict it hits is the
 version check, not the transition table.
+
+---
+
+## Step 12 — Web interface for Phase 2 ✅
+
+The last step of Phase 2, and the one that makes planning, supervision and
+issues usable by somebody who is not holding a terminal — the same role
+step 8 played for Phase 1.
+
+**Built:** nested routes under a project for all three modules —
+`/projects/:id/planning` (activities, milestones and submissions, one page,
+three cards — the same shape the project page already gives workstreams and
+team membership), `/projects/:id/supervision` and its site-visit detail page
+(`/projects/:id/supervision/:siteVisitId`, with observations and
+instructions), and `/projects/:id/issues` with its own detail
+(`/projects/:id/issues/:issueId`) and create (`/projects/:id/issues/new`)
+pages. A "Raise issue" link on each observation row carries its id into the
+issue-creation form via a query parameter, so an issue can be raised from the
+exact observation it was looking at without a picker that would need every
+observation across the project fetched up front.
+
+**Verified — 18 browser tests, all passing together (12 from Phase 1, 6 new for Phase 2):**
+
+| Behaviour                                                                     | Result |
+| ----------------------------------------------------------------------------- | ------ |
+| The three Phase 2 links appear on a project of type `BOTH`                    | ✅     |
+| An activity is created, listed, and marked done                               | ✅     |
+| A milestone is created and marked reached                                     | ✅     |
+| A submission is created and moved `DRAFT → SUBMITTED`                         | ✅     |
+| A site visit, an observation and an instruction are recorded                  | ✅     |
+| An instruction is marked actioned                                             | ✅     |
+| An issue is raised from an observation, carrying the link                     | ✅     |
+| The issue walks `Open → In Progress → Resolved → Closed → Open` (reopened)    | ✅     |
+| **A non-member gets nothing for planning, supervision or issues** — HTTP ≥400 | ✅     |
+| No unexpected refusal banner appeared along the way                           | ✅     |
+
+**Decisions:**
+
+- **Planning gets one page for three entities; supervision and issues get
+  detail pages of their own.** The difference is not arbitrary: an activity,
+  a milestone and a submission are each fully described by one table row plus
+  an inline action, the same treatment `Workstream` got in step 8. A site
+  visit and an issue both own children or enough fields to need a page — the
+  same reasoning that gave `Project` a detail page and `Workstream` only a
+  table row, applied one level down.
+- **No dedicated edit page for any Phase 2 entity.** `docs/phase-2-plan.md`
+  §7 asks for "list/detail/create" screens, not "list/detail/create/edit" —
+  and every Phase 2 entity's mutable state turns out to be either a targeted
+  action (mark done, mark reached, mark actioned, a named transition) or, for
+  Issue specifically, a small set of fields (severity, priority, owner, due
+  date, closure notes) folded into the detail page rather than a fourth
+  screen. This is a deliberate, narrower shape than Phase 1's full CRUD
+  pages, not an oversight — Phase 2's records are workflow-driven, not
+  freely-editable documents.
+- **`closureNotes` and the other editable issue fields share one form on the
+  issue's own detail page**, next to the transition buttons, rather than a
+  `/edit` route. Both are "the same page, different concerns" — status moves
+  through actions, everything else through one small form — matching how the
+  project page already puts transitions and team management side by side
+  without pretending they are one feature.
+
+**Bug found and fixed, by running it rather than reading it:** the Planning
+page places three separate create forms on one screen — the first time in
+this codebase two forms on the same page have used a field called `name`.
+`Field`'s `id` is derived directly from its `name` prop, so the activity
+form's "Name" input and the milestone form's "Name" input both rendered
+`id="name"` — invalid HTML, and it broke label association badly enough that
+the accessible name computed for one of the two inputs came out as "Name
+Name" and the other as nothing at all. Neither `tsc` nor `eslint` has any way
+to catch a duplicate DOM id; only opening the page and driving it with
+Playwright surfaced it. Fixed by naming the second field `milestoneName` — a
+reminder that any page combining more than one simple create form needs its
+field names checked for collisions, not just its logic.
+
+**Known limits, recorded rather than discovered later:**
+
+- **No picker for linking an issue to an observation from the issue-creation
+  screen directly** — only the one-click path from the observation's own row.
+  Deliberate for now: a full picker would need every observation across the
+  project fetched up front (there is no "all observations for a project"
+  endpoint, only "observations for a site visit"), for a feature the PRD
+  treats as occasional, not routine.
+- **Lists on these new pages fetch up to 100 rows and do not page**, the same
+  known limit step 8 recorded for Phase 1's lists, now true of six more of
+  them.

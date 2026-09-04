@@ -6,7 +6,16 @@
  * drift. These are the response shapes, which the API derives from the database
  * and this application only reads.
  */
-import type { ProjectStatus, ProjectType, Role, UserStatus } from '@ecms/contracts';
+import type {
+  IssuePriority,
+  IssueSeverity,
+  IssueStatus,
+  ProjectStatus,
+  ProjectType,
+  Role,
+  SubmissionStatus,
+  UserStatus,
+} from '@ecms/contracts';
 
 export interface Page<T> {
   items: T[];
@@ -92,5 +101,88 @@ export interface UserRow {
   displayName: string;
   status: UserStatus;
   roles: Role[];
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2 — planning, supervision, issues
+// ---------------------------------------------------------------------------
+
+export interface PlanningActivity {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string | null;
+  assigneeId: string | null;
+  dueDate: string | null;
+  done: boolean;
+  version: number;
+  archivedAt: string | null;
+}
+
+export interface Milestone {
+  id: string;
+  projectId: string;
+  name: string;
+  targetDate: string | null;
+  achievedDate: string | null;
+  version: number;
+  archivedAt: string | null;
+}
+
+export interface Submission {
+  id: string;
+  projectId: string;
+  reference: string;
+  authorityName: string;
+  notes: string | null;
+  status: SubmissionStatus;
+  version: number;
+  createdAt: string;
+}
+
+export interface SiteVisit {
+  id: string;
+  projectId: string;
+  visitDate: string;
+  attendees: string | null;
+  notes: string | null;
+  version: number;
+  createdAt: string;
+}
+
+export interface Observation {
+  id: string;
+  siteVisitId: string;
+  description: string;
+  category: string | null;
+  version: number;
+  createdAt: string;
+}
+
+export interface Instruction {
+  id: string;
+  siteVisitId: string;
+  directiveText: string;
+  assigneeId: string | null;
+  dueDate: string | null;
+  actionedAt: string | null;
+  version: number;
+  createdAt: string;
+}
+
+export interface Issue {
+  id: string;
+  projectId: string;
+  observationId: string | null;
+  title: string;
+  description: string | null;
+  severity: IssueSeverity;
+  priority: IssuePriority;
+  ownerId: string | null;
+  dueDate: string | null;
+  status: IssueStatus;
+  closureNotes: string | null;
+  version: number;
   createdAt: string;
 }
