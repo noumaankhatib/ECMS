@@ -18,6 +18,10 @@ Updated at the end of every step.
 | 6    | Projects and membership                                | ✅ Done |
 | 7    | Environment setup script                               | ✅ Done |
 | 8    | Web interface                                          | ✅ Done |
+| 9    | Planning — activities, milestones, submissions         | ✅ Done |
+| 10   | Supervision — site visits, observations, instructions  | ⬜ Next |
+| 11   | Issues — the fourth state machine                      | ⬜      |
+| 12   | Web interface for Phase 2                              | ⬜      |
 
 ---
 
@@ -609,3 +613,84 @@ Deep Ink Blue, at 2.72 : 1 — is why `--nav-text` exists rather than reusing
 application, not only the stylesheet: screenshotted signed in as an
 administrator and confirmed the sidebar, buttons and status badges render as
 intended.
+
+---
+
+## Step 9 — Planning: activities, milestones, submissions ✅
+
+The first of Phase 2's three modules (`docs/phase-2-plan.md`), and the only
+one of the three with no open business-rule question attached, which is why
+it went first.
+
+**Built:** `planning_activity`, `milestone` and `submission` tables, each
+belonging to a project; list/create/edit/archive for activities and
+milestones; create/edit/transition for submissions; the full Phase 2
+permission catalogue (`planning:*`, `supervision:*`, `issue:*`) seeded in the
+same migration, ahead of the two modules that will consume it — the same
+approach step 4 used for the whole Phase 1 matrix.
+
+**Endpoints:** `/projects/:projectId/planning/activities`,
+`/projects/:projectId/planning/milestones`,
+`/projects/:projectId/planning/submissions`,
+`.../submissions/:id/status`.
+
+**Verified — 12 tests, all against the real database:**
+
+| Behaviour                                                             | Result                  |
+| --------------------------------------------------------------------- | ----------------------- |
+| A non-member holds neither `planning:view` nor `planning:create`      | ✅                      |
+| The project member holds both                                         | ✅                      |
+| Create, list and archive an activity                                  | ✅                      |
+| A stale edit to an activity is refused                                | ✅ `STALE_RECORD`       |
+| An activity reached through the **wrong project** in the URL          | ✅ `NOT_FOUND`          |
+| A milestone is marked reached by setting `achievedDate`, not a status | ✅                      |
+| A submission is created at `DRAFT` and audited                        | ✅                      |
+| `DRAFT → SUBMITTED` succeeds; `SUBMITTED → DRAFT` is refused          | ✅ `ILLEGAL_TRANSITION` |
+| The refused transition is recorded, not only the ones that happened   | ✅                      |
+| A stale submission transition is refused                              | ✅ `STALE_RECORD`       |
+| **No planning record can be created on a closed project** — all three | ✅ `ILLEGAL_TRANSITION` |
+| Every seeded Phase 2 permission exists in the shared catalogue        | ✅                      |
+
+**Decisions:**
+
+- **A submission stops at `SUBMITTED` in this phase, on purpose.** PRD §6 asks
+  planning submissions to "record approval decisions, comments and dates," but
+  the PRD itself defines exactly one approval state machine shared across
+  submissions, drawings and documents (§6), and puts the whole `approvals`
+  module in Phase 3. Building a one-off approval flag here would be the first
+  of three divergent copies of a rule that should only ever be enforced in one
+  place — the same reasoning `architecture-discussion.md` used to reject
+  per-workflow approval logic in the first place. `DRAFT → SUBMITTED →
+WITHDRAWN` is a small, real transition table — enforced the same way
+  `Workstream`'s was in Phase 1 — but it is not one of the four full state
+  machines named in `phase-1-plan.md` §5a.
+- **The full Phase 2 permission catalogue was seeded now**, not staged one
+  module at a time, matching how Phase 1 step 4 seeded `user:*` and `role:*`
+  permissions three steps before user administration was built. The modules
+  catch up to the data.
+- **Every mutation is refused on a closed project** — creating an activity, a
+  milestone or a submission, not only editing an existing one. A closed
+  project is the historical record of an engagement; that has to be absolute,
+  not "closed to new members and workstreams but open to new planning work."
+- **`createdBy` on all three tables**, matching Client/Property/Project. Found
+  by TypeScript, not by review: the first draft of `activity.service.ts`
+  accepted an `actorId` parameter and never used it, because the column did
+  not exist yet.
+
+**A schema mistake caught before anything was committed:** the first version
+of the migration's Prisma-model edit silently failed to apply — a
+find-and-replace matched no text (whitespace differed from what was assumed),
+and the script had no assertion on that particular replacement, so it
+succeeded quietly and left the three new models undefined while a second,
+unrelated edit went through. `prisma validate` caught it immediately
+("neither a built-in type nor... another model"). Nothing was lost because
+nothing had been committed, but it is why every model-editing script in this
+project now asserts the text it expects to find actually exists before
+replacing it — an old lesson, relearned once.
+
+**Environment note:** partway through this step the local Docker daemon
+stopped entirely (not just the database container) — a host-level issue, not
+caused by anything in this repository. Restarting it needed a password only
+the user has, which the sandbox does not. Recorded because it is exactly the
+kind of interruption `scripts/setup.mjs`'s Docker check (step 7) exists to
+give a clear message for, rather than an obscure connection-refused error.

@@ -68,7 +68,16 @@ export type CurrentUser = z.infer<typeof currentUserSchema>;
 // ---------------------------------------------------------------------------
 
 /** The things permissions apply to, in Phase 1. */
-export const RESOURCES = ['client', 'property', 'project', 'user', 'role'] as const;
+export const RESOURCES = [
+  'client',
+  'property',
+  'project',
+  'planning',
+  'supervision',
+  'issue',
+  'user',
+  'role',
+] as const;
 export type Resource = (typeof RESOURCES)[number];
 
 /**
@@ -95,6 +104,19 @@ export const PERMISSIONS = [
   'project:edit',
   'project:close',
   'project:manage_members',
+
+  'planning:view',
+  'planning:create',
+  'planning:edit',
+
+  'supervision:view',
+  'supervision:create',
+  'supervision:edit',
+
+  'issue:view',
+  'issue:create',
+  'issue:edit',
+  'issue:close',
 
   'user:view',
   'user:admin',
@@ -577,3 +599,104 @@ export function grantsAllow(
   if (!options.projectId) return false;
   return (options.memberOf ?? []).includes(options.projectId);
 }
+
+// ---------------------------------------------------------------------------
+// Planning — activities, milestones and submissions
+//
+// docs/phase-2-plan.md §4. A submission stops at SUBMITTED in this phase —
+// there is no approval step yet, because the PRD defines exactly one approval
+// state machine shared across submissions, drawings and documents, and that
+// module is Phase 3. Building a one-off approval flag here would be the first
+// of three divergent copies of a rule that should only ever be enforced in
+// one place.
+// ---------------------------------------------------------------------------
+
+export const SUBMISSION_STATUSES = ['DRAFT', 'SUBMITTED', 'WITHDRAWN'] as const;
+export type SubmissionStatus = (typeof SUBMISSION_STATUSES)[number];
+
+/**
+ * Small, like the workstream transition table in Phase 1 — real, and
+ * enforced the same way, but not one of the four state machines named in
+ * `phase-1-plan.md` §5a. A submission cannot un-withdraw, and cannot go
+ * straight from nothing to withdrawn without having existed as a draft.
+ */
+export const SUBMISSION_TRANSITIONS = {
+  DRAFT: ['SUBMITTED', 'WITHDRAWN'],
+  SUBMITTED: ['WITHDRAWN'],
+  WITHDRAWN: [],
+} as const satisfies Record<SubmissionStatus, readonly SubmissionStatus[]>;
+
+export function canTransitionSubmission(from: SubmissionStatus, to: SubmissionStatus): boolean {
+  return (SUBMISSION_TRANSITIONS[from] as readonly SubmissionStatus[]).includes(to);
+}
+
+export const createPlanningActivitySchema = z
+  .object({
+    name: z.string().trim().min(1, 'A name is required').max(200),
+    description: optionalText(5000),
+    assigneeId: z.string().uuid().nullish(),
+    dueDate: optionalDate,
+  })
+  .strict();
+
+export type CreatePlanningActivity = z.infer<typeof createPlanningActivitySchema>;
+
+export const updatePlanningActivitySchema = createPlanningActivitySchema.partial().extend({
+  /** The only field a caller writes directly rather than through an action — there
+   * is no PRD-defined workflow around "done", just a checkbox. */
+  done: z.boolean().optional(),
+  version: z.number().int().min(1),
+});
+
+export type UpdatePlanningActivity = z.infer<typeof updatePlanningActivitySchema>;
+
+export const createMilestoneSchema = z
+  .object({
+    name: z.string().trim().min(1, 'A name is required').max(200),
+    targetDate: optionalDate,
+  })
+  .strict();
+
+export type CreateMilestone = z.infer<typeof createMilestoneSchema>;
+
+export const updateMilestoneSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200).optional(),
+    targetDate: optionalDate,
+    /** Set once, by reaching it — not something a caller un-sets casually. */
+    achievedDate: optionalDate,
+    version: z.number().int().min(1),
+  })
+  .strict();
+
+export type UpdateMilestone = z.infer<typeof updateMilestoneSchema>;
+
+export const createSubmissionSchema = z
+  .object({
+    reference: z.string().trim().min(1, 'A reference is required').max(100),
+    authorityName: z.string().trim().min(1, 'The authority is required').max(200),
+    notes: optionalText(5000),
+  })
+  .strict();
+
+export type CreateSubmission = z.infer<typeof createSubmissionSchema>;
+
+export const updateSubmissionSchema = z
+  .object({
+    reference: z.string().trim().min(1).max(100).optional(),
+    authorityName: z.string().trim().min(1).max(200).optional(),
+    notes: optionalText(5000),
+    version: z.number().int().min(1),
+  })
+  .strict();
+
+export type UpdateSubmission = z.infer<typeof updateSubmissionSchema>;
+
+export const submissionTransitionSchema = z
+  .object({
+    to: z.enum(SUBMISSION_STATUSES),
+    version: z.number().int().min(1),
+  })
+  .strict();
+
+export type SubmissionTransition = z.infer<typeof submissionTransitionSchema>;

@@ -59,7 +59,6 @@ model AuditEntry {
   @@map("audit_entry")
 }
 
-
 /// A person who can sign in.
 ///
 /// Roles and project membership arrive in the next step; this model covers
@@ -183,7 +182,7 @@ model Session {
 model Client {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  name String @db.VarChar(200)
+  name      String  @db.VarChar(200)
   /// The consultancy's own reference for this client. Optional, but unique
   /// among live clients when present — see the partial index in the migration.
   reference String? @db.VarChar(50)
@@ -219,10 +218,10 @@ model Contact {
   clientId String @map("client_id") @db.Uuid
   client   Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
 
-  name     String  @db.VarChar(200)
-  position String? @db.VarChar(150)
-  email    String? @db.VarChar(320)
-  phone    String? @db.VarChar(50)
+  name      String  @db.VarChar(200)
+  position  String? @db.VarChar(150)
+  email     String? @db.VarChar(320)
+  phone     String? @db.VarChar(50)
   /// The default person to contact. At most one per client, enforced by a
   /// partial unique index rather than by application logic.
   isPrimary Boolean @default(false) @map("is_primary")
@@ -267,6 +266,87 @@ model Property {
   @@index([clientId, archivedAt])
   @@index([archivedAt])
   @@map("property")
+}
+
+model PlanningActivity {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  name        String  @db.VarChar(200)
+  description String? @db.Text
+
+  /// Who it is assigned to. No foreign key to user, deliberately — the same
+  /// reasoning as audit_entry: an archived person must not damage a completed
+  /// task's record of who did it.
+  assigneeId String?   @map("assignee_id") @db.Uuid
+  dueDate    DateTime? @map("due_date") @db.Date
+
+  /// A checkbox, not a workflow. PRD §6 gives activities no state machine, so
+  /// there is nothing here for a transition table to validate.
+  done Boolean @default(false)
+
+  version Int @default(1)
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy  String?   @map("created_by") @db.Uuid
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+
+  @@index([projectId, archivedAt])
+  @@map("planning_activity")
+}
+
+model Milestone {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  name         String    @db.VarChar(200)
+  targetDate   DateTime? @map("target_date") @db.Date
+  /// Set once, when the milestone is reached. Never a status column — a date
+  /// is either present or it is not, and that is the whole state.
+  achievedDate DateTime? @map("achieved_date") @db.Date
+
+  version Int @default(1)
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy  String?   @map("created_by") @db.Uuid
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+
+  @@index([projectId, archivedAt])
+  @@map("milestone")
+}
+
+/// A planning authority application. Stops at SUBMITTED in this phase — see
+/// docs/phase-2-plan.md §2. Phase 3's shared Approvals module extends this
+/// status set; it does not replace it.
+model Submission {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  /// The consultancy's own reference for this application.
+  reference     String  @db.VarChar(100)
+  authorityName String  @map("authority_name") @db.VarChar(200)
+  notes         String? @db.Text
+
+  /// DRAFT, SUBMITTED or WITHDRAWN. Moves only through a checked transition,
+  /// the same rule as every status column in this system.
+  status String @default("DRAFT") @db.VarChar(20)
+
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+
+  @@index([projectId, status])
+  @@map("submission")
 }
 
 /// A piece of work for a client, at a property (PRD §4).
@@ -315,8 +395,11 @@ model Project {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdBy String?  @map("created_by") @db.Uuid
 
-  members     ProjectMember[]
-  workstreams Workstream[]
+  members            ProjectMember[]
+  workstreams        Workstream[]
+  planningActivities PlanningActivity[]
+  milestones         Milestone[]
+  submissions        Submission[]
 
   @@index([clientId])
   @@index([propertyId])
