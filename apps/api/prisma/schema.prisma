@@ -478,6 +478,90 @@ model Issue {
   @@map("issue")
 }
 
+/// A registered drawing (PRD §6, "Drawing and Revision Control"). The
+/// drawing itself is stable identity; `DrawingRevision` carries everything
+/// that changes. `currentRevisionId` is null until the first revision is
+/// uploaded — a drawing is registered, then revised.
+model Drawing {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  /// The consultancy's own drawing number. Unique per project,
+  /// case-insensitively — see the index in the migration.
+  number String @db.VarChar(100)
+  title  String @db.VarChar(200)
+
+  /// A convenience pointer to the current revision, kept in step with
+  /// `DrawingRevision.supersededAt` by the same transaction that changes
+  /// either. The partial unique index in the migration is what makes
+  /// "exactly one current revision" true independent of this column ever
+  /// drifting.
+  currentRevisionId String?          @unique @map("current_revision_id") @db.Uuid
+  currentRevision   DrawingRevision? @relation("DrawingCurrentRevision", fields: [currentRevisionId], references: [id], onDelete: SetNull)
+
+  revisions DrawingRevision[] @relation("DrawingRevisions")
+
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+
+  @@index([projectId])
+  @@map("drawing")
+}
+
+/// Append-only — a new revision is a new row, never an update to an
+/// existing one. The strictest invariant in the system
+/// (docs/phase-3-plan.md §5): once a revision reaches `APPROVED`, a database
+/// trigger (see the migration) refuses every further `UPDATE` except setting
+/// `supersededAt`, and refuses every `DELETE` outright, enforced even
+/// against a bug or direct database access.
+///
+/// Status is `ApprovalStatus` — the same shared state machine Submission
+/// uses (docs/phase-3-plan.md §4) — unchanged, with no extra edge; a
+/// drawing revision is never "withdrawn", only superseded by the next one.
+model DrawingRevision {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  drawingId String  @map("drawing_id") @db.Uuid
+  drawing   Drawing @relation("DrawingRevisions", fields: [drawingId], references: [id], onDelete: Restrict)
+
+  /// Free text ("P1", "C1", "Rev A"...), not a derived sequence — the PRD
+  /// gives no numbering convention (docs/phase-3-plan.md §8, B4). Unique per
+  /// drawing, permanently — even a superseded code is never reused.
+  revisionCode String @map("revision_code") @db.VarChar(50)
+
+  /// DRAFT, SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED or
+  /// RETURNED_FOR_REVISION.
+  status String @default("DRAFT") @db.VarChar(30)
+
+  /// The Drive file id, once uploaded (docs/phase-3-plan.md §7). Null while
+  /// this environment has no real Drive account — see the LocalDriveAdapter.
+  fileId String? @map("file_id")
+  notes  String? @db.Text
+
+  /// Set the instant a LATER revision is created for this drawing, never
+  /// earlier and never by any other path. Together with the partial unique
+  /// index in the migration, this is what "exactly one current revision"
+  /// means.
+  supersededAt DateTime? @map("superseded_at") @db.Timestamptz(6)
+
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+
+  drawingAsCurrentRevision Drawing? @relation("DrawingCurrentRevision")
+
+  @@unique([drawingId, revisionCode])
+  @@index([drawingId, supersededAt])
+  @@map("drawing_revision")
+}
+
 /// A piece of work for a client, at a property (PRD §4).
 ///
 /// The project is the unit of authorization for the whole system. Every
@@ -531,6 +615,7 @@ model Project {
   submissions        Submission[]
   siteVisits         SiteVisit[]
   issues             Issue[]
+  drawings           Drawing[]
 
   @@index([clientId])
   @@index([propertyId])

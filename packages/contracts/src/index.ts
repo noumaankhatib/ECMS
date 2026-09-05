@@ -119,6 +119,10 @@ export const PERMISSIONS = [
   'issue:edit',
   'issue:close',
 
+  'drawing:view',
+  'drawing:create',
+  'drawing:approve',
+
   'user:view',
   'user:admin',
 
@@ -923,3 +927,77 @@ export const issueTransitionSchema = z
   .strict();
 
 export type IssueTransition = z.infer<typeof issueTransitionSchema>;
+
+// ---------------------------------------------------------------------------
+// Drawings — the strictest invariant in the system (docs/phase-3-plan.md §5).
+//
+// A drawing revision's status is `ApprovalStatus`, unchanged — it consumes
+// the shared table directly, with no extra edge the way Submission's
+// `WITHDRAWN` is. There is no "edit" verb: a revision is created, and moves
+// through the approval actions, and nothing about its content may ever
+// change once written (`drawing:create` covers the former, `drawing:approve`
+// the decisions).
+// ---------------------------------------------------------------------------
+
+/**
+ * Not archived, and not paged by status the way issues are — a drawing
+ * register has no equivalent of "hide the closed ones".
+ */
+export const drawingListQuerySchema = z
+  .object({
+    search: z.string().trim().max(200).optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  })
+  .strict();
+
+export type DrawingListQuery = z.infer<typeof drawingListQuerySchema>;
+
+export const createDrawingSchema = z
+  .object({
+    number: z.string().trim().min(1, 'A drawing number is required').max(100),
+    title: z.string().trim().min(1, 'A title is required').max(200),
+  })
+  .strict();
+
+export type CreateDrawing = z.infer<typeof createDrawingSchema>;
+
+export const createDrawingRevisionSchema = z
+  .object({
+    revisionCode: z.string().trim().min(1, 'A revision code is required').max(50),
+    /** Set once a real Drive account exists to upload to
+     *  (docs/phase-3-plan.md §7) — null is the honest answer until then. */
+    fileId: optionalText(500),
+    notes: optionalText(5000),
+  })
+  .strict();
+
+export type CreateDrawingRevision = z.infer<typeof createDrawingRevisionSchema>;
+
+export const drawingRevisionTransitionSchema = z
+  .object({
+    version: z.number().int().min(1),
+    reason: optionalText(1000),
+  })
+  .strict();
+
+export type DrawingRevisionTransition = z.infer<typeof drawingRevisionTransitionSchema>;
+
+/**
+ * The named actions a caller may take on a revision, and where each one
+ * leads — reusing `ApprovalStatus` and `canTransitionApproval` directly,
+ * with no submission-style extra edge.
+ */
+export const DRAWING_REVISION_ACTIONS = {
+  submit: 'SUBMITTED',
+  review: 'UNDER_REVIEW',
+  approve: 'APPROVED',
+  reject: 'REJECTED',
+  returnForRevision: 'RETURNED_FOR_REVISION',
+} as const satisfies Record<string, ApprovalStatus>;
+
+export type DrawingRevisionAction = keyof typeof DRAWING_REVISION_ACTIONS;
+
+export const DRAWING_REVISION_ACTION_NAMES = Object.keys(
+  DRAWING_REVISION_ACTIONS,
+) as readonly DrawingRevisionAction[];

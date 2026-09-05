@@ -25,8 +25,8 @@ Updated at the end of every step.
 | 11   | Issues — the fourth state machine                      | ✅ Done |
 | 12   | Web interface for Phase 2                              | ✅ Done |
 | 13   | Approvals — the shared state machine                   | ✅ Done |
-| 14   | Drawings — append-only, immutable-when-approved        | ⬜ Next |
-| 15   | Documents — register, metadata and the Drive seam      | ⬜      |
+| 14   | Drawings — append-only, immutable-when-approved        | ✅ Done |
+| 15   | Documents — register, metadata and the Drive seam      | ⬜ Next |
 | 16   | Web interface for Phase 3                              | ⬜      |
 
 ---
@@ -1025,3 +1025,98 @@ which tripped the self-approval refusal instead of the transition-table
 check, the same "two different failures, pick the action that isolates one"
 lesson step 11 already learned. Fixed by deciding with `admin`, who created
 nothing here.
+
+---
+
+## Step 14 — Drawings: append-only, immutable-when-approved ✅
+
+The second step of Phase 3, and the highest-risk database work in the
+project so far — the one `docs/phase-3-plan.md` §5 and
+architecture-discussion decision A3 call the strictest invariant in the
+system: once a drawing revision is approved, nothing may change it, not
+even a bug or a hand-run `UPDATE`.
+
+**Built:** `drawing` and `drawing_revision` tables; `DrawingService`
+(register/list/read — no update, deliberately) and `DrawingRevisionService`
+(create, list, read, and the five named approval actions); a database
+trigger that refuses every `UPDATE` and `DELETE` on an `APPROVED` revision
+except the one write that sets `supersededAt`. `DrawingRevision.status`
+reuses `ApprovalStatus`/`canTransitionApproval` from step 13 directly, with
+no submission-style extra edge — the "one shared implementation" promise
+made when Approvals was built now has its second consumer.
+
+**Endpoints:** `/projects/:projectId/drawings`,
+`/projects/:projectId/drawings/:drawingId/revisions`,
+`.../revisions/:id/{submit,review,approve,reject,return-for-revision}`.
+
+**Verified — 16 tests, all against the real database:**
+
+| Behaviour                                                                           | Result                  |
+| ----------------------------------------------------------------------------------- | ----------------------- |
+| A non-member holds neither `drawing:view` nor `drawing:create`                      | ✅                      |
+| The project member (Planning) holds `view, create`, **not** `approve`               | ✅                      |
+| Director holds `view, approve` globally, **not** `create`                           | ✅                      |
+| A drawing is created with no current revision                                       | ✅                      |
+| A duplicate drawing number on the same project is refused, case-insensitively       | ✅ `CONFLICT`           |
+| A first revision becomes the drawing's current revision                             | ✅                      |
+| A duplicate revision code on the same drawing is refused                            | ✅ `CONFLICT`           |
+| **A second revision supersedes the first**, which is no longer current              | ✅                      |
+| A revision walks Draft → Submitted → Under Review → Approved                        | ✅                      |
+| **An approved revision refuses a direct `UPDATE` — bypassing the service entirely** | ✅ database trigger     |
+| **An approved revision refuses `DELETE` outright**                                  | ✅ database trigger     |
+| …but a later revision may still supersede it                                        | ✅                      |
+| Skipping straight from `Draft` to `Approved` is refused                             | ✅ `ILLEGAL_TRANSITION` |
+| The refused transition is recorded, not only the ones that happened                 | ✅                      |
+| A transition made from a stale version is refused                                   | ✅ `STALE_RECORD`       |
+| A drawing or revision reached through the wrong project/drawing in the URL          | ✅ `NOT_FOUND`          |
+| **No drawing or revision can be created on a closed project**                       | ✅ `ILLEGAL_TRANSITION` |
+| Every seeded drawing permission exists in the shared catalogue                      | ✅                      |
+
+**Decisions:**
+
+- **No `drawing:edit` permission, and no update route for either model.** A
+  drawing's number and title are set once; a revision's content may never
+  change once written. `drawing:create` covers registering a drawing,
+  uploading a revision, and the two ordinary progression actions (`submit`,
+  `review`); `drawing:approve` covers only the three decisions (`approve`,
+  `reject`, `returnForRevision`) — mirroring how `issue:close` sits beside
+  `issue:edit` rather than folding into it, but here there is no "edit" at
+  all for the verb to sit beside.
+- **`currentRevisionId` on `Drawing` and `supersededAt` on `DrawingRevision`
+  both exist, and both matter.** The FK column is the convenient read path;
+  the partial unique index (`drawing_id` `WHERE superseded_at IS NULL`) is
+  the actual guarantee, independent of the FK ever drifting — the same
+  belt-and-suspenders relationship a CHECK constraint has with the named
+  actions that are supposed to keep a status column honest.
+- **The immutability trigger checks every column except `superseded_at`**,
+  rather than allow-listing what it protects. A future column added to
+  `drawing_revision` is protected by default; someone would have to
+  deliberately add it to the trigger's exemption to make it editable on an
+  approved row, which is the safer direction to require someone to opt into.
+- **Superseding is unconditional on the previous revision's status.**
+  Whether the outgoing revision was `APPROVED`, `REJECTED`, or still
+  `DRAFT`, creating the next one retires it from being current. Only one
+  revision is ever "in flight" per drawing, matching how a real drawing
+  register works — revision 2 supersedes revision 1 the moment it exists,
+  not only once revision 1 has been decided.
+
+**Bug found by running it, not by reading it:** the first version of
+`DrawingRevisionService.create` inserted the new revision **before**
+superseding the old one. For the instant between those two statements, two
+rows for the same drawing both held `superseded_at = NULL` — exactly what
+`uq_drawing_revision_current` exists to refuse, and partial unique indexes
+are checked immediately, not deferred to the end of the transaction. Neither
+`tsc` nor a code read caught it; only actually creating a second revision
+did, in the `supersedes the previous current revision` test. Fixed by
+superseding first, inserting second — the same lesson as step 6's "the
+audit row for a refusal needs its own transaction": statement order inside
+a transaction is not free of consequence just because it will all commit or
+none of it will.
+
+**Also caught while writing the tests:** an assertion that Planning Team
+holds `drawing:approve` — copied, without checking, from step 13's
+`planning:approve` matrix. `docs/phase-3-plan.md` §9's own table gives
+Planning Team `view, create` for drawings specifically, not `approve`; only
+Director and System Administrator get that here. The seed migration was
+right; the test's expectation, carried over from a different permission on
+a different resource, was not.
