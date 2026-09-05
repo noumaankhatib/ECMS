@@ -7,6 +7,9 @@
  * and this application only reads.
  */
 import type {
+  ApprovalStatus,
+  DocumentLinkedType,
+  DocumentUploadStatus,
   IssuePriority,
   IssueSeverity,
   IssueStatus,
@@ -185,4 +188,48 @@ export interface Issue {
   closureNotes: string | null;
   version: number;
   createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 — drawings, documents
+// ---------------------------------------------------------------------------
+
+export interface Drawing {
+  id: string;
+  projectId: string;
+  number: string;
+  title: string;
+  currentRevisionId: string | null;
+  version: number;
+  createdAt: string;
+}
+
+export interface DrawingRevision {
+  id: string;
+  drawingId: string;
+  revisionCode: string;
+  status: ApprovalStatus;
+  fileId: string | null;
+  notes: string | null;
+  supersededAt: string | null;
+  version: number;
+  createdAt: string;
+}
+
+export interface Document {
+  id: string;
+  projectId: string;
+  category: string;
+  title: string;
+  description: string | null;
+  uploadStatus: DocumentUploadStatus;
+  fileId: string | null;
+  originalFilename: string | null;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  linkedType: DocumentLinkedType | null;
+  linkedId: string | null;
+  version: number;
+  createdAt: string;
+  archivedAt: string | null;
 }

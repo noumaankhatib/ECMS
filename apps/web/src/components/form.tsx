@@ -58,6 +58,32 @@ export function Field({
   );
 }
 
+/** A real file input. There is exactly one form in this application that
+ *  needs one — creating a document — so this stays deliberately plain rather
+ *  than growing options nothing else uses. */
+export function FileField({
+  label,
+  name,
+  required,
+  hint,
+}: {
+  label: string;
+  name: string;
+  required?: boolean;
+  hint?: string;
+}) {
+  return (
+    <div className="field field--wide">
+      <label htmlFor={name}>
+        {label}
+        {required ? <span aria-hidden="true"> *</span> : null}
+      </label>
+      <input id={name} name={name} type="file" required={required ?? false} />
+      {hint ? <span className="hint">{hint}</span> : null}
+    </div>
+  );
+}
+
 export function TextArea({
   label,
   name,

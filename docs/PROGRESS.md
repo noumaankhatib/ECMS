@@ -7,7 +7,7 @@ Updated at the end of every step.
 
 **Phase 2 — Core Operations** (PRD §20): planning, supervision, site visits, observations, instructions and issues. See `docs/phase-2-plan.md`. Complete.
 
-**Phase 3 — Documents** (PRD §20): document register, drawing revisions, Google Shared Drive and approvals. See `docs/phase-3-plan.md`.
+**Phase 3 — Documents** (PRD §20): document register, drawing revisions, Google Shared Drive and approvals. See `docs/phase-3-plan.md`. Complete.
 
 | Step | Track point                                            | Status  |
 | ---- | ------------------------------------------------------ | ------- |
@@ -27,7 +27,7 @@ Updated at the end of every step.
 | 13   | Approvals — the shared state machine                   | ✅ Done |
 | 14   | Drawings — append-only, immutable-when-approved        | ✅ Done |
 | 15   | Documents — register, metadata and the Drive seam      | ✅ Done |
-| 16   | Web interface for Phase 3                              | ⬜ Next |
+| 16   | Web interface for Phase 3                              | ✅ Done |
 
 ---
 
@@ -1225,3 +1225,95 @@ unanswered, and the reconciliation job architecture-discussion §6.5 asks for
 is still a stub with nothing real to reconcile against. Both wait on the
 same external account this environment does not have, same as step 14 left
 them.
+
+---
+
+## Step 16 — Web interface for Phase 3 ✅
+
+The last step of Phase 3, and the one that makes drawings and documents
+usable by somebody who is not holding a terminal — the same role step 8
+played for Phase 1 and step 12 for Phase 2.
+
+**Built:** `/projects/:id/drawings` (list, register a drawing) and
+`/projects/:id/drawings/:drawingId` (the revision timeline — the one
+genuinely new UI pattern in this application: a table of every revision,
+most-recent-first, the row with no `supersededAt` marked "Current" and
+every other one marked "Superseded", each row's own transition buttons
+filtered by `canTransitionApproval` the same way the planning page already
+filters Submission's); `/projects/:id/documents` (list, upload a document —
+the first real file input and the first real file upload in this
+application) and `/projects/:id/documents/:documentId` (metadata, a
+download link, an edit form). Two new buttons on the project page,
+alongside Planning/Supervision/Issues, gated by `drawing:view` and
+`document:view` and — unlike those three — not conditional on the
+project's type, since neither drawings nor documents belong to one
+workstream kind over the other.
+
+**Also built, because a document's bytes cannot be JSON:** `api.postForm`
+in `apps/web/src/lib/api.ts`, sending a `FormData` body with no explicit
+`content-type` header so `fetch` fills in the multipart boundary itself;
+a `stream()` helper and a route handler at
+`/projects/:id/documents/:documentId/content` that proxies the API's own
+download endpoint straight through, cookie forwarded the same way every
+other call is — the browser still never learns the API's address, and the
+API still makes the only real `document:view` decision, this route is a
+pass-through, not a second permission check. A `FileField` component was
+added to `components/form.tsx`, the only form in this application that
+needs a real `<input type="file">`.
+
+**Verified — 7 new browser tests, 25 passing together (12 from Phase 1, 6
+from Phase 2, 7 new):**
+
+| Behaviour                                                                                                          | Result |
+| ------------------------------------------------------------------------------------------------------------------ | ------ |
+| The Drawings and Documents links appear on a project page                                                          | ✅     |
+| A drawing is registered, a revision is uploaded, and walks Draft → Submitted → Under review → Approved             | ✅     |
+| **A second revision supersedes the first** — the timeline shows one "Current" and one "Superseded"                 | ✅     |
+| **A document is registered, a real file is uploaded, and downloaded back byte-for-byte** through the route handler | ✅     |
+| Archiving a document hides it from the ordinary list                                                               | ✅     |
+| **A non-member gets nothing for either route** — HTTP ≥ 400                                                        | ✅     |
+| No unexpected refusal banner appeared along the way                                                                | ✅     |
+
+**Decisions:**
+
+- **The drawing-revision timeline needed no new primitive.** `Card`,
+  `table`, `Badge` and `DateText` — the same pieces every Phase 1 and 2 list
+  page already uses — were enough; "current" vs "superseded" is one
+  conditional, not a new component.
+- **`ACTIONS` arrays, filtered by the shared transition table, are copied
+  once more.** The drawing detail page's `ACTIONS`/`available` shape is
+  line-for-line the pattern the project page established for
+  `PROJECT_TRANSITIONS` and the planning page repeated for
+  `SUBMISSION_TRANSITIONS` — a fourth consumer of the same idiom, not a
+  new one invented for drawings.
+- **No linking UI for a document to an activity, site visit, issue or
+  submission.** The API supports `linkedType`/`linkedId` (step 15); the web
+  form does not expose it, the same deliberate gap step 12 left for an
+  issue's `observationId` — a full picker across four different tables'
+  records would need all of them fetched up front, for a feature the PRD
+  treats as occasional rather than routine. Nothing here forecloses adding
+  a picker, or a one-click carried-link path the way "Raise issue" carries
+  an observation, later.
+- **The download route is a proxy, not a second authorization check.** It
+  forwards the session cookie and returns whatever the API answers,
+  including a refusal — deciding `document:view` twice, in two languages,
+  is exactly the kind of duplicated rule this codebase has avoided
+  everywhere else.
+- **`api.postForm` and `request`/`login` now share one `parseResponse`
+  helper.** `login` previously duplicated the same parse-and-throw block
+  `request` used; adding a third caller for multipart bodies was the
+  moment to stop copying it a second time rather than a third.
+
+**Known limit, recorded rather than discovered later:** lists on these two
+new pages fetch up to 100 rows and do not page, the same limit recorded in
+steps 8 and 12 and now true of two more of them.
+
+**Environment note, not a defect in the code:** running the browser suite
+in this sandbox required working around two things neither prior step
+hit: an unrelated process already bound to port 3000 on this shared
+machine (worked around by starting the web server on a different port and
+pointing Playwright's `WEB_URL` at it — no committed file changes), and
+the in-memory sign-in rate limiter (`docs/PROGRESS.md` step 4's known
+limit) tripping after many repeated manual re-runs against one long-lived
+API process — cleared by restarting it. Both are artifacts of this
+particular sandbox session, not of the application.

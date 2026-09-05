@@ -62,6 +62,29 @@ interface ErrorBody {
   requestId?: string;
 }
 
+/** The one place a response becomes either a value or an `ApiError` — used
+ *  by every call below, JSON or multipart, so a refusal is shaped identically
+ *  regardless of which one made the request. */
+async function parseResponse<T>(response: Response): Promise<T> {
+  if (response.status === 204) return undefined as T;
+
+  const text = await response.text();
+  const parsed: unknown = text === '' ? {} : JSON.parse(text);
+
+  if (!response.ok) {
+    const payload = parsed as ErrorBody;
+    throw new ApiError(
+      response.status,
+      payload.error?.code ?? 'INTERNAL',
+      payload.error?.message ?? 'Something went wrong.',
+      payload.error?.fields ?? [],
+      payload.requestId,
+    );
+  }
+
+  return parsed as T;
+}
+
 async function request<T>(
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   path: string,
@@ -84,31 +107,51 @@ async function request<T>(
     cache: 'no-store',
   });
 
-  if (response.status === 204) return undefined as T;
+  return parseResponse<T>(response);
+}
 
-  const text = await response.text();
-  const parsed: unknown = text === '' ? {} : JSON.parse(text);
+/**
+ * As `request`, but for a multipart body — a document upload cannot be JSON.
+ * No `content-type` header is set explicitly: the browser/Node's own `fetch`
+ * fills in the multipart boundary from the `FormData` itself, and setting one
+ * by hand would only get it wrong.
+ */
+async function requestForm<T>(method: 'POST' | 'PATCH', path: string, form: FormData): Promise<T> {
+  const store = await cookies();
+  const session = store.get(SESSION_COOKIE)?.value;
 
-  if (!response.ok) {
-    const payload = parsed as ErrorBody;
-    throw new ApiError(
-      response.status,
-      payload.error?.code ?? 'INTERNAL',
-      payload.error?.message ?? 'Something went wrong.',
-      payload.error?.fields ?? [],
-      payload.requestId,
-    );
-  }
+  const response = await fetch(`${API_URL}${path}`, {
+    method,
+    headers: { ...(session ? { cookie: `${SESSION_COOKIE}=${session}` } : {}) },
+    body: form,
+    cache: 'no-store',
+  });
 
-  return parsed as T;
+  return parseResponse<T>(response);
 }
 
 export const api = {
   get: <T>(path: string): Promise<T> => request<T>('GET', path),
   post: <T>(path: string, body?: unknown): Promise<T> => request<T>('POST', path, body ?? {}),
+  postForm: <T>(path: string, form: FormData): Promise<T> => requestForm<T>('POST', path, form),
   patch: <T>(path: string, body: unknown): Promise<T> => request<T>('PATCH', path, body),
   delete: <T>(path: string): Promise<T> => request<T>('DELETE', path),
 };
+
+/**
+ * Streams a response straight through, cookie forwarded the same way every
+ * other call is. For a route handler that must hand the browser real bytes —
+ * a document's content is never JSON, so it cannot go through `api.get`.
+ */
+export async function stream(path: string): Promise<Response> {
+  const store = await cookies();
+  const session = store.get(SESSION_COOKIE)?.value;
+
+  return fetch(`${API_URL}${path}`, {
+    headers: { ...(session ? { cookie: `${SESSION_COOKIE}=${session}` } : {}) },
+    cache: 'no-store',
+  });
+}
 
 /**
  * Signs in, and returns the cookie the API issued so the caller can set it.
@@ -127,19 +170,7 @@ export async function login(
     cache: 'no-store',
   });
 
-  const text = await response.text();
-  const parsed: unknown = text === '' ? {} : JSON.parse(text);
-
-  if (!response.ok) {
-    const payload = parsed as ErrorBody;
-    throw new ApiError(
-      response.status,
-      payload.error?.code ?? 'INTERNAL',
-      payload.error?.message ?? 'Something went wrong.',
-      payload.error?.fields ?? [],
-      payload.requestId,
-    );
-  }
+  await parseResponse(response);
 
   return { setCookie: response.headers.get('set-cookie') };
 }

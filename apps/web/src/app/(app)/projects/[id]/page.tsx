@@ -153,6 +153,16 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             Issues
           </Link>
         ) : null}
+        {session.can('drawing:view', id) ? (
+          <Link href={`/projects/${id}/drawings`} className="button button--secondary">
+            Drawings
+          </Link>
+        ) : null}
+        {session.can('document:view', id) ? (
+          <Link href={`/projects/${id}/documents`} className="button button--secondary">
+            Documents
+          </Link>
+        ) : null}
       </div>
 
       <div className="grid-2">
