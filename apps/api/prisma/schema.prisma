@@ -562,6 +562,59 @@ model DrawingRevision {
   @@map("drawing_revision")
 }
 
+/// A registered document (PRD §6, "Document Management"). Deliberately not
+/// run through `ApprovalStatus` (docs/phase-3-plan.md §4) — most documents
+/// this system will hold have no approval step in practice, and forcing one
+/// onto every uploaded file is the complexity PRD §22 asks to avoid until
+/// the business needs it. Its own small state is the upload write flow
+/// architecture-discussion §6.5 (decision A5) specifies.
+model Document {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  /// A free-text catalogue, not a fixed enum (docs/phase-3-plan.md §8, B6) —
+  /// the same treatment `Issue.severity` started with.
+  category    String  @db.VarChar(100)
+  title       String  @db.VarChar(200)
+  description String? @db.Text
+
+  /// PENDING while bytes are being written to Drive, ACTIVE once the file id
+  /// is confirmed, FAILED if the upload never completed.
+  uploadStatus String @default("PENDING") @map("upload_status") @db.VarChar(20)
+  /// The Drive file id, set the instant uploadStatus becomes ACTIVE. Null
+  /// otherwise — see the LocalDriveAdapter (docs/phase-3-plan.md §7).
+  fileId           String? @map("file_id")
+  originalFilename String? @map("original_filename") @db.VarChar(255)
+  mimeType         String? @map("mime_type") @db.VarChar(150)
+  sizeBytes        Int?    @map("size_bytes")
+
+  /// A document can point at a record in any of four different tables
+  /// across three modules — not a real foreign key, the same trade
+  /// `PlanningActivity.assigneeId` and `Issue.ownerId` already make: a real
+  /// FK would need one nullable column per target type, or a check the
+  /// database cannot express cleanly. Checked at the point of use instead
+  /// (docs/phase-3-plan.md §6).
+  linkedType String? @map("linked_type") @db.VarChar(20)
+  linkedId   String? @map("linked_id") @db.Uuid
+
+  version Int @default(1)
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy  String?   @map("created_by") @db.Uuid
+  /// Archived, never deleted — the same posture Client and Property take.
+  /// The underlying file is left in place; only the register entry is
+  /// hidden from ordinary listings.
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+  archivedBy String?   @map("archived_by") @db.Uuid
+
+  @@index([projectId, archivedAt])
+  @@index([linkedType, linkedId])
+  @@map("document")
+}
+
 /// A piece of work for a client, at a property (PRD §4).
 ///
 /// The project is the unit of authorization for the whole system. Every
@@ -616,6 +669,7 @@ model Project {
   siteVisits         SiteVisit[]
   issues             Issue[]
   drawings           Drawing[]
+  documents          Document[]
 
   @@index([clientId])
   @@index([propertyId])

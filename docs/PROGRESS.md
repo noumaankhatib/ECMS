@@ -26,8 +26,8 @@ Updated at the end of every step.
 | 12   | Web interface for Phase 2                              | ✅ Done |
 | 13   | Approvals — the shared state machine                   | ✅ Done |
 | 14   | Drawings — append-only, immutable-when-approved        | ✅ Done |
-| 15   | Documents — register, metadata and the Drive seam      | ⬜ Next |
-| 16   | Web interface for Phase 3                              | ⬜      |
+| 15   | Documents — register, metadata and the Drive seam      | ✅ Done |
+| 16   | Web interface for Phase 3                              | ⬜ Next |
 
 ---
 
@@ -1120,3 +1120,108 @@ Planning Team `view, create` for drawings specifically, not `approve`; only
 Director and System Administrator get that here. The seed migration was
 right; the test's expectation, carried over from a different permission on
 a different resource, was not.
+
+---
+
+## Step 15 — Documents: register, metadata and the Drive seam ✅
+
+The third step of Phase 3, and the one that finally answers what everything
+since step 1 has been building toward for files: business metadata in this
+database, actual bytes behind an adapter interface, never the reverse
+(architecture-discussion §6.5, decision A5).
+
+**Built:** the `document` table; `DocumentService` (list/read/create/edit/
+archive/download); the `DriveAdapter` interface and its only implementation
+so far, `LocalDriveAdapter`, which writes to a directory on disk and returns
+a fabricated-but-stable file id — injected everywhere through a DI token
+(`DRIVE_ADAPTER`) rather than a concrete class, so a real `GoogleDriveAdapter`
+is a provider swap, not a rewrite, once B7 is answered. The write flow is
+three separate steps, not one transaction, matching architecture-discussion
+§6.5 literally: create the row `PENDING` and commit; upload the bytes outside
+any open transaction; write the outcome — `ACTIVE` with the file id, or
+`FAILED` — last. `Document` is deliberately **not** run through
+`ApprovalStatus` — see step 13's and `docs/phase-3-plan.md` §4's reasoning,
+unchanged. `linkedType`/`linkedId` let a document point at an activity, site
+visit, issue or submission on the same project, checked at the point of use
+rather than as a real foreign key, the same trade `PlanningActivity.assigneeId`
+already makes.
+
+**Endpoints:** `/projects/:projectId/documents` (list, create — multipart,
+one `file` field plus metadata), `.../documents/:id` (read, edit, archive),
+`.../documents/:id/content` (download the raw bytes).
+
+**Verified — 14 tests, all against the real database and a real filesystem:**
+
+| Behaviour                                                                                                       | Result                  |
+| --------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| A non-member holds neither `document:view` nor `document:create`                                                | ✅                      |
+| The project's Document Controller holds view, create, edit **and archive**                                      | ✅                      |
+| Planning Team on the project holds view only, not create or archive                                             | ✅                      |
+| Director holds view only, globally, and no create                                                               | ✅                      |
+| **A document is registered, uploaded through the `LocalDriveAdapter`, and downloaded back byte-for-byte**       | ✅                      |
+| **An upload that never completes is marked `FAILED`, not left `PENDING` forever, and download is then refused** | ✅                      |
+| A document is linked to an activity on the same project                                                         | ✅                      |
+| A link to an activity on **another** project is refused                                                         | ✅ `CONFLICT`           |
+| A link to an activity that does not exist is refused                                                            | ✅ `NOT_FOUND`          |
+| Metadata edits under optimistic locking; a stale edit is refused                                                | ✅ `STALE_RECORD`       |
+| Archiving hides a document from an ordinary list but not from `includeArchived`                                 | ✅                      |
+| A document reached through the wrong project in the URL                                                         | ✅ `NOT_FOUND`          |
+| **No document can be created on a closed project**                                                              | ✅ `ILLEGAL_TRANSITION` |
+| Every seeded document permission exists in the shared catalogue                                                 | ✅                      |
+
+**Decisions:**
+
+- **The write flow is three steps, not one transaction, on purpose.**
+  External I/O — writing bytes to disk today, a real Drive API call once B7
+  is answered — has no place inside an open database transaction; a slow or
+  hung upload would otherwise hold a lock the whole time. The `PENDING` row
+  is committed before the upload starts, so a crash mid-upload leaves a
+  record that an attempt was made, not silence.
+- **`DriveAdapter` is injected by a Symbol token, not a concrete class.**
+  `docs/phase-3-plan.md` §7 promises "nothing above the adapter changes"
+  when the real `GoogleDriveAdapter` arrives; that promise only holds if
+  `DocumentService` depends on the interface, not on `LocalDriveAdapter`
+  specifically. The test suite exploits the same seam the other direction —
+  a `FailingDriveAdapter` stub is what proves the `FAILED` path without
+  needing to break a real filesystem.
+- **Archive, not delete, and the underlying file is left in place.** The
+  same posture Client and Property took in step 5 — PRD §6 forbids
+  destructive removal, and a document nobody can currently see may still be
+  what a later audit needs. Unlike Client's archive, there is no dependency
+  check: nothing in this system points at a document the way a project
+  points at a client.
+- **No re-upload, and `linkedType`/`linkedId` are set once, at creation.** A
+  new file is a new document — the same shape a new drawing revision is a
+  new row, not an edit to the old one — and the edit endpoint touches only
+  `category`, `title` and `description`.
+- **`Document` is not run through `ApprovalStatus`.** Unchanged from
+  `docs/phase-3-plan.md` §4: most documents this system will hold have no
+  approval step in practice, and forcing one onto every uploaded file is
+  exactly the complexity PRD §22 asks to avoid until the business needs it.
+- **The four `linkedType` targets are a flat, one-hop lookup**, not
+  `IssueService`'s two-hop check through an observation's site visit —
+  `PlanningActivity`, `SiteVisit`, `Issue` and `Submission` all carry
+  `projectId` directly, so there is no intermediate table to walk through
+  first.
+- **`linked_type` is a database `CHECK` constraint even though it is not a
+  foreign key.** It is still a closed catalogue, and a typo here should fail
+  loudly rather than sit silently in a document nothing can later find by
+  its link — the same discipline every status-shaped column in this system
+  gets.
+
+**Known limit, recorded rather than discovered later:** the PRD's "maintain
+revision and access history" line for documents (§6) is only partly met.
+Every create, edit, archive and status change is audited — that is the
+access history — but there is no document-revision table the way
+`DrawingRevision` exists for drawings; re-uploading a corrected file today
+means registering a new document, with no link back to the one it replaces.
+`docs/phase-3-plan.md` §6 scopes Document this way deliberately (a flat
+register, no revision concept), and nothing built here forecloses adding one
+later if the client's real usage needs it.
+
+**Also carried forward, unchanged:** the Drive integration itself is still
+`LocalDriveAdapter` only — B7 (`docs/phase-3-plan.md` §7, §9B) remains
+unanswered, and the reconciliation job architecture-discussion §6.5 asks for
+is still a stub with nothing real to reconcile against. Both wait on the
+same external account this environment does not have, same as step 14 left
+them.

@@ -67,7 +67,7 @@ export type CurrentUser = z.infer<typeof currentUserSchema>;
 // hiding a button is a courtesy; the server check is the control (PRD §8, §16).
 // ---------------------------------------------------------------------------
 
-/** The things permissions apply to, in Phase 1. */
+/** The things permissions apply to. */
 export const RESOURCES = [
   'client',
   'property',
@@ -75,6 +75,8 @@ export const RESOURCES = [
   'planning',
   'supervision',
   'issue',
+  'drawing',
+  'document',
   'user',
   'role',
 ] as const;
@@ -122,6 +124,11 @@ export const PERMISSIONS = [
   'drawing:view',
   'drawing:create',
   'drawing:approve',
+
+  'document:view',
+  'document:create',
+  'document:edit',
+  'document:archive',
 
   'user:view',
   'user:admin',
@@ -1001,3 +1008,80 @@ export type DrawingRevisionAction = keyof typeof DRAWING_REVISION_ACTIONS;
 export const DRAWING_REVISION_ACTION_NAMES = Object.keys(
   DRAWING_REVISION_ACTIONS,
 ) as readonly DrawingRevisionAction[];
+
+// ---------------------------------------------------------------------------
+// Documents (docs/phase-3-plan.md §6). Deliberately NOT run through
+// `ApprovalStatus` — most documents this system will hold (site photographs,
+// reports, correspondence) have no approval step in practice, and PRD §22
+// asks to avoid that complexity until the business actually needs it. A
+// document's own state is the upload write flow architecture-discussion
+// §6.5 (decision A5) specifies: created PENDING, bytes uploaded, marked
+// ACTIVE with the file id — or FAILED if the upload never completed.
+// ---------------------------------------------------------------------------
+
+export const DOCUMENT_UPLOAD_STATUSES = ['PENDING', 'ACTIVE', 'FAILED'] as const;
+export type DocumentUploadStatus = (typeof DOCUMENT_UPLOAD_STATUSES)[number];
+
+/**
+ * What a document may be linked to (PRD §6: "link documents to projects,
+ * activities, visits, approvals and issues"). Submission is where an
+ * approval currently lives (step 13), so "approvals" here means Submission.
+ * Not a foreign key — see `linkedId` below and `docs/phase-3-plan.md` §6.
+ */
+export const DOCUMENT_LINKED_TYPES = ['ACTIVITY', 'SITE_VISIT', 'ISSUE', 'SUBMISSION'] as const;
+export type DocumentLinkedType = (typeof DOCUMENT_LINKED_TYPES)[number];
+
+export const documentListQuerySchema = z
+  .object({
+    search: z.string().trim().max(200).optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(25),
+    includeArchived: z.coerce.boolean().default(false),
+    /** Both given together, or neither — see `createDocumentSchema` below. */
+    linkedType: z.enum(DOCUMENT_LINKED_TYPES).optional(),
+    linkedId: z.string().uuid().optional(),
+  })
+  .strict();
+
+export type DocumentListQuery = z.infer<typeof documentListQuerySchema>;
+
+export const createDocumentSchema = z
+  .object({
+    /** A free-text catalogue, not a fixed enum (docs/phase-3-plan.md §8,
+     *  B6) — the PRD gives no fixed category list, matching how
+     *  `Issue.severity` started. */
+    category: z.string().trim().min(1, 'A category is required').max(100),
+    title: z.string().trim().min(1, 'A title is required').max(200),
+    description: optionalText(5000),
+    linkedType: z.enum(DOCUMENT_LINKED_TYPES).nullish(),
+    linkedId: z.string().uuid().nullish(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (Boolean(value.linkedType) !== Boolean(value.linkedId)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['linkedId'],
+        message: 'linkedType and linkedId must be given together, or not at all.',
+      });
+    }
+  });
+
+export type CreateDocument = z.infer<typeof createDocumentSchema>;
+
+/**
+ * Metadata only. There is no re-upload — a new file is a new document, the
+ * same way a new drawing revision is a new row rather than an edit to the
+ * old one — and `linkedType`/`linkedId` are set once, at creation, the same
+ * treatment `Issue.observationId` gets.
+ */
+export const updateDocumentSchema = z
+  .object({
+    category: z.string().trim().min(1).max(100).optional(),
+    title: z.string().trim().min(1).max(200).optional(),
+    description: optionalText(5000),
+    version: z.number().int().min(1),
+  })
+  .strict();
+
+export type UpdateDocument = z.infer<typeof updateDocumentSchema>;
