@@ -1,6 +1,6 @@
 'use server';
 
-import type { SubmissionStatus } from '@ecms/contracts';
+import type { SubmissionAction } from '@ecms/contracts';
 
 import { nullableText, refresh, runAction, text } from '@/lib/actions';
 import { api } from '@/lib/api';
@@ -84,14 +84,28 @@ export async function createSubmission(_state: FormState, form: FormData): Promi
   return result;
 }
 
-/** One function for both legal moves — the API's own transition table decides
- *  which are actually offered (see SUBMISSION_TRANSITIONS in the page). */
+/** One route per named action (phase-1-plan.md §5a); `returnForRevision` is
+ *  the one whose URL segment isn't just its own name in kebab-case. */
+const ACTION_PATHS: Record<SubmissionAction, string> = {
+  submit: 'submit',
+  review: 'review',
+  approve: 'approve',
+  reject: 'reject',
+  returnForRevision: 'return-for-revision',
+  withdraw: 'withdraw',
+};
+
+/** One function for every named action — the API's own transition table
+ *  decides which are actually offered (see SUBMISSION_TRANSITIONS in the
+ *  page), and `approve`'s own permission decides who may call it at all. */
 export async function transitionSubmission(
   projectId: string,
   id: string,
-  to: SubmissionStatus,
+  action: SubmissionAction,
   version: number,
 ): Promise<void> {
-  await api.post(`/projects/${projectId}/planning/submissions/${id}/status`, { to, version });
+  await api.post(`/projects/${projectId}/planning/submissions/${id}/${ACTION_PATHS[action]}`, {
+    version,
+  });
   await refresh(`/projects/${projectId}/planning`);
 }

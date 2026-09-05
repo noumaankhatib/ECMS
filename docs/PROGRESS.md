@@ -5,7 +5,9 @@ Updated at the end of every step.
 
 **Phase 1 — Foundation** (PRD §20): authentication, users, roles, clients, properties, projects. Complete.
 
-**Phase 2 — Core Operations** (PRD §20): planning, supervision, site visits, observations, instructions and issues. See `docs/phase-2-plan.md`.
+**Phase 2 — Core Operations** (PRD §20): planning, supervision, site visits, observations, instructions and issues. See `docs/phase-2-plan.md`. Complete.
+
+**Phase 3 — Documents** (PRD §20): document register, drawing revisions, Google Shared Drive and approvals. See `docs/phase-3-plan.md`.
 
 | Step | Track point                                            | Status  |
 | ---- | ------------------------------------------------------ | ------- |
@@ -22,6 +24,10 @@ Updated at the end of every step.
 | 10   | Supervision — site visits, observations, instructions  | ✅ Done |
 | 11   | Issues — the fourth state machine                      | ✅ Done |
 | 12   | Web interface for Phase 2                              | ✅ Done |
+| 13   | Approvals — the shared state machine                   | ✅ Done |
+| 14   | Drawings — append-only, immutable-when-approved        | ⬜ Next |
+| 15   | Documents — register, metadata and the Drive seam      | ⬜      |
+| 16   | Web interface for Phase 3                              | ⬜      |
 
 ---
 
@@ -941,3 +947,81 @@ field names checked for collisions, not just its logic.
 - **Lists on these new pages fetch up to 100 rows and do not page**, the same
   known limit step 8 recorded for Phase 1's lists, now true of six more of
   them.
+
+---
+
+## Step 13 — Approvals: the shared state machine ✅
+
+The first step of Phase 3 (`docs/phase-3-plan.md`), and deliberately first: it
+needs neither a new table nor a Google Drive dependency, and it is what makes
+Phase 2's submissions stop being stuck at `SUBMITTED`.
+
+**Built:** `ApprovalStatus`/`APPROVAL_TRANSITIONS`/`canTransitionApproval` in
+`@ecms/contracts` — the one shared implementation architecture-discussion §6.4
+(decision A6) asks for. `Submission.status` grows from `{DRAFT, SUBMITTED,
+WITHDRAWN}` to the full approval set plus `WITHDRAWN`, exactly as promised in
+step 9. Submission's transition endpoint changed from a single generic
+`POST .../status {to, version}` route to six named-action routes — `submit`,
+`review`, `approve`, `reject`, `returnForRevision`, `withdraw` — matching the
+"no generic set status" rule (`phase-1-plan.md` §5a) that Project and Issue
+already followed and Submission, until now, did not. The one new permission,
+`planning:approve`, is the first real use of the `approve` verb PRD §8 named
+back in step 4.
+
+**Endpoints:** `/projects/:projectId/planning/submissions/:id/{submit,review,
+approve,reject,return-for-revision,withdraw}`.
+
+**Verified — 5 new tests (111 total in the API suite):**
+
+| Behaviour                                                                                   | Result                  |
+| ------------------------------------------------------------------------------------------- | ----------------------- |
+| A submission cannot skip `UNDER_REVIEW` straight to a decision                              | ✅ `ILLEGAL_TRANSITION` |
+| A full walk: submit → review → returned for revision → resubmit → review → approve          | ✅                      |
+| **A reviewer approving their own submission is refused**                                    | ✅ `FORBIDDEN`          |
+| …but rejecting or returning their own submission is not — not the same conflict of interest | ✅                      |
+| `planning:approve` is held by Director and Planning Team, not Project Manager               | ✅                      |
+
+**Decisions:**
+
+- **One shared transition table in contracts, not one shared database
+  table.** Architecture-discussion §6.4 asks for "a single reusable approval
+  state machine, not per-workflow duplication" and frames it as a polymorphic
+  `ApprovalRequest` entity. This codebase's own idiom — a transition table
+  and function per state machine, living in `@ecms/contracts`
+  (`PROJECT_TRANSITIONS`, `SUBMISSION_TRANSITIONS`, `ISSUE_TRANSITIONS`) —
+  already achieves the same goal ("one place the rule lives") without a
+  denormalised table joining unrelated entities. `Submission` composes the
+  shared table with one submission-specific edge (`WITHDRAWN`) rather than
+  copying it; `DrawingRevision` will consume the same shared table unchanged
+  in step 14.
+- **Self-approval is refused for `approve` only, not `reject` or
+  `returnForRevision`.** The conflict of interest is specifically in
+  rubber-stamping your own work; sending it back or refusing it carries no
+  equivalent incentive to abuse. Checked in the service, next to
+  `requireOpenProject`, not as a fourth permission — the matrix says who may
+  approve _something_, not whose.
+- **`planning:approve` sits on the existing `planning` resource**, not a new
+  `approval` resource, matching how `issue:close` already sits on `issue`
+  rather than a separate `closure` resource — the verb belongs to the thing
+  it governs.
+- **The matrix comes from PRD §3's own role descriptions**, already sitting
+  unused in `ROLE_DEFINITIONS` since step 4: Planning Team's is "submissions,
+  drawings **and approvals**"; Director's is "dashboards **and approvals**".
+  Project Manager's description says neither, and holds no approve grant.
+
+**Bug found while writing the tests, not the code:** `RETURNED_FOR_REVISION`
+is 21 characters; `Submission.status` was `VarChar(20)`, one character short.
+Prisma's own type-checking had nothing to say about it — the failure surfaced
+only as a database error the moment a real transition tried to write the
+value, in `walks a submission through the full approval lifecycle`. Fixed by
+widening the column to `VarChar(30)`, and worth a general lesson: a CHECK
+constraint that lists literal values does not protect against one of those
+literals being longer than the column that holds it.
+
+**Also found while writing the tests:** an early version of the
+"no further without a reviewer" test tried to prove `SUBMITTED` cannot jump
+straight to `APPROVED`, but used the submission's own creator as the actor —
+which tripped the self-approval refusal instead of the transition-table
+check, the same "two different failures, pick the action that isolates one"
+lesson step 11 already learned. Fixed by deciding with `admin`, who created
+nothing here.

@@ -1,6 +1,6 @@
 import {
-  SUBMISSION_TRANSITIONS,
   canTransitionSubmission,
+  type SubmissionAction,
   type SubmissionStatus,
 } from '@ecms/contracts';
 
@@ -44,14 +44,37 @@ export const metadata = { title: 'Planning — ECMS' };
 const SUBMISSION_LABEL: Record<SubmissionStatus, string> = {
   DRAFT: 'Draft',
   SUBMITTED: 'Submitted',
+  UNDER_REVIEW: 'Under review',
+  APPROVED: 'Approved',
+  REJECTED: 'Rejected',
+  RETURNED_FOR_REVISION: 'Returned for revision',
   WITHDRAWN: 'Withdrawn',
 };
 
-const SUBMISSION_ACTION_LABEL: Record<SubmissionStatus, string> = {
-  DRAFT: 'Revert to draft',
-  SUBMITTED: 'Submit',
-  WITHDRAWN: 'Withdraw',
-};
+/**
+ * The named actions, and the word for each — the same shape the project and
+ * issue pages use. `approve`, `reject` and `returnForRevision` are decisions
+ * and sit behind `planning:approve`; the rest are ordinary editing.
+ */
+const SUBMISSION_ACTION_DEFS: {
+  action: SubmissionAction;
+  to: SubmissionStatus;
+  label: string;
+  decision?: boolean;
+  variant?: 'secondary' | 'danger';
+}[] = [
+  { action: 'submit', to: 'SUBMITTED', label: 'Submit' },
+  { action: 'review', to: 'UNDER_REVIEW', label: 'Start review' },
+  { action: 'approve', to: 'APPROVED', label: 'Approve', decision: true },
+  { action: 'reject', to: 'REJECTED', label: 'Reject', decision: true, variant: 'danger' },
+  {
+    action: 'returnForRevision',
+    to: 'RETURNED_FOR_REVISION',
+    label: 'Return for revision',
+    decision: true,
+  },
+  { action: 'withdraw', to: 'WITHDRAWN', label: 'Withdraw', variant: 'danger' },
+];
 
 /**
  * Planning — activities, milestones and submissions (docs/phase-2-plan.md).
@@ -82,6 +105,7 @@ export default async function PlanningPage({ params }: { params: Promise<{ id: s
   const closed = project.status === 'CLOSED';
   const mayCreate = session.can('planning:create', id) && !closed;
   const mayEdit = session.can('planning:edit', id) && !closed;
+  const mayApprove = session.can('planning:approve', id) && !closed;
 
   return (
     <>
@@ -260,10 +284,11 @@ export default async function PlanningPage({ params }: { params: Promise<{ id: s
               </thead>
               <tbody>
                 {submissions.items.map((submission) => {
-                  const legal = SUBMISSION_TRANSITIONS[
-                    submission.status
-                  ] as readonly SubmissionStatus[];
-                  const next = legal.filter((to) => canTransitionSubmission(submission.status, to));
+                  const available = SUBMISSION_ACTION_DEFS.filter(
+                    (candidate) =>
+                      canTransitionSubmission(submission.status, candidate.to) &&
+                      (candidate.decision ? mayApprove : mayEdit),
+                  );
                   return (
                     <tr key={submission.id}>
                       <td className="mono">{submission.reference}</td>
@@ -272,24 +297,22 @@ export default async function PlanningPage({ params }: { params: Promise<{ id: s
                         <Badge>{SUBMISSION_LABEL[submission.status]}</Badge>
                       </td>
                       <td className="right">
-                        {mayEdit ? (
-                          <div className="row" style={{ justifyContent: 'flex-end' }}>
-                            {next.map((to) => (
-                              <ActionButton
-                                key={to}
-                                action={transitionSubmission.bind(
-                                  null,
-                                  id,
-                                  submission.id,
-                                  to,
-                                  submission.version,
-                                )}
-                                label={SUBMISSION_ACTION_LABEL[to]}
-                                variant={to === 'WITHDRAWN' ? 'danger' : 'secondary'}
-                              />
-                            ))}
-                          </div>
-                        ) : null}
+                        <div className="row" style={{ justifyContent: 'flex-end' }}>
+                          {available.map((candidate) => (
+                            <ActionButton
+                              key={candidate.action}
+                              action={transitionSubmission.bind(
+                                null,
+                                id,
+                                submission.id,
+                                candidate.action,
+                                submission.version,
+                              )}
+                              label={candidate.label}
+                              variant={candidate.variant ?? 'secondary'}
+                            />
+                          ))}
+                        </div>
                       </td>
                     </tr>
                   );

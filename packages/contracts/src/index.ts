@@ -108,6 +108,7 @@ export const PERMISSIONS = [
   'planning:view',
   'planning:create',
   'planning:edit',
+  'planning:approve',
 
   'supervision:view',
   'supervision:create',
@@ -601,34 +602,83 @@ export function grantsAllow(
 }
 
 // ---------------------------------------------------------------------------
-// Planning — activities, milestones and submissions
-//
-// docs/phase-2-plan.md §4. A submission stops at SUBMITTED in this phase —
-// there is no approval step yet, because the PRD defines exactly one approval
-// state machine shared across submissions, drawings and documents, and that
-// module is Phase 3. Building a one-off approval flag here would be the first
-// of three divergent copies of a rule that should only ever be enforced in
-// one place.
+// Approvals — one shared state machine (docs/phase-3-plan.md §4), consumed by
+// submissions here and by drawing revisions later, rather than reimplemented
+// per module. This is `phase-1-plan.md` §5a's `Approval` row.
 // ---------------------------------------------------------------------------
 
-export const SUBMISSION_STATUSES = ['DRAFT', 'SUBMITTED', 'WITHDRAWN'] as const;
+export const APPROVAL_STATUSES = [
+  'DRAFT',
+  'SUBMITTED',
+  'UNDER_REVIEW',
+  'APPROVED',
+  'REJECTED',
+  'RETURNED_FOR_REVISION',
+] as const;
+export type ApprovalStatus = (typeof APPROVAL_STATUSES)[number];
+
+export const APPROVAL_TRANSITIONS = {
+  DRAFT: ['SUBMITTED'],
+  SUBMITTED: ['UNDER_REVIEW'],
+  UNDER_REVIEW: ['APPROVED', 'REJECTED', 'RETURNED_FOR_REVISION'],
+  APPROVED: [],
+  REJECTED: [],
+  RETURNED_FOR_REVISION: ['SUBMITTED'],
+} as const satisfies Record<ApprovalStatus, readonly ApprovalStatus[]>;
+
+export function canTransitionApproval(from: ApprovalStatus, to: ApprovalStatus): boolean {
+  return (APPROVAL_TRANSITIONS[from] as readonly ApprovalStatus[]).includes(to);
+}
+
+// ---------------------------------------------------------------------------
+// Planning — activities, milestones and submissions
+//
+// docs/phase-2-plan.md §4 promised that Phase 3's Approvals module would
+// extend a submission's status set rather than replace it — this is that.
+// `WITHDRAWN` is layered on top of the shared approval table as a
+// submission-specific edge; the shared table has no reason to know about it.
+// ---------------------------------------------------------------------------
+
+export const SUBMISSION_STATUSES = [...APPROVAL_STATUSES, 'WITHDRAWN'] as const;
 export type SubmissionStatus = (typeof SUBMISSION_STATUSES)[number];
 
-/**
- * Small, like the workstream transition table in Phase 1 — real, and
- * enforced the same way, but not one of the four state machines named in
- * `phase-1-plan.md` §5a. A submission cannot un-withdraw, and cannot go
- * straight from nothing to withdrawn without having existed as a draft.
- */
 export const SUBMISSION_TRANSITIONS = {
-  DRAFT: ['SUBMITTED', 'WITHDRAWN'],
-  SUBMITTED: ['WITHDRAWN'],
+  DRAFT: [...APPROVAL_TRANSITIONS.DRAFT, 'WITHDRAWN'],
+  SUBMITTED: [...APPROVAL_TRANSITIONS.SUBMITTED, 'WITHDRAWN'],
+  UNDER_REVIEW: [...APPROVAL_TRANSITIONS.UNDER_REVIEW],
+  APPROVED: [...APPROVAL_TRANSITIONS.APPROVED],
+  REJECTED: [...APPROVAL_TRANSITIONS.REJECTED],
+  RETURNED_FOR_REVISION: [...APPROVAL_TRANSITIONS.RETURNED_FOR_REVISION],
   WITHDRAWN: [],
 } as const satisfies Record<SubmissionStatus, readonly SubmissionStatus[]>;
 
 export function canTransitionSubmission(from: SubmissionStatus, to: SubmissionStatus): boolean {
   return (SUBMISSION_TRANSITIONS[from] as readonly SubmissionStatus[]).includes(to);
 }
+
+/**
+ * The named actions a caller may take, and where each one leads — the same
+ * shape `PROJECT_ACTIONS` and `ISSUE_ACTIONS` use, and for the same reason:
+ * no generic "set status" operation (`phase-1-plan.md` §5a). `submit` covers
+ * both a draft's first submission and a resubmission after being returned
+ * for revision, the same way `activate` covers two starting states in
+ * `PROJECT_ACTIONS` — the target is identical, and the transition table
+ * already says which starting states are legal.
+ */
+export const SUBMISSION_ACTIONS = {
+  submit: 'SUBMITTED',
+  review: 'UNDER_REVIEW',
+  approve: 'APPROVED',
+  reject: 'REJECTED',
+  returnForRevision: 'RETURNED_FOR_REVISION',
+  withdraw: 'WITHDRAWN',
+} as const satisfies Record<string, SubmissionStatus>;
+
+export type SubmissionAction = keyof typeof SUBMISSION_ACTIONS;
+
+export const SUBMISSION_ACTION_NAMES = Object.keys(
+  SUBMISSION_ACTIONS,
+) as readonly SubmissionAction[];
 
 export const createPlanningActivitySchema = z
   .object({
@@ -694,8 +744,10 @@ export type UpdateSubmission = z.infer<typeof updateSubmissionSchema>;
 
 export const submissionTransitionSchema = z
   .object({
-    to: z.enum(SUBMISSION_STATUSES),
     version: z.number().int().min(1),
+    /** An approval decision's own comment — "why this move, right now" — the
+     *  same role `reason` plays on `ProjectTransition`. */
+    reason: optionalText(1000),
   })
   .strict();
 

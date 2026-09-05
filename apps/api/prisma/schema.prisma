@@ -335,9 +335,12 @@ model Submission {
   authorityName String  @map("authority_name") @db.VarChar(200)
   notes         String? @db.Text
 
-  /// DRAFT, SUBMITTED or WITHDRAWN. Moves only through a checked transition,
-  /// the same rule as every status column in this system.
-  status String @default("DRAFT") @db.VarChar(20)
+  /// The shared approval state machine (DRAFT, SUBMITTED, UNDER_REVIEW,
+  /// APPROVED, REJECTED, RETURNED_FOR_REVISION — docs/phase-3-plan.md §4)
+  /// plus WITHDRAWN, a submission-specific edge. Moves only through a
+  /// checked transition, the same rule as every status column in this system.
+  /// VarChar(30): RETURNED_FOR_REVISION alone is 21 characters.
+  status String @default("DRAFT") @db.VarChar(30)
 
   version Int @default(1)
 

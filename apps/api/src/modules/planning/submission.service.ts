@@ -1,8 +1,10 @@
 import {
+  SUBMISSION_ACTIONS,
   canTransitionSubmission,
   type CreateSubmission,
   type ListQuery,
   type Page,
+  type SubmissionAction,
   type SubmissionStatus,
   type SubmissionTransition,
   type UpdateSubmission,
@@ -17,12 +19,11 @@ import { AuditService } from '../audit';
 import { requireOpenProject } from './project-guard';
 
 /**
- * A planning authority application. Stops at `SUBMITTED` in this phase — see
- * docs/phase-2-plan.md §2. There is no approval step here on purpose: the PRD
- * defines exactly one approval state machine shared across submissions,
- * drawings and documents, and that module is Phase 3. Building one just for
- * submissions now would be the first of three divergent copies of a rule that
- * should only ever be enforced in one place.
+ * A planning authority application. Its status is the shared approval state
+ * machine (docs/phase-3-plan.md §4) plus one submission-specific edge,
+ * `WITHDRAWN` — not a one-off copy of it. `ApprovalStatus`/
+ * `canTransitionApproval` live in `@ecms/contracts` for drawing revisions to
+ * reuse later, the same way this module reuses them now.
  */
 @Injectable()
 export class SubmissionService {
@@ -130,26 +131,38 @@ export class SubmissionService {
   }
 
   /**
-   * Moves a submission to `SUBMITTED` or `WITHDRAWN`.
+   * Moves a submission to a new status. The named action decides the target,
+   * the shared transition table decides whether the move is legal from where
+   * the submission currently is, and the write is conditional on it still
+   * being in that state — the same three-layer shape `ProjectService.transition`
+   * established in Phase 1.
    *
-   * Small, like the workstream transition table in Phase 1 — real, and
-   * enforced the same way, but not one of the four full state machines named
-   * in `phase-1-plan.md` §5a. The write is conditional on the current status,
-   * the same mechanism that stops two people acting on a project at once.
+   * `approve` alone is refused when the actor created the submission being
+   * approved (docs/phase-3-plan.md §4's starting answer to B3) — a reviewer
+   * rejecting or returning their own submission is not the conflict of
+   * interest self-approval is, so only this one action carries the check.
    */
   async transition(
     projectId: string,
     id: string,
+    action: SubmissionAction,
     input: SubmissionTransition,
+    actorId: string,
   ): Promise<Submission> {
+    const target: SubmissionStatus = SUBMISSION_ACTIONS[action];
+
     const current = await this.prisma.submission.findUnique({
       where: { id },
-      select: { id: true, projectId: true, status: true },
+      select: { id: true, projectId: true, status: true, createdBy: true },
     });
     if (!current || current.projectId !== projectId) throw appError('NOT_FOUND');
 
+    if (action === 'approve' && current.createdBy === actorId) {
+      throw appError('FORBIDDEN', { context: { submission_id: id, reason: 'self_approval' } });
+    }
+
     const from = current.status as SubmissionStatus;
-    if (!canTransitionSubmission(from, input.to)) {
+    if (!canTransitionSubmission(from, target)) {
       await this.prisma.$transaction((tx) =>
         this.audit.record(tx, {
           action: 'STATUS_CHANGED',
@@ -158,14 +171,12 @@ export class SubmissionService {
           projectId,
           outcome: 'REJECTED',
           before: { status: from },
-          after: { status: input.to },
+          after: { status: target },
         }),
       );
 
       throw appError('ILLEGAL_TRANSITION', {
-        fields: [
-          { field: 'status', reason: `A submission cannot go from ${from} to ${input.to}.` },
-        ],
+        fields: [{ field: 'status', reason: `A submission cannot go from ${from} to ${target}.` }],
       });
     }
 
@@ -174,7 +185,7 @@ export class SubmissionService {
 
       const { count } = await tx.submission.updateMany({
         where: { id, status: from, version: input.version },
-        data: { status: input.to, version: { increment: 1 } },
+        data: { status: target, version: { increment: 1 } },
       });
       if (count === 0) throw appError('STALE_RECORD', { context: { submission_id: id } });
 
@@ -184,7 +195,7 @@ export class SubmissionService {
         entityId: id,
         projectId,
         before: { status: from },
-        after: { status: input.to },
+        after: { status: target, reason: input.reason ?? null },
       });
 
       return tx.submission.findUniqueOrThrow({ where: { id } });

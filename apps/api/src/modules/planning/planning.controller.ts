@@ -208,13 +208,76 @@ export class SubmissionController {
     return this.submissions.update(projectId, id, body, actorOf(req));
   }
 
-  @Post(':id/status')
+  // ---------------------------------------------------------------------------
+  // Transitions. One route per named action, deliberately — see
+  // phase-1-plan.md §5a and ProjectsController's identical shape. `approve` is
+  // its own permission: it is the one action PRD §3 gives to a specific
+  // authority (Planning Team and Director "and approvals"), not general editing.
+  // ---------------------------------------------------------------------------
+
+  @Post(':id/submit')
   @RequirePermission('planning:edit')
-  transition(
+  submit(
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(submissionTransitionSchema)) body: SubmissionTransition,
+    @Req() req: Request,
   ): Promise<Submission> {
-    return this.submissions.transition(projectId, id, body);
+    return this.submissions.transition(projectId, id, 'submit', body, actorOf(req));
+  }
+
+  @Post(':id/review')
+  @RequirePermission('planning:edit')
+  review(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(submissionTransitionSchema)) body: SubmissionTransition,
+    @Req() req: Request,
+  ): Promise<Submission> {
+    return this.submissions.transition(projectId, id, 'review', body, actorOf(req));
+  }
+
+  @Post(':id/approve')
+  @RequirePermission('planning:approve')
+  approve(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(submissionTransitionSchema)) body: SubmissionTransition,
+    @Req() req: Request,
+  ): Promise<Submission> {
+    return this.submissions.transition(projectId, id, 'approve', body, actorOf(req));
+  }
+
+  @Post(':id/reject')
+  @RequirePermission('planning:approve')
+  reject(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(submissionTransitionSchema)) body: SubmissionTransition,
+    @Req() req: Request,
+  ): Promise<Submission> {
+    return this.submissions.transition(projectId, id, 'reject', body, actorOf(req));
+  }
+
+  @Post(':id/return-for-revision')
+  @RequirePermission('planning:approve')
+  returnForRevision(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(submissionTransitionSchema)) body: SubmissionTransition,
+    @Req() req: Request,
+  ): Promise<Submission> {
+    return this.submissions.transition(projectId, id, 'returnForRevision', body, actorOf(req));
+  }
+
+  @Post(':id/withdraw')
+  @RequirePermission('planning:edit')
+  withdraw(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(submissionTransitionSchema)) body: SubmissionTransition,
+    @Req() req: Request,
+  ): Promise<Submission> {
+    return this.submissions.transition(projectId, id, 'withdraw', body, actorOf(req));
   }
 }

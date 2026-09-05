@@ -222,7 +222,7 @@ describe('planning', () => {
     expect(entries).toBe(1);
   });
 
-  it('moves a submission from DRAFT to SUBMITTED, and no further forward', async () => {
+  it('moves a submission from DRAFT to SUBMITTED, and no further without a reviewer', async () => {
     const submission = await inContext(() =>
       submissions.create(
         projectId,
@@ -232,18 +232,23 @@ describe('planning', () => {
     );
 
     const submitted = await inContext(() =>
-      submissions.transition(projectId, submission.id, { to: 'SUBMITTED', version: 1 }),
+      submissions.transition(projectId, submission.id, 'submit', { version: 1 }, owningManager),
     );
     expect(submitted.status).toBe('SUBMITTED');
 
-    // There is no approval step in this phase — SUBMITTED is where it stops,
-    // not one of the four full state machines in the system.
+    // Approval only reaches a decision through UNDER_REVIEW — SUBMITTED
+    // cannot jump straight to a decision. Decided by `admin`, not the
+    // submission's own creator, so this checks the transition table rather
+    // than tripping the separate self-approval refusal.
     await expect(
       inContext(() =>
-        submissions.transition(projectId, submission.id, {
-          to: 'DRAFT',
-          version: submitted.version,
-        }),
+        submissions.transition(
+          projectId,
+          submission.id,
+          'approve',
+          { version: submitted.version },
+          admin,
+        ),
       ),
     ).rejects.toMatchObject({ code: 'ILLEGAL_TRANSITION' });
   });
@@ -257,12 +262,12 @@ describe('planning', () => {
       ),
     );
     await inContext(() =>
-      submissions.transition(projectId, submission.id, { to: 'WITHDRAWN', version: 1 }),
+      submissions.transition(projectId, submission.id, 'withdraw', { version: 1 }, owningManager),
     );
 
     await expect(
       inContext(() =>
-        submissions.transition(projectId, submission.id, { to: 'SUBMITTED', version: 2 }),
+        submissions.transition(projectId, submission.id, 'submit', { version: 2 }, owningManager),
       ),
     ).rejects.toMatchObject({ code: 'ILLEGAL_TRANSITION' });
 
@@ -286,15 +291,150 @@ describe('planning', () => {
       ),
     );
     await inContext(() =>
-      submissions.transition(projectId, submission.id, { to: 'SUBMITTED', version: 1 }),
+      submissions.transition(projectId, submission.id, 'submit', { version: 1 }, owningManager),
     );
 
     // The second caller read version 1 before the first move landed.
     await expect(
       inContext(() =>
-        submissions.transition(projectId, submission.id, { to: 'WITHDRAWN', version: 1 }),
+        submissions.transition(projectId, submission.id, 'withdraw', { version: 1 }, owningManager),
       ),
     ).rejects.toMatchObject({ code: 'STALE_RECORD' });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Approvals (docs/phase-3-plan.md §4) — the shared state machine, reached
+  // through submissions first
+  // ---------------------------------------------------------------------------
+
+  it('walks a submission through the full approval lifecycle, including a return and resubmission', async () => {
+    const reviewer = await userWithRole('PLANNING');
+    await prisma.projectMember.create({
+      data: { projectId, userId: reviewer, roleCode: 'PLANNING' },
+    });
+
+    const submission = await inContext(() =>
+      submissions.create(
+        projectId,
+        { reference: 'SUB-005', authorityName: 'Local Planning Authority' },
+        owningManager,
+      ),
+    );
+
+    let current = await inContext(() =>
+      submissions.transition(projectId, submission.id, 'submit', { version: 1 }, owningManager),
+    );
+    current = await inContext(() =>
+      submissions.transition(
+        projectId,
+        submission.id,
+        'review',
+        { version: current.version },
+        owningManager,
+      ),
+    );
+    expect(current.status).toBe('UNDER_REVIEW');
+
+    current = await inContext(() =>
+      submissions.transition(
+        projectId,
+        submission.id,
+        'returnForRevision',
+        { version: current.version, reason: 'Missing a site plan' },
+        reviewer,
+      ),
+    );
+    expect(current.status).toBe('RETURNED_FOR_REVISION');
+
+    current = await inContext(() =>
+      submissions.transition(
+        projectId,
+        submission.id,
+        'submit',
+        { version: current.version },
+        owningManager,
+      ),
+    );
+    expect(current.status).toBe('SUBMITTED');
+
+    current = await inContext(() =>
+      submissions.transition(
+        projectId,
+        submission.id,
+        'review',
+        { version: current.version },
+        owningManager,
+      ),
+    );
+    current = await inContext(() =>
+      submissions.transition(
+        projectId,
+        submission.id,
+        'approve',
+        { version: current.version },
+        reviewer,
+      ),
+    );
+    expect(current.status).toBe('APPROVED');
+  });
+
+  it('refuses a reviewer approving their own submission', async () => {
+    const reviewer = await userWithRole('PLANNING');
+    await prisma.projectMember.create({
+      data: { projectId, userId: reviewer, roleCode: 'PLANNING' },
+    });
+
+    const submission = await inContext(() =>
+      submissions.create(
+        projectId,
+        { reference: 'SUB-006', authorityName: 'Local Planning Authority' },
+        reviewer,
+      ),
+    );
+    let current = await inContext(() =>
+      submissions.transition(projectId, submission.id, 'submit', { version: 1 }, reviewer),
+    );
+    current = await inContext(() =>
+      submissions.transition(
+        projectId,
+        submission.id,
+        'review',
+        { version: current.version },
+        reviewer,
+      ),
+    );
+
+    await expect(
+      inContext(() =>
+        submissions.transition(
+          projectId,
+          submission.id,
+          'approve',
+          { version: current.version },
+          reviewer,
+        ),
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    // Rejecting or returning one's own submission is not the same conflict
+    // of interest, and is not refused.
+    const rejected = await inContext(() =>
+      submissions.transition(
+        projectId,
+        submission.id,
+        'reject',
+        { version: current.version },
+        reviewer,
+      ),
+    );
+    expect(rejected.status).toBe('REJECTED');
+  });
+
+  it('holds planning:approve only where the matrix says so', async () => {
+    expect(await authorization.can(admin, 'planning:approve', projectId)).toBe(true);
+    // Project Manager coordinates but does not approve (PRD §3 gives
+    // "approvals" to Planning Team and Director, not Project Manager).
+    expect(await authorization.can(owningManager, 'planning:approve', projectId)).toBe(false);
   });
 
   // ---------------------------------------------------------------------------
