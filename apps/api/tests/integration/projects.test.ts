@@ -8,6 +8,7 @@ import { PropertyService } from '../../src/modules/directory/property.service';
 import { MembershipService } from '../../src/modules/projects/membership.service';
 import { ProjectService } from '../../src/modules/projects/project.service';
 import { WorkstreamService } from '../../src/modules/projects/workstream.service';
+import { SequenceService } from '../../src/modules/sequence';
 import { runInRequestContext } from '../../src/shared/context/request-context';
 import type { PrismaService } from '../../src/shared/database/prisma.service';
 
@@ -28,7 +29,7 @@ describe('projects', () => {
   const authorization = new AuthorizationService(prisma);
   const clients = new ClientService(prisma, audit);
   const properties = new PropertyService(prisma, audit);
-  const projects = new ProjectService(prisma, audit, authorization);
+  const projects = new ProjectService(prisma, audit, authorization, new SequenceService());
   const members = new MembershipService(prisma, audit);
   const workstreams = new WorkstreamService(prisma, audit);
 
@@ -210,6 +211,30 @@ describe('projects', () => {
         ),
       ),
     ).rejects.toMatchObject({ code: 'CONFLICT' });
+  });
+
+  it('generates a code from the type-matched sequence when none is given', async () => {
+    const year = String(new Date().getUTCFullYear() % 100).padStart(2, '0');
+
+    const supervision = await inContext(() =>
+      projects.create({ clientId, propertyId, name: 'No code given', type: 'SUPERVISION' }, admin),
+    );
+    expect(supervision.code).toMatch(new RegExp(`^${year}\\.S\\.\\d{3,}$`));
+
+    const planning = await inContext(() =>
+      projects.create({ clientId, propertyId, name: 'Planning, no code', type: 'PLANNING' }, admin),
+    );
+    expect(planning.code).toMatch(new RegExp(`^${year}\\.P\\.\\d{3,}$`));
+
+    // An explicit code, e.g. for a migrated historical project, still works
+    // exactly as before and is not overridden.
+    const explicit = await inContext(() =>
+      projects.create(
+        { clientId, propertyId, code: uniqueCode(), name: 'Explicit', type: 'PLANNING' },
+        admin,
+      ),
+    );
+    expect(explicit.code).not.toMatch(/\.P\.|\.S\./);
   });
 
   it('refuses a property that belongs to a different client', async () => {

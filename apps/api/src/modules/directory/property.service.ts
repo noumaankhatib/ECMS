@@ -24,6 +24,10 @@ export class PropertyService {
               { reference: { contains: query.search, mode: 'insensitive' } },
               { city: { contains: query.search, mode: 'insensitive' } },
               { postcode: { contains: query.search, mode: 'insensitive' } },
+              // A plot is more often looked up by its own number than its
+              // name in practice — see docs/phase-4-plan.md §7.
+              { plotNumber: { contains: query.search, mode: 'insensitive' } },
+              { surveyReference: { contains: query.search, mode: 'insensitive' } },
             ],
           }
         : {}),
@@ -75,6 +79,13 @@ export class PropertyService {
             postcode: input.postcode ?? null,
             country: input.country ?? null,
             notes: input.notes ?? null,
+            plotNumber: input.plotNumber ?? null,
+            wilayat: input.wilayat ?? null,
+            village: input.village ?? null,
+            surveyReference: input.surveyReference ?? null,
+            titleDeedReference: input.titleDeedReference ?? null,
+            ownerName: input.ownerName ?? null,
+            ownerNationalId: input.ownerNationalId ?? null,
             createdBy: actorId,
           },
         })

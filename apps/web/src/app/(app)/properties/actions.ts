@@ -18,6 +18,13 @@ async function addressFrom(form: FormData) {
     postcode: await nullableText(form, 'postcode'),
     country: await nullableText(form, 'country'),
     notes: await nullableText(form, 'notes'),
+    plotNumber: await nullableText(form, 'plotNumber'),
+    wilayat: await nullableText(form, 'wilayat'),
+    village: await nullableText(form, 'village'),
+    surveyReference: await nullableText(form, 'surveyReference'),
+    titleDeedReference: await nullableText(form, 'titleDeedReference'),
+    ownerName: await nullableText(form, 'ownerName'),
+    ownerNationalId: await nullableText(form, 'ownerNationalId'),
   };
 }
 

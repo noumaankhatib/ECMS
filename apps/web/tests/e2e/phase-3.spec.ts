@@ -57,7 +57,7 @@ test.describe('Phase 3 through the browser', () => {
 
     await page.goto(`/properties/new?clientId=${clientId}`);
     await page.getByLabel('Client').selectOption(clientId);
-    await page.getByLabel('Name').fill(`Phase 3 House ${tag}`);
+    await page.getByLabel('Name', { exact: true }).fill(`Phase 3 House ${tag}`);
     await page.getByRole('button', { name: 'Create property' }).click();
     await page.waitForURL(/\/properties\/[0-9a-f-]{36}$/);
     const propertyId = page.url().split('/').pop() ?? '';

@@ -138,6 +138,48 @@ describe('directory', () => {
     ).rejects.toMatchObject({ code: 'CONFLICT' });
   });
 
+  it('records the Oman land-registry identity on a property, all fields optional', async () => {
+    const property = await inContext(() =>
+      properties.create(
+        {
+          clientId,
+          name: 'Villa, Al Mawaleh South',
+          plotNumber: '102/8',
+          wilayat: 'Al Seeb',
+          village: 'Al Mawaleh South',
+          surveyReference: '1-35-055-01-585',
+          titleDeedReference: '2015/19618',
+          ownerName: 'Nasreen bint Abdul Rahim bin Sheikh',
+          ownerNationalId: '62898538',
+        },
+        actor,
+      ),
+    );
+
+    expect(property.plotNumber).toBe('102/8');
+    expect(property.titleDeedReference).toBe('2015/19618');
+    expect(property.ownerNationalId).toBe('62898538');
+
+    // A property with none of it given is not blocked — the paperwork may
+    // arrive after the record does.
+    const bare = await inContext(() => properties.create({ clientId, name: 'Bare Plot' }, actor));
+    expect(bare.plotNumber).toBeNull();
+  });
+
+  it('finds a property by its plot number, not only its name', async () => {
+    const plotNumber = `PLOT-${crypto.randomUUID()}`;
+    await inContext(() => properties.create({ clientId, name: 'Findable', plotNumber }, actor));
+
+    const page = await properties.list({
+      page: 1,
+      pageSize: 10,
+      includeArchived: false,
+      search: plotNumber,
+    });
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]?.plotNumber).toBe(plotNumber);
+  });
+
   it('keeps at most one primary contact, demoting the previous one', async () => {
     await inContext(() => contacts.create(clientId, { name: 'First', isPrimary: true }));
     await inContext(() => contacts.create(clientId, { name: 'Second', isPrimary: true }));

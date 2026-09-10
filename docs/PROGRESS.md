@@ -9,6 +9,12 @@ Updated at the end of every step.
 
 **Phase 3 — Documents** (PRD §20): document register, drawing revisions, Google Shared Drive and approvals. See `docs/phase-3-plan.md`. Complete.
 
+**Phase 4 — Property identity and real numbering**: Oman land-registry identity on `Property`
+(plot number, Krookie survey reference, Mulkia title-deed reference, registered owner), and a real
+annual-reset numbering service replacing the free-typed project code. The first of an 8-phase
+roadmap derived from the client's own documents and registers, not just the PRD — see
+`docs/phase-4-plan.md` and `~/.claude/plans/swirling-singing-book.md`. Complete.
+
 | Step | Track point                                            | Status  |
 | ---- | ------------------------------------------------------ | ------- |
 | 0    | Project skeleton and tooling                           | ✅ Done |
@@ -28,6 +34,10 @@ Updated at the end of every step.
 | 14   | Drawings — append-only, immutable-when-approved        | ✅ Done |
 | 15   | Documents — register, metadata and the Drive seam      | ✅ Done |
 | 16   | Web interface for Phase 3                              | ✅ Done |
+| 17   | Property fields — Oman land-registry identity          | ✅ Done |
+| 18   | Sequence service — real, annual-reset numbering        | ✅ Done |
+| 19   | Wired into `Project.create` — generated `code`         | ✅ Done |
+| 20   | Web — property form, project-code hint                 | ✅ Done |
 
 ---
 
@@ -1317,3 +1327,97 @@ the in-memory sign-in rate limiter (`docs/PROGRESS.md` step 4's known
 limit) tripping after many repeated manual re-runs against one long-lived
 API process — cleared by restarting it. Both are artifacts of this
 particular sandbox session, not of the application.
+
+---
+
+## Step 17 — Property fields: Oman land-registry identity ✅
+
+The first step of Phase 4, and the trigger for the whole phase: the client supplied a real
+property's title deed (Mulkia), survey/plot plan (Krookie) and the owner's ID card, and `Property`
+had nowhere to put any of them. See `docs/phase-4-plan.md` §3–4 for the full reasoning; this is not
+scoped from the PRD but from those three documents plus the client's own Excel registers.
+
+**Built:** five new optional columns on `Property` — `plotNumber`, `wilayat`, `village`,
+`surveyReference`, `titleDeedReference`, `ownerName`, `ownerNationalId` (migration
+`20260910205034_property_identity_and_sequence_counter`). `PropertyService.create` writes all seven;
+`PropertyService.update`'s existing generic field loop needed no change. Search extended to match
+`plotNumber`/`surveyReference` alongside the existing name/reference/city/postcode fields — a plot is
+more often looked up by its own number in practice than by name.
+
+**Decision, recorded in the plan rather than assumed:** owner identity lives on `Property`, not
+`Client`. The Mulkia used for this phase's sample data shows a _gift_ deed — the registered owner and
+the consultancy's actual paying customer are not always the same person, and folding owner identity
+into `Client` would quietly assume they are.
+
+**Verified:** a property records all seven fields, or none of them — every field is optional, so a
+property entered before its paperwork arrives is not blocked; a plot is found by `plotNumber` through
+the same search a name search already used.
+
+## Step 18 — Sequence service: real, annual-reset numbering ✅
+
+The second step of Phase 4. `Project.code` was a free-typed string with only a uniqueness
+constraint; the client's own registers (`2026 Sketch Register`, `2009 Drawing Project Status`) show
+real annual-reset numbering already in daily use (`26-SB-101`, `09.S.101`).
+
+**Built:** a `sequence_counter` table — one row per `(sequenceType, year)` — and `SequenceService`
+(new `sequence` module, a leaf module like `audit`), which reserves the next number with a single
+`INSERT ... ON CONFLICT ... DO UPDATE ... RETURNING` statement, the one raw-SQL statement in this
+codebase. Formatting is a lookup table of pure functions keyed by `sequenceType`
+(`PLANNING_PROJECT` → `YY.P.NNN`, `SUPERVISION_PROJECT` → `YY.S.NNN`), the same "the rule is data"
+posture the permission matrix already takes.
+
+**Verified — against the real database, including concurrency:** the counter advances by one per
+call within a year; separate types keep separate counters for the same year; twenty concurrent
+callers for the same `(type, year)` never receive the same number — proven with `Promise.all`, not
+assumed from the single-statement design.
+
+**Open question, recorded rather than guessed:** the registers also show a third format,
+`NNN.IKP.YY`, on the Sketch Register's own "Project#" column — but the one cross-reference available
+(`186.IKP.23`, three years and only six numbers before `192.IKP.26`) suggests it may not reset
+annually at all. `PLANNING_PROJECT` ships as `YY.P.NNN` for internal consistency with
+`SUPERVISION_PROJECT`, not as a confirmed match for `IKP` — see `docs/phase-4-plan.md` §5.
+
+## Step 19 — Wired into `Project.create` ✅
+
+`ProjectService.create` now mints `code` from the type-matched sequence — `SUPERVISION` gets
+`SUPERVISION_PROJECT`, `PLANNING` and `BOTH` both get `PLANNING_PROJECT` (a `BOTH` project usually
+reaches that shape by a Supervision workstream opening on an existing Planning engagement, not the
+reverse) — reserved inside the same transaction as the project row, so a number is never burned by a
+create that then fails. An explicit `code` is still honoured exactly as before, unique-checked the
+same way, for migrated historical data that will never fit a generated pattern.
+
+**Verified:** a project created with no code gets one matching its type's pattern for the current
+year; an explicit code still works and is not overridden.
+
+## Step 20 — Web: property form, project-code hint ✅
+
+The properties list/new/edit/detail pages gained the seven new fields (`Field` components, no new
+primitive needed); the project-creation form's code field lost its `required` attribute and gained a
+hint that it auto-generates when left blank.
+
+**Verified through the browser:** a property records its full land-registry identity and displays it
+back; a project created with the code field left empty shows a generated `YY.S.NNN`-shaped code.
+
+**Found while verifying, not introduced by this step:** adding "Owner name" to the properties pages
+made `getByLabel('Name')` ambiguous against the existing "Name" field — every prior phase's e2e spec
+that filled a property's name this way needed `{ exact: true }` added (phase-1, phase-2, phase-3
+specs). A genuine regression from this step, now fixed everywhere it applied.
+
+**Found while verifying, NOT introduced by this step — recorded so it isn't rediscovered as a Phase 4
+bug later:** the dev database has grown past ~200 rows in `client`/`property`/`project` from repeated
+sessions' testing. Two independent, pre-existing effects follow, confirmed by reverting to
+unmodified Phase 1-3 code and reproducing both identically:
+
+- The hardcoded `pageSize=100` list fetches behind the Client/Property `<select>` dropdowns
+  (`docs/PROGRESS.md` steps 8 and 12's own recorded "known limit") now regularly omit a
+  freshly-created row, since both lists order by `name asc` with no filter — this is not new, only
+  now large enough to bite.
+- Less expected: once a `<select>` holding the full accumulated list receives a `selectOption` call,
+  subsequent `getByLabel(...)` lookups on the same page become unreliable in this environment, though
+  `locator('#id')` lookups on the same elements are unaffected — apparently an accessibility-tree
+  cost specific to a very large `<select>`, not anything in this application's code. This phase's own
+  e2e spec works around both by using `#id` locators throughout and prefixing test data `"AAA"` so it
+  sorts within the first 100 results regardless of how much the database has grown — a workaround,
+  not a fix, and not this phase's to fix. Phase 1-3's own specs are not touched beyond the `Name`
+  regression above; they will need the same treatment (or a database reset) to pass again as this
+  environment's data keeps growing.

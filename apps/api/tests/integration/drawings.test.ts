@@ -8,6 +8,7 @@ import { PropertyService } from '../../src/modules/directory/property.service';
 import { DrawingRevisionService } from '../../src/modules/drawings/drawing-revision.service';
 import { DrawingService } from '../../src/modules/drawings/drawing.service';
 import { ProjectService } from '../../src/modules/projects/project.service';
+import { SequenceService } from '../../src/modules/sequence';
 import { runInRequestContext } from '../../src/shared/context/request-context';
 import type { PrismaService } from '../../src/shared/database/prisma.service';
 
@@ -28,7 +29,7 @@ describe('drawings', () => {
   const authorization = new AuthorizationService(prisma);
   const clients = new ClientService(prisma, audit);
   const properties = new PropertyService(prisma, audit);
-  const projects = new ProjectService(prisma, audit, authorization);
+  const projects = new ProjectService(prisma, audit, authorization, new SequenceService());
   const drawings = new DrawingService(prisma, audit);
   const revisions = new DrawingRevisionService(prisma, audit);
 

@@ -113,6 +113,29 @@ export default async function PropertyPage({ params }: { params: Promise<{ id: s
                   address.map((line) => <div key={line}>{line}</div>)
                 )}
               </dd>
+              <dt>Plot number</dt>
+              <dd className="mono">
+                <Value>{property.plotNumber}</Value>
+              </dd>
+              <dt>Wilayat / village</dt>
+              <dd>
+                {[property.wilayat, property.village].filter(Boolean).join(' / ') || (
+                  <span className="faint">—</span>
+                )}
+              </dd>
+              <dt>Survey reference (Krookie)</dt>
+              <dd className="mono">
+                <Value>{property.surveyReference}</Value>
+              </dd>
+              <dt>Title deed reference (Mulkia)</dt>
+              <dd className="mono">
+                <Value>{property.titleDeedReference}</Value>
+              </dd>
+              <dt>Registered owner</dt>
+              <dd>
+                <Value>{property.ownerName}</Value>
+                {property.ownerNationalId ? ` (ID ${property.ownerNationalId})` : ''}
+              </dd>
               {property.notes ? (
                 <>
                   <dt>Notes</dt>

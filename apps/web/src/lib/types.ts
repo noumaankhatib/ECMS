@@ -60,6 +60,13 @@ export interface Property {
   postcode: string | null;
   country: string | null;
   notes: string | null;
+  plotNumber: string | null;
+  wilayat: string | null;
+  village: string | null;
+  surveyReference: string | null;
+  titleDeedReference: string | null;
+  ownerName: string | null;
+  ownerNationalId: string | null;
   version: number;
   archivedAt: string | null;
 }

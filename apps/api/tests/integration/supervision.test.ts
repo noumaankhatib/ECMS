@@ -6,6 +6,7 @@ import { AuditService } from '../../src/modules/audit/audit.service';
 import { ClientService } from '../../src/modules/directory/client.service';
 import { PropertyService } from '../../src/modules/directory/property.service';
 import { ProjectService } from '../../src/modules/projects/project.service';
+import { SequenceService } from '../../src/modules/sequence';
 import { InstructionService } from '../../src/modules/supervision/instruction.service';
 import { ObservationService } from '../../src/modules/supervision/observation.service';
 import { SiteVisitService } from '../../src/modules/supervision/site-visit.service';
@@ -29,7 +30,7 @@ describe('supervision', () => {
   const authorization = new AuthorizationService(prisma);
   const clients = new ClientService(prisma, audit);
   const properties = new PropertyService(prisma, audit);
-  const projects = new ProjectService(prisma, audit, authorization);
+  const projects = new ProjectService(prisma, audit, authorization, new SequenceService());
   const siteVisits = new SiteVisitService(prisma, audit);
   const observations = new ObservationService(prisma, audit);
   const instructions = new InstructionService(prisma, audit);

@@ -284,6 +284,17 @@ export const createPropertySchema = z
     postcode: optionalText(20),
     country: optionalText(100),
     notes: optionalText(5000),
+    /** The Krookie's "القطعة" — e.g. "102/8". */
+    plotNumber: optionalText(50),
+    wilayat: optionalText(100),
+    village: optionalText(100),
+    /** The Krookie's own serial — e.g. "1-35-055-01-585". */
+    surveyReference: optionalText(100),
+    /** The Mulkia's deed/gift reference — e.g. "2015/19618". */
+    titleDeedReference: optionalText(100),
+    /** The registered owner per the title deed — may differ from the client. */
+    ownerName: optionalText(200),
+    ownerNationalId: optionalText(50),
   })
   .strict();
 
@@ -399,8 +410,13 @@ export const createProjectSchema = z
   .object({
     clientId: z.string().uuid('Must reference a client'),
     propertyId: z.string().uuid('Must reference a property'),
-    /** The consultancy's own project number. Unique across the portfolio. */
-    code: z.string().trim().min(1, 'A project code is required').max(50),
+    /**
+     * The consultancy's own project number. Unique across the portfolio.
+     * Optional — left blank, the server generates one from SequenceService
+     * (docs/phase-4-plan.md §4); supplied, it is used as given (needed for
+     * migrated historical projects that won't fit the generated pattern).
+     */
+    code: optionalText(50),
     name: z.string().trim().min(1, 'A name is required').max(200),
     description: optionalText(5000),
     type: z.enum(PROJECT_TYPES),

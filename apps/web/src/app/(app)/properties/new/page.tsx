@@ -49,6 +49,21 @@ export default async function NewPropertyPage({
               <Field label="Town or city" name="city" />
               <Field label="Postcode" name="postcode" />
               <Field label="Country" name="country" />
+              <Field label="Plot number" name="plotNumber" hint="The Krookie's plot number." />
+              <Field label="Wilayat" name="wilayat" />
+              <Field label="Village" name="village" />
+              <Field
+                label="Survey reference"
+                name="surveyReference"
+                hint="The Krookie's own serial."
+              />
+              <Field
+                label="Title deed reference"
+                name="titleDeedReference"
+                hint="The Mulkia's deed reference."
+              />
+              <Field label="Owner name" name="ownerName" hint="Per the title deed." />
+              <Field label="Owner national ID" name="ownerNationalId" />
             </div>
             <TextArea label="Notes" name="notes" />
           </ActionForm>

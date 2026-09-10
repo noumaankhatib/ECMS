@@ -63,8 +63,7 @@ export default async function NewProjectPage() {
               <Field
                 label="Project code"
                 name="code"
-                required
-                hint="Unique across the portfolio."
+                hint="Leave blank to generate one automatically for the selected type."
               />
               <Field label="Name" name="name" required />
               <Select

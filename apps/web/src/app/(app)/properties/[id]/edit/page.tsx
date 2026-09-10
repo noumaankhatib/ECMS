@@ -53,6 +53,37 @@ export default async function EditPropertyPage({ params }: { params: Promise<{ i
               <Field label="Town or city" name="city" defaultValue={property.city} />
               <Field label="Postcode" name="postcode" defaultValue={property.postcode} />
               <Field label="Country" name="country" defaultValue={property.country} />
+              <Field
+                label="Plot number"
+                name="plotNumber"
+                defaultValue={property.plotNumber}
+                hint="The Krookie's plot number."
+              />
+              <Field label="Wilayat" name="wilayat" defaultValue={property.wilayat} />
+              <Field label="Village" name="village" defaultValue={property.village} />
+              <Field
+                label="Survey reference"
+                name="surveyReference"
+                defaultValue={property.surveyReference}
+                hint="The Krookie's own serial."
+              />
+              <Field
+                label="Title deed reference"
+                name="titleDeedReference"
+                defaultValue={property.titleDeedReference}
+                hint="The Mulkia's deed reference."
+              />
+              <Field
+                label="Owner name"
+                name="ownerName"
+                defaultValue={property.ownerName}
+                hint="Per the title deed."
+              />
+              <Field
+                label="Owner national ID"
+                name="ownerNationalId"
+                defaultValue={property.ownerNationalId}
+              />
             </div>
             <TextArea label="Notes" name="notes" defaultValue={property.notes} />
           </ActionForm>

@@ -253,6 +253,23 @@ model Property {
   country      String? @db.VarChar(100)
   notes        String? @db.Text
 
+  /// Oman land-registry identity (docs/phase-4-plan.md §4). All optional — a
+  /// property entered before its paperwork arrives is not blocked. Together
+  /// these are the plot's own identity; addressLine1/2 above are not how a
+  /// plot is actually found in practice.
+  plotNumber String? @map("plot_number") @db.VarChar(50)
+  wilayat    String? @db.VarChar(100)
+  village    String? @db.VarChar(100)
+  /// The Krookie's own serial (e.g. "1-35-055-01-585").
+  surveyReference String? @map("survey_reference") @db.VarChar(100)
+  /// The Mulkia's deed/gift reference (e.g. "2015/19618").
+  titleDeedReference String? @map("title_deed_reference") @db.VarChar(100)
+  /// The registered owner per the title deed. Deliberately separate from
+  /// Client — a gift or inheritance can leave the legal owner different from
+  /// the consultancy's actual contracting customer.
+  ownerName       String? @map("owner_name") @db.VarChar(200)
+  ownerNationalId String? @map("owner_national_id") @db.VarChar(50)
+
   version Int @default(1)
 
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -734,4 +751,19 @@ model Workstream {
   @@unique([projectId, type])
   @@index([projectId])
   @@map("workstream")
+}
+
+/// Backs SequenceService (docs/phase-4-plan.md §4) — one strictly increasing
+/// counter per (sequenceType, year), so a numbering format is a formatter
+/// function keyed on `sequenceType`, not a schema change. `lastValue` is
+/// advanced by a single atomic statement (see SequenceService), never read
+/// then written as two steps — that gap is exactly what would let two
+/// concurrent project creations receive the same number.
+model SequenceCounter {
+  sequenceType String @map("sequence_type") @db.VarChar(30)
+  year         Int
+  lastValue    Int    @default(0) @map("last_value")
+
+  @@id([sequenceType, year])
+  @@map("sequence_counter")
 }

@@ -19,6 +19,19 @@ import type { Tx } from '../../shared/database/transaction';
 import { appError } from '../../shared/errors/app-error';
 import { AuthorizationService } from '../access';
 import { AuditService } from '../audit';
+import { SequenceService, type SequenceType } from '../sequence';
+
+/**
+ * A project of type BOTH gets the Planning-style code — most combined
+ * projects reach that shape by a Supervision workstream opening on top of an
+ * existing Planning engagement (docs/phase-4-plan.md's flow, stage 5), not
+ * the other way round. Easy to change if the client's real usage disagrees.
+ */
+const SEQUENCE_FOR_TYPE: Record<CreateProject['type'], SequenceType> = {
+  PLANNING: 'PLANNING_PROJECT',
+  SUPERVISION: 'SUPERVISION_PROJECT',
+  BOTH: 'PLANNING_PROJECT',
+};
 
 @Injectable()
 export class ProjectService {
@@ -26,6 +39,7 @@ export class ProjectService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly authorization: AuthorizationService,
+    private readonly sequence: SequenceService,
   ) {}
 
   /**
@@ -142,12 +156,18 @@ export class ProjectService {
         });
       }
 
+      // Left blank, a code is minted from the series that matches this
+      // project's type (docs/phase-4-plan.md §4) — reserved inside this same
+      // transaction, so the number and the project it names commit together
+      // or not at all.
+      const code = input.code ?? (await this.sequence.next(tx, SEQUENCE_FOR_TYPE[input.type])).code;
+
       const project = await tx.project
         .create({
           data: {
             clientId: input.clientId,
             propertyId: input.propertyId,
-            code: input.code,
+            code,
             name: input.name,
             description: input.description ?? null,
             type: input.type,

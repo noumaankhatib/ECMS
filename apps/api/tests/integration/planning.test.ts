@@ -9,6 +9,7 @@ import { ActivityService } from '../../src/modules/planning/activity.service';
 import { MilestoneService } from '../../src/modules/planning/milestone.service';
 import { SubmissionService } from '../../src/modules/planning/submission.service';
 import { ProjectService } from '../../src/modules/projects/project.service';
+import { SequenceService } from '../../src/modules/sequence';
 import { runInRequestContext } from '../../src/shared/context/request-context';
 import type { PrismaService } from '../../src/shared/database/prisma.service';
 
@@ -30,7 +31,7 @@ describe('planning', () => {
   const authorization = new AuthorizationService(prisma);
   const clients = new ClientService(prisma, audit);
   const properties = new PropertyService(prisma, audit);
-  const projects = new ProjectService(prisma, audit, authorization);
+  const projects = new ProjectService(prisma, audit, authorization, new SequenceService());
   const activities = new ActivityService(prisma, audit);
   const milestones = new MilestoneService(prisma, audit);
   const submissions = new SubmissionService(prisma, audit);

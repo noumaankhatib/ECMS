@@ -122,7 +122,7 @@ test.describe('Phase 1 through the browser', () => {
 
     await page.goto(`/properties/new?clientId=${clientId}`);
     await page.getByLabel('Client').selectOption(clientId);
-    await page.getByLabel('Name').fill(`Riverside House ${tag}`);
+    await page.getByLabel('Name', { exact: true }).fill(`Riverside House ${tag}`);
     await page.getByLabel('Town or city').fill('Leeds');
     await page.getByLabel('Postcode').fill('LS1 4AP');
     await page.getByRole('button', { name: 'Create property' }).click();

@@ -9,6 +9,7 @@ import { DocumentService } from '../../src/modules/documents/document.service';
 import { ActivityService } from '../../src/modules/planning/activity.service';
 import { MembershipService } from '../../src/modules/projects/membership.service';
 import { ProjectService } from '../../src/modules/projects/project.service';
+import { SequenceService } from '../../src/modules/sequence';
 import { runInRequestContext } from '../../src/shared/context/request-context';
 import type { PrismaService } from '../../src/shared/database/prisma.service';
 import type { DriveAdapter } from '../../src/shared/drive/drive-adapter';
@@ -55,7 +56,7 @@ describe('documents', () => {
   const authorization = new AuthorizationService(prisma);
   const clients = new ClientService(prisma, audit);
   const properties = new PropertyService(prisma, audit);
-  const projects = new ProjectService(prisma, audit, authorization);
+  const projects = new ProjectService(prisma, audit, authorization, new SequenceService());
   const activities = new ActivityService(prisma, audit);
   const members = new MembershipService(prisma, audit);
   const documents = new DocumentService(prisma, audit, new LocalDriveAdapter());
