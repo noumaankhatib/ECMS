@@ -10,6 +10,10 @@ coverage/
 .env.*
 !.env.example
 
+# Client-supplied reference documents (real names, national ID numbers,
+# property ownership records) — local reference only, never committed.
+client-reference/
+
 .DS_Store
 *.log
 
