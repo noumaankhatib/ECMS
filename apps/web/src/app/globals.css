@@ -72,9 +72,16 @@
   --space-5: 24px;
   --space-6: 32px;
 
+  /* IBM Plex superfamily (loaded, self-hosted, in app/layout.tsx) — chosen
+   * because it was drawn for technical/engineering documentation, so serif,
+   * sans and mono read as one family rather than three unrelated fonts.
+   * System-font fallbacks keep the page usable before/without the webfont. */
+  --font-serif: var(--font-plex-serif), Georgia, 'Times New Roman', serif;
   --font:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+    var(--font-plex-sans), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-mono:
+    var(--font-plex-mono), ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 }
 
 *,
@@ -99,14 +106,14 @@ body {
 }
 
 h1,
-h2,
-h3 {
+h2 {
   margin: 0;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
+  font-family: var(--font-serif);
+  line-height: 1.2;
+  letter-spacing: -0.005em;
 }
 h1 {
-  font-size: 22px;
+  font-size: 25px;
   font-weight: 600;
 }
 h2 {
@@ -114,11 +121,12 @@ h2 {
   font-weight: 600;
 }
 h3 {
-  font-size: 14px;
+  margin: 0;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
 }
 
 a {
@@ -156,17 +164,19 @@ a:hover {
 }
 
 .sidebar__brand {
-  font-size: 15px;
+  font-family: var(--font-serif);
+  font-size: 16px;
   font-weight: 600;
   color: var(--white);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.005em;
 }
 .sidebar__brand span {
   display: block;
+  font-family: var(--font);
   font-size: 11px;
   font-weight: 400;
   color: var(--nav-text);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -496,6 +506,28 @@ select:disabled {
 .mono {
   font-family: var(--font-mono);
   font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A reference code — project number, client/property ID, drawing revision.
+ * This business's own registers treat these as the identity of a piece of
+ * work, not incidental data, so it gets a distinct, deliberate treatment
+ * rather than sitting in the same plain text as everything else: a bordered
+ * tag, set in mono, echoing the reference cell of a drawing's title block. */
+.code-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--slate-50);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 .right {
   text-align: right;
@@ -522,7 +554,10 @@ select:disabled {
 }
 .login__brand strong {
   display: block;
-  font-size: 18px;
+  font-family: var(--font-serif);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
   color: var(--text);
 }
 .login__brand span {

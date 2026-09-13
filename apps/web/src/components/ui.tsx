@@ -110,6 +110,18 @@ export function Badge({ children }: { children: ReactNode }) {
   return <span className="badge badge--plain">{children}</span>;
 }
 
+/**
+ * A reference code — project number, client/property ID, drawing revision.
+ *
+ * Not plain text: this business's own registers (Planning No., Supervision
+ * No., Municipality Application No., ...) treat these as the identity of a
+ * piece of work, so they get a distinct bordered/mono treatment wherever
+ * they appear, instead of blending into surrounding prose.
+ */
+export function CodeTag({ children }: { children: ReactNode }) {
+  return <span className="code-tag">{children}</span>;
+}
+
 /** A date, or a dash. Never an empty cell that looks like a bug. */
 export function DateText({ value }: { value: string | null | undefined }) {
   if (!value) return <span className="faint">—</span>;
