@@ -14,6 +14,10 @@ import type { SequenceResult, SequenceType } from './sequence.types';
 const FORMATTERS: Record<SequenceType, (year: number, value: number) => string> = {
   PLANNING_PROJECT: (year, value) => `${twoDigitYear(year)}.P.${pad(value)}`,
   SUPERVISION_PROJECT: (year, value) => `${twoDigitYear(year)}.S.${pad(value)}`,
+  // Matches the real Sketch Register exactly (docs/phase-5-plan.md §3),
+  // e.g. "26-SB-118" — a different separator/order than the two above
+  // because it is a pre-existing, already-in-use format, not a new one.
+  SKETCH: (year, value) => `${twoDigitYear(year)}-SB-${pad(value)}`,
 };
 
 function twoDigitYear(year: number): string {

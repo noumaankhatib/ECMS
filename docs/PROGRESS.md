@@ -38,6 +38,9 @@ roadmap derived from the client's own documents and registers, not just the PRD 
 | 18   | Sequence service — real, annual-reset numbering        | ✅ Done |
 | 19   | Wired into `Project.create` — generated `code`         | ✅ Done |
 | 20   | Web — property form, project-code hint                 | ✅ Done |
+| 21   | Proposal data model, sketch numbering, CRUD            | ✅ Done |
+| 22   | Proposal status machine — the transition endpoint      | ✅ Done |
+| 23   | Convert action — WON proposal to a real numbered project | ✅ Done |
 
 ---
 
@@ -1421,3 +1424,175 @@ unmodified Phase 1-3 code and reproducing both identically:
   not a fix, and not this phase's to fix. Phase 1-3's own specs are not touched beyond the `Name`
   regression above; they will need the same treatment (or a database reset) to pass again as this
   environment's data keeps growing.
+
+## Step 21 — Proposal data model, sketch numbering, CRUD ✅
+
+The first step of Phase 5, per `docs/phase-5-plan.md` and the approved 8-phase roadmap
+(`~/.claude/plans/swirling-singing-book.md`) — proposal/sketch intake, not Handover, is next after
+Phase 4, because it is the highest-volume workflow still entirely off-system (~25 inquiries/month per
+spec §2; 17 sketch numbers logged in about two weeks of August 2026 in the real
+`2026 Sketch Register - NOuman.xlsx`).
+
+**Built:** a new `Proposal` model — `clientId`/`propertyId` both optional (decision §5a: bare
+`contactName`/`contactPhone` is enough to log an inquiry; either can be attached immediately or later,
+never staged in a fixed order), a generated `sketchNumber` (`26-SB-NNN`, matching the real register
+exactly), `source` kept as a field genuinely separate from `status` (decision §5b — the register's own
+`Old Customer`/`New Customer` values are customer provenance, not a lifecycle stage), and
+`assignedArchitectId` with deliberately no foreign key to `User`, the same reasoning
+`PlanningActivity.assigneeId` already documents.
+
+A new `ProposalSketchType` model backs the "fixed list, but configurable" decision (§5c): ten rows
+seeded by migration from the real register's own values (`Villa - GF Only`, `Villa - G+1`, `Twin Villa`,
+...), rename/retire-able afterwards by whoever holds the new `sketch_type:admin` permission, without a
+code change. There is deliberately no `sketch_type:view` permission — seeing the list is bundled into
+`proposal:view`, the same way seeing a project's own reference data needs no permission of its own.
+
+`SequenceService` (`apps/api/src/modules/sequence`) gained a third type, `SKETCH`, formatted
+`YY-SB-NNN` — the comment planted at Phase 4 ("Proposals in Phase 5") pointed exactly here.
+`ProposalService.create` reserves a number inside the same transaction as the insert, the same
+no-number-burned-by-a-failed-create guarantee `ProjectService.create` already gives its own code.
+
+The full status machine (`PROPOSAL_STATUSES`, `PROPOSAL_TRANSITIONS`, `canTransitionProposal`,
+`PROPOSAL_ACTIONS`) is defined in `@ecms/contracts` now, alongside the model, even though the transition
+_endpoint_ is Step 22 — the column needed a closed set of legal values from the start, not an
+unconstrained string with a machine bolted on later. `WON` has no ordinary transition to `CONVERTED`:
+reaching it is reserved for the dedicated convert action (Step 23), since converting also creates a
+`Project` and must go through the one code path that does both correctly together.
+
+New module `apps/api/src/modules/proposals` (`ProposalService`, `ProposalSketchTypeService`,
+`ProposalController`, `ProposalSketchTypeController`), registered in `AppModule`. Five new permissions
+(`proposal:view/create/edit/convert`, `sketch_type:admin`) seeded by migration against
+`SYSTEM_ADMINISTRATOR` (all five), `PROJECT_MANAGER` (all five), `PLANNING` (view/create/edit only —
+conversion and list administration are a manager decision), `DIRECTOR` (view only, matching its
+oversight-only posture everywhere else).
+
+**Verified — against the real database, through the running API, not just unit-level:**
+
+| Behaviour                                                                                                                                                                                                 | Result |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| A proposal created with only `contactName`/`contactPhone` succeeds, no client or property required                                                                                                        | ✅     |
+| It receives a real `26-SB-NNN` sketch number, incrementing correctly across successive creates                                                                                                            | ✅     |
+| A proposal can be created with a `sketchTypeId` from the seeded list, `source`, and notes together                                                                                                        | ✅     |
+| Search matches by contact name                                                                                                                                                                            | ✅     |
+| A user holding `SUPERVISION` (no `proposal:view`) is refused the list endpoint with 403                                                                                                                   | ✅     |
+| Every create writes an audit row                                                                                                                                                                          | ✅     |
+| `pnpm exec vitest run` — the existing "grants an administrator everything in the catalogue" and "holds no permission outside the shared catalogue" tests both still pass against the five new permissions | ✅     |
+
+**Decisions, recorded rather than assumed:**
+
+- **`ProposalSketchType.code` is immutable once created.** Only `label`/`sortOrder` are editable;
+  renaming the code would silently repoint every proposal already using it. Retiring (`archivedAt`) and
+  adding a fresh entry is the correct move if the code itself was wrong, the same posture `Role` codes
+  already take implicitly.
+- **No restore for a retired sketch type in this step.** Consistent with `Client`/`Property` archival
+  having no restore endpoint either — an accidental retirement is recovered by creating a new entry
+  with the same label, not by a dedicated undo. Cheap to add later if it turns out to matter in
+  practice.
+- **`Proposal.convertedProjectId` is unique.** A project is converted from at most one proposal; this is
+  enforced at the schema level, not just assumed by the (still unbuilt) convert action.
+
+**Known limit, not introduced by this step:** the pre-existing `pageSize=100` hardcoded list-fetch
+issue recorded in Steps 8, 12 and 20 is unrelated to proposals but was hit again while running the full
+test suite — two unrelated tests (`users.test.ts`, `projects.test.ts`) failed because the dev database
+has grown past 100 rows in `project`/`user` from repeated sessions. Reproduced as pre-existing by
+inspection of the failing assertions themselves (both are the exact shape Step 20 already documented);
+not a regression from this step.
+
+**Not yet built:** the transition endpoint (Step 22) and the convert-to-project action (Step 23) — both
+require the CRUD/data model this step lays down and are the next two steps in `docs/phase-5-plan.md`.
+
+---
+
+## Step 22 — Proposal status machine: the transition endpoint ✅
+
+`ProposalService.transition` and one `POST /proposals/:id/<action>` route per named action
+(`start-concept`, `send-for-client-review`, `approve`, `win`, `lose`, `hold`, `resume`) — the same
+three-layer discipline `ProjectService.transition`/`IssueService.transition` already established: a named
+action decides the target status, `canTransitionProposal` decides whether the move is legal from where the
+proposal currently is, and the write is conditional on the status actually still being what was read
+(`WHERE id = ? AND status = ? AND version = ?`).
+
+No route targets `CONVERTED` — `PROPOSAL_ACTIONS` (defined in Step 21, alongside the rest of the status
+machine) has no entry that does, so reaching it by any of these seven actions is a compile-time
+impossibility, not a runtime check. `WON` therefore has no legal ordinary exit; only the still-unbuilt
+Step 23 convert action can move it further.
+
+**Verified — 10 tests, all against the real database:**
+
+| Behaviour                                                                      | Result                  |
+| ------------------------------------------------------------------------------- | ----------------------- |
+| Planning holds `proposal:view/create/edit` but not `proposal:convert`           | ✅                      |
+| Director holds `proposal:view` only                                            | ✅                      |
+| A proposal logs from bare `contactName`, no client/property required           | ✅                      |
+| It receives a real `YY-SB-NNN` sketch number                                   | ✅                      |
+| The full walk `New → Concept → Client Revision → Approved → Won`               | ✅                      |
+| `Concept → On Hold → Concept` (hold and resume)                                | ✅                      |
+| Skipping straight from `New` to `Approved` is refused                          | ✅ `ILLEGAL_TRANSITION` |
+| The refused transition is recorded, not only the ones that happened            | ✅                      |
+| A transition made from a stale version is refused                             | ✅ `STALE_RECORD`       |
+| `WON` has no legal ordinary exit — reaching `CONVERTED` needs the convert action | ✅ `ILLEGAL_TRANSITION` |
+
+**Decisions:**
+
+- **One route per named action, not a generic `POST /proposals/:id/transition` taking an action name in
+  the body.** Matches `IssueController`'s shape exactly — the set of legal actions is closed and small,
+  and a route per action means an unauthorised or unknown action is rejected by routing itself, before any
+  application code runs.
+- **Every transition route requires `proposal:edit`, none `proposal:convert`.** `proposal:convert` is
+  reserved entirely for the Step 23 convert action, matching how `issue:close` guards exactly the `close`
+  route and nothing else — a permission that gates one specific, consequential action should not also
+  silently gate seven others that happen to share a resource name.
+- **A proposal is never project-scoped (§6 of the plan), so `transition` takes no `projectId`.** Every
+  other state machine in this codebase (`Project`, `Workstream`, `Issue`) checks a nested URL; this one
+  is the first that doesn't need to, because a proposal predates any project by definition.
+
+**Not yet built:** the convert-to-project action (Step 23) and the web interface (Step 24), both still
+next in `docs/phase-5-plan.md`.
+
+---
+
+## Step 23 — Convert action: WON proposal to a real numbered project ✅
+
+`ProposalService.convert`, the one path from `WON` to `CONVERTED` (docs/phase-5-plan.md §4). Unlike every
+other transition, this one creates a second record — inside a single transaction it reserves a project
+code via `SequenceService`, inserts the `Project` row with its opening workstreams and the caller's own
+membership as `PROJECT_MANAGER` (the same two things `ProjectService.create` does alongside an ordinary
+project), and marks the proposal `CONVERTED` with `convertedProjectId`/`convertedAt` set. Either everything
+commits or none of it does.
+
+`POST /proposals/:id/convert`, gated by its own `proposal:convert` permission — not `proposal:edit`, the
+same split `issue:close` already established for a single consequential action living apart from ordinary
+edits on the same resource.
+
+**Verified — 4 new tests, all against the real database (14 total in the proposals suite):**
+
+| Behaviour                                                                        | Result            |
+| ----------------------------------------------------------------------------------- | ----------------- |
+| A `WON` proposal with a property converts to a project with the right client, property, generated code (`YY.P.NNN`), name, one `PLANNING` workstream, and the caller as `PROJECT_MANAGER` | ✅ |
+| A `WON` proposal with no `propertyId` is refused, naming the field                   | ✅ `CONFLICT`      |
+| A proposal that is not `WON` is refused conversion                                   | ✅ `ILLEGAL_TRANSITION` |
+| A stale version is refused — proven with an intervening *edit* that bumps the version without touching status, so the conflict is genuinely about the version, not a second not-WON case | ✅ `STALE_RECORD` |
+
+**Decisions:**
+
+- **`SEQUENCE_FOR_TYPE` is duplicated from `ProjectService`, not imported.** It is a private, unexported
+  const there; proposals never reaches into projects' internals (`projects/index.ts`'s own stated rule),
+  the same trade `requireOpenProject` already pays three times over in supervision/planning/issues.
+- **The project's `clientId` is taken from the property, not the proposal.** A proposal's own `clientId`
+  is optional and, when present, is only cross-checked for consistency — the property is the one thing
+  the convert action requires, so it is also the authoritative source, mirroring how `ProjectService.create`
+  already treats the named property as ground truth over a caller-supplied client id.
+- **`Project.name` is set from `Proposal.contactName`.** A proposal carries no separate "project name"
+  field, and inventing one now would be new surface for a step that is about wiring two existing records
+  together, not designing a third naming scheme. Easy to revisit once real usage shows what staff actually
+  want to see as a converted project's name.
+- **The not-WON check runs before the property/version checks, unconditionally.** A proposal not at `WON`
+  is refused regardless of whether it has a property or a fresh version — matching how a caller should
+  learn the real blocking reason first, not "no property" on a proposal that was never eligible to convert
+  in the first place.
+- **Two audit rows, not one.** `STATUS_CHANGED` on the proposal and `CREATED` on the new project, both in
+  the same transaction — the project's own history should show it was born from a conversion, not just
+  that the proposal's history shows where it went.
+
+**Not yet built:** the web interface (Step 24) — proposal list/detail/create/edit pages, the sketch-type
+admin screen, and a "Convert to project" button on `WON` proposals.

@@ -72,6 +72,8 @@ export const RESOURCES = [
   'client',
   'property',
   'project',
+  'proposal',
+  'sketch_type',
   'planning',
   'supervision',
   'issue',
@@ -106,6 +108,20 @@ export const PERMISSIONS = [
   'project:edit',
   'project:close',
   'project:manage_members',
+
+  'proposal:view',
+  'proposal:create',
+  'proposal:edit',
+  /** Turning a WON proposal into a real project — kept separate from
+   *  `proposal:edit` because it creates a second record (a Project) and is
+   *  a coordination decision, not routine data entry (docs/phase-5-plan.md §6). */
+  'proposal:convert',
+
+  /** Managing the admin-configurable sketch-type pick list (docs/phase-5-plan.md
+   *  §5c). There is no `sketch_type:view` — anyone who can touch a proposal
+   *  already needs to see the list to pick from it, so seeing it is bundled
+   *  into `proposal:create`/`proposal:edit` rather than checked separately. */
+  'sketch_type:admin',
 
   'planning:view',
   'planning:create',
@@ -525,6 +541,141 @@ export const addProjectMemberSchema = z
   .strict();
 
 export type AddProjectMember = z.infer<typeof addProjectMemberSchema>;
+
+// ---------------------------------------------------------------------------
+// Proposals — inquiry to conversion (docs/phase-5-plan.md)
+//
+// An inquiry starts as bare contact info; `clientId`/`propertyId` are attached
+// whenever they exist, not staged in a fixed order (decision §5a). Converting
+// to a real Project is a dedicated action (`POST /proposals/:id/convert`),
+// not a status write — see PROPOSAL_ACTIONS below.
+// ---------------------------------------------------------------------------
+
+/** Spec §5's own list, unchanged. */
+export const PROPOSAL_STATUSES = [
+  'NEW',
+  'CONCEPT',
+  'CLIENT_REVISION',
+  'APPROVED',
+  'WON',
+  'LOST',
+  'ON_HOLD',
+  'CONVERTED',
+] as const;
+export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
+
+/**
+ * `WON` has no ordinary transition to `CONVERTED` — reaching it is only
+ * possible through the dedicated convert action (docs/phase-5-plan.md §4),
+ * because converting also creates a Project and must go through the one code
+ * path that does that correctly, not a bare status edit.
+ */
+export const PROPOSAL_TRANSITIONS = {
+  NEW: ['CONCEPT', 'ON_HOLD', 'LOST'],
+  CONCEPT: ['CLIENT_REVISION', 'ON_HOLD', 'LOST'],
+  CLIENT_REVISION: ['CONCEPT', 'APPROVED', 'ON_HOLD', 'LOST'],
+  APPROVED: ['WON', 'LOST'],
+  WON: [],
+  LOST: [],
+  ON_HOLD: ['CONCEPT', 'LOST'],
+  CONVERTED: [],
+} as const satisfies Record<ProposalStatus, readonly ProposalStatus[]>;
+
+export function canTransitionProposal(from: ProposalStatus, to: ProposalStatus): boolean {
+  return (PROPOSAL_TRANSITIONS[from] as readonly ProposalStatus[]).includes(to);
+}
+
+/** The named actions a caller may take, and where each one leads. No generic
+ *  "set status" — the same rule every other state machine here follows. */
+export const PROPOSAL_ACTIONS = {
+  startConcept: 'CONCEPT',
+  sendForClientReview: 'CLIENT_REVISION',
+  approve: 'APPROVED',
+  win: 'WON',
+  lose: 'LOST',
+  hold: 'ON_HOLD',
+  resume: 'CONCEPT',
+} as const satisfies Record<string, ProposalStatus>;
+
+export type ProposalAction = keyof typeof PROPOSAL_ACTIONS;
+
+export const PROPOSAL_ACTION_NAMES = Object.keys(PROPOSAL_ACTIONS) as readonly ProposalAction[];
+
+export const proposalTransitionSchema = z
+  .object({
+    version: z.number().int().min(1),
+    reason: optionalText(1000),
+  })
+  .strict();
+
+export type ProposalTransition = z.infer<typeof proposalTransitionSchema>;
+
+/** The admin-configurable sketch-type pick list (decision §5c). */
+export const createProposalSketchTypeSchema = z
+  .object({
+    code: z
+      .string()
+      .trim()
+      .min(1, 'A code is required')
+      .max(50)
+      .regex(/^[A-Z0-9_]+$/, 'Use upper-case letters, digits and underscores only'),
+    label: z.string().trim().min(1, 'A label is required').max(100),
+    sortOrder: z.number().int().default(0),
+  })
+  .strict();
+
+export type CreateProposalSketchType = z.infer<typeof createProposalSketchTypeSchema>;
+
+/** `code` is not editable — it is how existing proposals reference this
+ *  entry; renaming would silently repoint them. Retire and add a new one
+ *  instead if the code itself was wrong. */
+export const updateProposalSketchTypeSchema = z
+  .object({
+    label: z.string().trim().min(1).max(100).optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .strict();
+
+export type UpdateProposalSketchType = z.infer<typeof updateProposalSketchTypeSchema>;
+
+export const createProposalSchema = z
+  .object({
+    contactName: z.string().trim().min(1, 'A contact name is required').max(200),
+    contactPhone: optionalText(50),
+    clientId: z.string().uuid().nullish(),
+    propertyId: z.string().uuid().nullish(),
+    sketchTypeId: z.string().uuid().nullish(),
+    projectType: z.enum(PROJECT_TYPES).nullish(),
+    approxAreaSqm: z.coerce.number().positive().nullish(),
+    source: optionalText(100),
+    assignedArchitectId: z.string().uuid().nullish(),
+    receivedAt: optionalDate,
+    dueAt: optionalDate,
+    notes: optionalText(5000),
+  })
+  .strict();
+
+export type CreateProposal = z.infer<typeof createProposalSchema>;
+
+/** Status is absent on purpose — see PROPOSAL_ACTIONS above. `sketchNumber` is
+ *  always server-generated and never appears in either schema. */
+export const updateProposalSchema = createProposalSchema.partial().extend({
+  version: z.number().int().min(1),
+});
+
+export type UpdateProposal = z.infer<typeof updateProposalSchema>;
+
+export const proposalListQuerySchema = z
+  .object({
+    search: z.string().trim().max(200).optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(25),
+    status: z.enum(PROPOSAL_STATUSES).optional(),
+    clientId: z.string().uuid().optional(),
+  })
+  .strict();
+
+export type ProposalListQuery = z.infer<typeof proposalListQuerySchema>;
 
 // ---------------------------------------------------------------------------
 // User administration

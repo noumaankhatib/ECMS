@@ -8,6 +8,7 @@ import { DrawingsModule } from './modules/drawings';
 import { IssuesModule } from './modules/issues';
 import { PlanningModule } from './modules/planning';
 import { ProjectsModule } from './modules/projects';
+import { ProposalsModule } from './modules/proposals';
 import { SupervisionModule } from './modules/supervision';
 import { DatabaseModule } from './shared/database/database.module';
 import { DriveModule } from './shared/drive/drive.module';
@@ -25,6 +26,7 @@ import { LOGGER } from './shared/logging/logger.token';
     AccessModule,
     DirectoryModule,
     ProjectsModule,
+    ProposalsModule,
     PlanningModule,
     SupervisionModule,
     IssuesModule,

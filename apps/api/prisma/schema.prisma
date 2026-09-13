@@ -205,6 +205,7 @@ model Client {
   contacts   Contact[]
   properties Property[]
   projects   Project[]
+  proposals  Proposal[]
 
   @@index([archivedAt])
   @@index([name])
@@ -278,7 +279,8 @@ model Property {
   archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
   archivedBy String?   @map("archived_by") @db.Uuid
 
-  projects Project[]
+  projects  Project[]
+  proposals Proposal[]
 
   @@index([clientId, archivedAt])
   @@index([archivedAt])
@@ -687,6 +689,9 @@ model Project {
   issues             Issue[]
   drawings           Drawing[]
   documents          Document[]
+  /// Set only if this project was minted by a Proposal conversion
+  /// (docs/phase-5-plan.md §4) — absent for a project created directly.
+  convertedFromProposal Proposal?
 
   @@index([clientId])
   @@index([propertyId])
@@ -766,4 +771,92 @@ model SequenceCounter {
 
   @@id([sequenceType, year])
   @@map("sequence_counter")
+}
+
+/// An admin-configurable pick list (docs/phase-5-plan.md §4/§5c) — seeded
+/// from the real values already in use in the client's own Sketch Register,
+/// extendable afterwards by an administrator without a code change. The same
+/// "reference data, not application code" posture `Role` already takes.
+model ProposalSketchType {
+  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code  String @db.VarChar(50)
+  label String @db.VarChar(100)
+
+  sortOrder Int @default(0) @map("sort_order")
+
+  /// Retired, never deleted — a proposal already using this value must keep
+  /// displaying it. Excluded only from the picker offered for NEW proposals.
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+
+  proposals Proposal[]
+
+  @@unique([code])
+  @@map("proposal_sketch_type")
+}
+
+/// An inquiry, from first contact until it is lost, put on hold, or converted
+/// into a real Planning/Supervision project (docs/phase-5-plan.md).
+///
+/// `clientId`/`propertyId` are deliberately optional — spec §5's own
+/// "Inquiry" stage is captured before a formal Client or Property record
+/// necessarily exists (decision §5a). Converting to a Project (§4's "Convert
+/// action") requires `propertyId` to be set; nothing else in this model does.
+model Proposal {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  clientId String?  @map("client_id") @db.Uuid
+  client   Client?  @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  propertyId String?   @map("property_id") @db.Uuid
+  property   Property? @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+
+  /// Set at intake, independently of whether a Client record exists yet.
+  contactName  String  @map("contact_name") @db.VarChar(200)
+  contactPhone String? @map("contact_phone") @db.VarChar(50)
+
+  /// The consultancy's own sketch number — generated via
+  /// SequenceService(SKETCH), e.g. "26-SB-118".
+  sketchNumber String @map("sketch_number") @db.VarChar(50)
+
+  sketchTypeId String?             @map("sketch_type_id") @db.Uuid
+  sketchType   ProposalSketchType? @relation(fields: [sketchTypeId], references: [id], onDelete: SetNull)
+
+  /// PLANNING / SUPERVISION / BOTH — the type the eventual Project will carry.
+  projectType   String?  @map("project_type") @db.VarChar(20)
+  approxAreaSqm Decimal? @map("approx_area_sqm") @db.Decimal(10, 2)
+  /// Customer provenance ("referral", "old customer", "walk-in", ...) —
+  /// deliberately separate from `status` (decision §5b): the real register's
+  /// own `Status` column records this, not the proposal's lifecycle stage.
+  source String? @db.VarChar(100)
+
+  /// Who it is assigned to. No foreign key to User, deliberately — the same
+  /// reasoning `PlanningActivity.assigneeId` already documents: an archived
+  /// person must not damage a proposal's record of who worked it.
+  assignedArchitectId String? @map("assigned_architect_id") @db.Uuid
+
+  /// NEW, CONCEPT, CLIENT_REVISION, APPROVED, WON, LOST, ON_HOLD or
+  /// CONVERTED (spec §5). Never written directly — moved only through a named
+  /// transition checked against @ecms/contracts, the same rule every other
+  /// state machine in this codebase already follows.
+  status String @default("NEW") @db.VarChar(20)
+
+  receivedAt DateTime? @map("received_at") @db.Date
+  dueAt      DateTime? @map("due_at") @db.Date
+  notes      String?   @db.Text
+
+  /// Set only by the convert action (§4), never by an ordinary edit.
+  convertedProjectId String?   @unique @map("converted_project_id") @db.Uuid
+  convertedProject   Project?  @relation(fields: [convertedProjectId], references: [id], onDelete: SetNull)
+  convertedAt        DateTime? @map("converted_at") @db.Timestamptz(6)
+
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+
+  @@index([status])
+  @@index([sketchNumber])
+  @@index([clientId])
+  @@map("proposal")
 }

@@ -3,7 +3,7 @@
  * literal here and a formatter in `sequence.service.ts` — never a schema
  * change (docs/phase-4-plan.md §4).
  */
-export const SEQUENCE_TYPES = ['PLANNING_PROJECT', 'SUPERVISION_PROJECT'] as const;
+export const SEQUENCE_TYPES = ['PLANNING_PROJECT', 'SUPERVISION_PROJECT', 'SKETCH'] as const;
 export type SequenceType = (typeof SEQUENCE_TYPES)[number];
 
 export interface SequenceResult {
