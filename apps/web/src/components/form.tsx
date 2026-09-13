@@ -250,12 +250,18 @@ export function ActionButton({
   confirm,
   variant = 'secondary',
   hidden,
+  disabledReason,
 }: {
   action: () => Promise<void>;
   label: string;
   confirm?: string;
   variant?: 'primary' | 'secondary' | 'danger';
   hidden?: boolean;
+  /** Shown as the button's title, and the button is disabled rather than
+   *  submitting — the interface hides what someone may never do, but a
+   *  precondition they can still go and satisfy is a reason, not a missing
+   *  button (docs/phase-10-plan.md §6). */
+  disabledReason?: string;
 }) {
   if (hidden) return null;
 
@@ -265,6 +271,14 @@ export function ActionButton({
       : variant === 'danger'
         ? 'button button--small button--danger'
         : 'button button--small button--secondary';
+
+  if (disabledReason) {
+    return (
+      <button type="button" className={className} disabled title={disabledReason}>
+        {label}
+      </button>
+    );
+  }
 
   return (
     <form

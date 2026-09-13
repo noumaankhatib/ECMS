@@ -7,6 +7,7 @@ import { ClientService } from '../../src/modules/directory/client.service';
 import { PropertyService } from '../../src/modules/directory/property.service';
 import { DrawingRevisionService } from '../../src/modules/drawings/drawing-revision.service';
 import { DrawingService } from '../../src/modules/drawings/drawing.service';
+import { HandoverService } from '../../src/modules/handover';
 import { ModificationService } from '../../src/modules/modifications/modification.service';
 import { ProjectService } from '../../src/modules/projects/project.service';
 import { SequenceService } from '../../src/modules/sequence';
@@ -30,7 +31,14 @@ describe('modifications', () => {
   const authorization = new AuthorizationService(prisma);
   const clients = new ClientService(prisma, audit);
   const properties = new PropertyService(prisma, audit);
-  const projects = new ProjectService(prisma, audit, authorization, new SequenceService());
+  const handover = new HandoverService(prisma, audit);
+  const projects = new ProjectService(
+    prisma,
+    audit,
+    authorization,
+    new SequenceService(),
+    handover,
+  );
   const drawings = new DrawingService(prisma, audit);
   const drawingRevisions = new DrawingRevisionService(prisma, audit);
   const siteVisits = new SiteVisitService(prisma, audit);
@@ -39,6 +47,43 @@ describe('modifications', () => {
 
   const requestId = '55555555-2222-4111-8000-999999999999';
   const inContext = <T>(fn: () => Promise<T>): Promise<T> => runInRequestContext({ requestId }, fn);
+
+  // Closing is gated on a complete handover checklist
+  // (docs/phase-10-plan.md §4): no open issues, no missing required
+  // documents (the Phase 9 seed applies its six ANY-scoped categories to
+  // every project), and every checklist item ticked.
+  async function completeHandover(projectId: string): Promise<void> {
+    const requirements = await prisma.requiredDocument.findMany({
+      where: { archivedAt: null },
+    });
+    const existing = await prisma.document.findMany({
+      where: { projectId, archivedAt: null },
+      select: { category: true },
+    });
+    const covered = new Set(existing.map((d) => d.category.trim().toLowerCase()));
+    for (const requirement of requirements) {
+      if (covered.has(requirement.category.trim().toLowerCase())) continue;
+      await prisma.document.create({
+        data: {
+          projectId,
+          category: requirement.category,
+          title: `${requirement.category} (test fixture)`,
+          uploadStatus: 'ACTIVE',
+        },
+      });
+    }
+
+    const status = await handover.status(projectId);
+    await handover.update(projectId, {
+      finalInspectionDone: true,
+      authorityDocsReceived: true,
+      testsReceived: true,
+      asBuiltReceived: true,
+      warrantiesReceived: true,
+      finalReportIssued: true,
+      version: status.version,
+    });
+  }
 
   async function userWithRole(roleCode: string): Promise<string> {
     const user = await prisma.user.create({
@@ -338,6 +383,7 @@ describe('modifications', () => {
     current = await inContext(() =>
       projects.transition(closingProject.id, 'complete', { version: current.version }, admin),
     );
+    await completeHandover(closingProject.id);
     await inContext(() =>
       projects.transition(closingProject.id, 'close', { version: current.version }, admin),
     );

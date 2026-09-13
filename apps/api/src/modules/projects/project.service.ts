@@ -19,6 +19,7 @@ import type { Tx } from '../../shared/database/transaction';
 import { appError } from '../../shared/errors/app-error';
 import { AuthorizationService } from '../access';
 import { AuditService } from '../audit';
+import { HandoverService } from '../handover';
 import { SequenceService, type SequenceType } from '../sequence';
 
 /**
@@ -40,6 +41,7 @@ export class ProjectService {
     private readonly audit: AuditService,
     private readonly authorization: AuthorizationService,
     private readonly sequence: SequenceService,
+    private readonly handover: HandoverService,
   ) {}
 
   /**
@@ -278,6 +280,24 @@ export class ProjectService {
           {
             field: 'status',
             reason: `A project cannot go from ${humanise(from)} to ${humanise(target)}.`,
+          },
+        ],
+      });
+    }
+
+    // The one precondition on any project transition (docs/phase-10-plan.md
+    // §4): closing requires no open issues, no missing required documents,
+    // and a fully ticked handover checklist. Every other transition is
+    // unaffected — this is reached only when the target is CLOSED, which
+    // `PROJECT_TRANSITIONS` only ever allows from COMPLETED.
+    if (target === 'CLOSED' && !(await this.handover.isReady(id))) {
+      await this.recordRefusal(id, from, target, actorId);
+      throw appError('HANDOVER_INCOMPLETE', {
+        fields: [
+          {
+            field: 'status',
+            reason:
+              'Close all issues, upload every required document and complete the handover checklist first.',
           },
         ],
       });

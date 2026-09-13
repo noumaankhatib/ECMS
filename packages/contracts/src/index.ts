@@ -1532,3 +1532,43 @@ export const updateRequiredDocumentSchema = z
   .strict();
 
 export type UpdateRequiredDocument = z.infer<typeof updateRequiredDocumentSchema>;
+
+// ---------------------------------------------------------------------------
+// Handover checklist (docs/phase-10-plan.md) — the Closure-phase items no
+// existing table already answers. Open issues and missing documents are
+// deliberately not fields here — they are computed from `Issue`/`Document`
+// at read time and reported alongside the checklist, not stored in it.
+// ---------------------------------------------------------------------------
+
+export const updateHandoverChecklistSchema = z
+  .object({
+    finalInspectionDone: z.boolean().optional(),
+    authorityDocsReceived: z.boolean().optional(),
+    testsReceived: z.boolean().optional(),
+    asBuiltReceived: z.boolean().optional(),
+    warrantiesReceived: z.boolean().optional(),
+    finalReportIssued: z.boolean().optional(),
+    version: z.number().int().min(1),
+  })
+  .strict();
+
+export type UpdateHandoverChecklist = z.infer<typeof updateHandoverChecklistSchema>;
+
+/** What `GET /projects/:id/handover` returns — the checklist's own six
+ *  dates plus the two counts derived from real `Issue`/`Document` rows, and
+ *  `ready`, which is exactly what `ProjectService.transition()` checks
+ *  before allowing `close`. Kept in one shape so the web page and the API's
+ *  own gate can never describe "ready" two different ways. */
+export interface HandoverStatus {
+  projectId: string;
+  version: number;
+  finalInspectionAt: string | null;
+  authorityDocsReceivedAt: string | null;
+  testsReceivedAt: string | null;
+  asBuiltReceivedAt: string | null;
+  warrantiesReceivedAt: string | null;
+  finalReportIssuedAt: string | null;
+  openIssueCount: number;
+  missingDocumentCount: number;
+  ready: boolean;
+}

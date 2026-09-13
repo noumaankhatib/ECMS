@@ -2,6 +2,7 @@ import {
   PROJECT_TRANSITIONS,
   ROLE_DEFINITIONS,
   canTransitionWorkstream,
+  type HandoverStatus,
   type ProjectAction,
   type ProjectStatus,
 } from '@ecms/contracts';
@@ -33,7 +34,13 @@ import type {
   Workstream,
 } from '@/lib/types';
 
-import { addMember, removeMember, transitionProject, transitionWorkstream } from '../actions';
+import {
+  addMember,
+  markHandoverItem,
+  removeMember,
+  transitionProject,
+  transitionWorkstream,
+} from '../actions';
 
 export const metadata = { title: 'Project — ECMS' };
 
@@ -55,6 +62,40 @@ const ACTIONS: { action: ProjectAction; to: ProjectStatus; label: string; confir
     label: 'Close',
     confirm: 'Close this project? Closed is final — nothing can be changed afterwards.',
   },
+];
+
+/** One row per `HandoverChecklist` field (docs/phase-10-plan.md §3) — the
+ *  field name doubles as the `UpdateHandoverChecklist` key `markHandoverItem`
+ *  sends, so the table and the write can never name the item differently. */
+const HANDOVER_ITEMS: {
+  field:
+    | 'finalInspectionDone'
+    | 'authorityDocsReceived'
+    | 'testsReceived'
+    | 'asBuiltReceived'
+    | 'warrantiesReceived'
+    | 'finalReportIssued';
+  at: keyof Pick<
+    HandoverStatus,
+    | 'finalInspectionAt'
+    | 'authorityDocsReceivedAt'
+    | 'testsReceivedAt'
+    | 'asBuiltReceivedAt'
+    | 'warrantiesReceivedAt'
+    | 'finalReportIssuedAt'
+  >;
+  label: string;
+}[] = [
+  { field: 'finalInspectionDone', at: 'finalInspectionAt', label: 'Final inspection done' },
+  {
+    field: 'authorityDocsReceived',
+    at: 'authorityDocsReceivedAt',
+    label: 'Authority completion documents received',
+  },
+  { field: 'testsReceived', at: 'testsReceivedAt', label: 'Mandatory tests received' },
+  { field: 'asBuiltReceived', at: 'asBuiltReceivedAt', label: 'As-built drawings received' },
+  { field: 'warrantiesReceived', at: 'warrantiesReceivedAt', label: 'Warranties received' },
+  { field: 'finalReportIssued', at: 'finalReportIssuedAt', label: 'Final report issued' },
 ];
 
 const WORKSTREAM_LABEL: Record<string, string> = {
@@ -88,7 +129,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   // read it without being able to read the client list.
   const isSupervised = project.type === 'SUPERVISION' || project.type === 'BOTH';
 
-  const [client, property, users, currentAgreement] = await Promise.all([
+  const isPastActive = project.status === 'COMPLETED' || project.status === 'CLOSED';
+
+  const [client, property, users, currentAgreement, handover] = await Promise.all([
     session.can('client:view')
       ? api.get<Client>(`/clients/${project.clientId}`).catch(() => null)
       : null,
@@ -102,6 +145,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       ? api
           .get<SupervisionAgreement | null>(`/projects/${id}/supervision/agreements/current`)
           .catch(() => null)
+      : null,
+    // Only fetched once there is something to gate — a project that has
+    // never reached COMPLETED has nothing to show here.
+    isPastActive && session.can('project:view', id)
+      ? api.get<HandoverStatus>(`/projects/${id}/handover`).catch(() => null)
       : null,
   ]);
 
@@ -192,6 +240,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                       label={candidate.label}
                       variant={candidate.action === 'close' ? 'danger' : 'secondary'}
                       {...(candidate.confirm ? { confirm: candidate.confirm } : {})}
+                      {...(candidate.action === 'close' && handover && !handover.ready
+                        ? {
+                            disabledReason:
+                              'Close all issues, upload every required document and complete the handover checklist first.',
+                          }
+                        : {})}
                     />
                   ))}
                 </div>
@@ -199,6 +253,48 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                   Only the moves that are legal from{' '}
                   <strong>{project.status.toLowerCase().replace('_', ' ')}</strong> are offered. The
                   server checks again regardless.
+                </p>
+              </CardBody>
+            </Card>
+          ) : null}
+
+          {handover ? (
+            <Card>
+              <CardHead title="Handover" />
+              <CardBody>
+                <dl className="definition">
+                  <dt>Open issues</dt>
+                  <dd>{handover.openIssueCount}</dd>
+                  <dt>Missing required documents</dt>
+                  <dd>{handover.missingDocumentCount}</dd>
+                </dl>
+                <table>
+                  <tbody>
+                    {HANDOVER_ITEMS.map((item) => (
+                      <tr key={item.field}>
+                        <td>{item.label}</td>
+                        <td className="nowrap">
+                          {handover[item.at] ? (
+                            <DateText value={handover[item.at]} />
+                          ) : (
+                            <span className="faint">Not yet</span>
+                          )}
+                        </td>
+                        <td className="right">
+                          {mayEdit && !handover[item.at] ? (
+                            <ActionButton
+                              action={markHandoverItem.bind(null, id, item.field, handover.version)}
+                              label="Mark done"
+                            />
+                          ) : null}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="hint" style={{ marginTop: 'var(--space-3)' }}>
+                  Closing requires no open issues, no missing required documents, and every item
+                  above ticked. The server checks this again regardless.
                 </p>
               </CardBody>
             </Card>

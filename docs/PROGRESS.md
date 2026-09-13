@@ -34,33 +34,45 @@ Complete.
 own six categories, seeded on day one) and a computed `GET /projects/:id/documents/completeness` that
 diffs it against a project's own uploaded categories. See `docs/phase-9-plan.md`. Complete.
 
-| Step | Track point                                              | Status  |
-| ---- | -------------------------------------------------------- | ------- |
-| 0    | Project skeleton and tooling                             | ✅ Done |
-| 1    | Database, migrations, privilege model                    | ✅ Done |
-| 2    | Correlation IDs, logging, error handling, audit writer   | ✅ Done |
-| 3    | Users and sign-in                                        | ✅ Done |
-| 4    | Roles, permissions, authorization choke point            | ✅ Done |
-| 5    | Clients, contacts, properties                            | ✅ Done |
-| 6    | Projects and membership                                  | ✅ Done |
-| 7    | Environment setup script                                 | ✅ Done |
-| 8    | Web interface                                            | ✅ Done |
-| 9    | Planning — activities, milestones, submissions           | ✅ Done |
-| 10   | Supervision — site visits, observations, instructions    | ✅ Done |
-| 11   | Issues — the fourth state machine                        | ✅ Done |
-| 12   | Web interface for Phase 2                                | ✅ Done |
-| 13   | Approvals — the shared state machine                     | ✅ Done |
-| 14   | Drawings — append-only, immutable-when-approved          | ✅ Done |
-| 15   | Documents — register, metadata and the Drive seam        | ✅ Done |
-| 16   | Web interface for Phase 3                                | ✅ Done |
-| 17   | Property fields — Oman land-registry identity            | ✅ Done |
-| 18   | Sequence service — real, annual-reset numbering          | ✅ Done |
-| 19   | Wired into `Project.create` — generated `code`           | ✅ Done |
-| 20   | Web — property form, project-code hint                   | ✅ Done |
-| 21   | Proposal data model, sketch numbering, CRUD              | ✅ Done |
-| 22   | Proposal status machine — the transition endpoint        | ✅ Done |
-| 23   | Convert action — WON proposal to a real numbered project | ✅ Done |
-| 24   | Web interface for Phase 5                                | ✅ Done |
+**Phase 10 — Handover & closure gate**: the Closure-phase checklist (final inspection, authority
+completion documents, tests, as-built, warranties, final report) that gates a project's own
+`COMPLETED → CLOSED` transition — until now the one transition in the whole state machine with no
+precondition at all. See `docs/phase-10-plan.md`. Complete.
+
+| Step  | Track point                                              | Status  |
+| ----- | -------------------------------------------------------- | ------- |
+| 0     | Project skeleton and tooling                             | ✅ Done |
+| 1     | Database, migrations, privilege model                    | ✅ Done |
+| 2     | Correlation IDs, logging, error handling, audit writer   | ✅ Done |
+| 3     | Users and sign-in                                        | ✅ Done |
+| 4     | Roles, permissions, authorization choke point            | ✅ Done |
+| 5     | Clients, contacts, properties                            | ✅ Done |
+| 6     | Projects and membership                                  | ✅ Done |
+| 7     | Environment setup script                                 | ✅ Done |
+| 8     | Web interface                                            | ✅ Done |
+| 9     | Planning — activities, milestones, submissions           | ✅ Done |
+| 10    | Supervision — site visits, observations, instructions    | ✅ Done |
+| 11    | Issues — the fourth state machine                        | ✅ Done |
+| 12    | Web interface for Phase 2                                | ✅ Done |
+| 13    | Approvals — the shared state machine                     | ✅ Done |
+| 14    | Drawings — append-only, immutable-when-approved          | ✅ Done |
+| 15    | Documents — register, metadata and the Drive seam        | ✅ Done |
+| 16    | Web interface for Phase 3                                | ✅ Done |
+| 17    | Property fields — Oman land-registry identity            | ✅ Done |
+| 18    | Sequence service — real, annual-reset numbering          | ✅ Done |
+| 19    | Wired into `Project.create` — generated `code`           | ✅ Done |
+| 20    | Web — property form, project-code hint                   | ✅ Done |
+| 21    | Proposal data model, sketch numbering, CRUD              | ✅ Done |
+| 22    | Proposal status machine — the transition endpoint        | ✅ Done |
+| 23    | Convert action — WON proposal to a real numbered project | ✅ Done |
+| 24    | Web interface for Phase 5                                | ✅ Done |
+| 25-28 | Phase 6 — Authority application tracking                 | ✅ Done |
+| 29-31 | Phase 7 — Supervision Agreements                         | ✅ Done |
+| 32-34 | Phase 8 — Client Modifications / Deviations              | ✅ Done |
+| 35-37 | Phase 9 — Document Completeness                          | ✅ Done |
+| 38    | Handover data model + endpoints                          | ✅ Done |
+| 39    | The closure gate — `HANDOVER_INCOMPLETE`                 | ✅ Done |
+| 40    | Web interface for Phase 10                               | ✅ Done |
 
 ---
 
@@ -1980,3 +1992,71 @@ having been written id-first from the start the same way every phase since 4 has
 
 Phase 9 is complete. All of `docs/phase-9-plan.md` §8's definition of done is demonstrated either by
 an API-level test (Steps 35-36) or by a browser test (Step 37).
+
+---
+
+## Steps 38-40 — Phase 10: Handover & Closure Gate ✅
+
+The last workflow phase — Phase 11 only reads what everything before it has recorded — and the first
+precondition ever placed on `COMPLETED → CLOSED`, the one project transition Step 6 left unguarded.
+See `docs/phase-10-plan.md`.
+
+**Built:**
+
+- **Data model + endpoints (Step 38).** New `HandoverChecklist` model: one row per project
+  (`projectId` unique), six date-or-not fields for the Closure-phase items no existing table already
+  answers — final inspection, authority completion documents, mandatory tests, as-built, warranties,
+  final report — the same treatment `Milestone.achievedDate`/`Instruction.actionedAt` already get.
+  Created lazily via `upsert` on first read or edit, never a migration-time backfill.
+  `HandoverService.status()`/`update()`, exposed at `GET`/`PATCH /projects/:id/handover`. Open issues
+  and missing documents are deliberately **not** columns — `Issue.status` and a reimplementation of
+  Phase 9's own completeness diff are computed fresh on every read, the same "derive, don't
+  duplicate" choice Phase 7 made for `SupervisionAgreement.visitsUsed`. Rides `project:view`/
+  `project:edit` — no new permission resource, the same reasoning Phase 8 gave `Modification` riding
+  `planning:*`.
+- **The gate (Step 39).** `ProjectService.transition()` now injects `HandoverService` and checks
+  `isReady()` only when the target is `CLOSED` — reached only via the `close` action, which
+  `PROJECT_TRANSITIONS` only ever allows from `COMPLETED`. A failing check throws a new
+  `HANDOVER_INCOMPLETE` (409) rather than reusing `ILLEGAL_TRANSITION`: the move is legal, a business
+  precondition is unmet — the same distinction `DEPENDENCY_EXISTS` already draws for archival. The
+  refusal is recorded in its own transaction, exactly like every other refused transition since Step 6.
+- **Web (Step 40).** The project page gains a "Handover" card once a project reaches `COMPLETED` or
+  `CLOSED`: live open-issue and missing-document counts, and the six checklist items as one-way
+  "Mark done" buttons (`ActionButton`, the same shape `Instruction`/`Milestone` already use). The
+  `close` button gained a `disabledReason` — a new optional `ActionButton` prop rendering a disabled
+  button with an explanatory title instead of submitting, used here for the first time: hiding the
+  button outright would be indistinguishable from a permissions problem, but this is a precondition
+  the person can still go and satisfy.
+
+**Verified — 11 new integration tests in `apps/api/tests/integration/handover.test.ts`** (starts
+unready with nothing satisfied; refused independently for an open issue, a missing document, and an
+incomplete checklist; the refusal is recorded; closes once all three clear; resolving the one open
+issue that was blocking it is enough; every other transition — `activate`/`hold`/`complete` — is
+untouched; a checklist row does not exist until first read, which creates it; a stale checklist
+update is refused) plus the full existing suite, all passing.
+
+**Decisions:**
+
+- **`HandoverService` is injected directly into `ProjectService`**, not duplicated — the established
+  convention `ProjectService` already uses for `SequenceService`. Cross-module service composition
+  via a module's own exported `index`, not the private-helper duplication pattern
+  (`requireOpenProject`) reserved for small guards no module wants to expose.
+- **A dedicated `HANDOVER_INCOMPLETE` error code.** Reusing `ILLEGAL_TRANSITION` would have
+  conflated "the state machine forbids this" with "the state machine allows this, but a business
+  rule doesn't yet" — two different facts a caller needs to tell apart, the same way
+  `DEPENDENCY_EXISTS` is already kept separate from `ILLEGAL_TRANSITION` for archival refusals.
+- **Test files run sequentially against the shared database (`fileParallelism: false` in
+  `vitest.config.mts`).** Required documents is a genuinely global, mutable catalogue, and this
+  phase is the first thing that treats it as a hard precondition rather than an informational read —
+  two test files racing to add or retire a requirement while another checked a project's readiness
+  would flip a real result, not just collide on fixture data. Discovered because the closed-project
+  tests in `modifications.test.ts` and `supervision.test.ts` passed in isolation but failed
+  intermittently in the full suite.
+
+**Known limit, not introduced by this step:** the same pre-existing accumulated-dev-database issue
+recurred against `projects.test.ts` and `users.test.ts` while running the full suite locally — both
+are `pageSize: 100` list assertions against a dev database that has accumulated over a thousand rows
+across many prior local runs. Confirmed absent in a fresh database (CI provisions one on every run).
+
+Phase 10 is complete. All of `docs/phase-10-plan.md` §8's definition of done is demonstrated by an
+API-level test (Steps 38-39) or by a browser check (Step 40).

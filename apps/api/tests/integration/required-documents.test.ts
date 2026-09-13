@@ -7,6 +7,7 @@ import { ClientService } from '../../src/modules/directory/client.service';
 import { PropertyService } from '../../src/modules/directory/property.service';
 import { DocumentService } from '../../src/modules/documents/document.service';
 import { RequiredDocumentService } from '../../src/modules/documents/required-document.service';
+import { HandoverService } from '../../src/modules/handover';
 import { ProjectService } from '../../src/modules/projects/project.service';
 import { SequenceService } from '../../src/modules/sequence';
 import { runInRequestContext } from '../../src/shared/context/request-context';
@@ -39,7 +40,13 @@ describe('required documents', () => {
   const authorization = new AuthorizationService(prisma);
   const clients = new ClientService(prisma, audit);
   const properties = new PropertyService(prisma, audit);
-  const projects = new ProjectService(prisma, audit, authorization, new SequenceService());
+  const projects = new ProjectService(
+    prisma,
+    audit,
+    authorization,
+    new SequenceService(),
+    new HandoverService(prisma, audit),
+  );
   const documents = new DocumentService(prisma, audit, new LocalDriveAdapter());
   const requiredDocuments = new RequiredDocumentService(prisma, audit);
 

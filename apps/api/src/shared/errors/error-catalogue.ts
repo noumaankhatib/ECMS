@@ -28,6 +28,10 @@ export const ERROR_CATALOGUE = {
     status: 409,
     message: 'This cannot be archived because other records depend on it.',
   },
+  HANDOVER_INCOMPLETE: {
+    status: 409,
+    message: 'The handover checklist must be complete before this project can be closed.',
+  },
   RATE_LIMITED: { status: 429, message: 'Too many requests. Please slow down.' },
   INTERNAL: { status: 500, message: 'Something went wrong.' },
 } as const satisfies Record<string, { status: number; message: string }>;

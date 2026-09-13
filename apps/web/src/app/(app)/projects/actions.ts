@@ -1,6 +1,6 @@
 'use server';
 
-import type { ProjectAction } from '@ecms/contracts';
+import type { HandoverStatus, ProjectAction, UpdateHandoverChecklist } from '@ecms/contracts';
 import { redirect } from 'next/navigation';
 
 import { attempt, nullableText, refresh, runAction, text } from '@/lib/actions';
@@ -86,6 +86,18 @@ export async function addMember(_state: FormState, form: FormData): Promise<Form
 
 export async function removeMember(projectId: string, userId: string): Promise<void> {
   await api.delete(`/projects/${projectId}/members/${userId}`);
+  await refresh(`/projects/${projectId}`);
+}
+
+/** Ticks one handover checklist item (docs/phase-10-plan.md §6) — a
+ *  one-way "mark done", the same treatment `Milestone.achievedDate` and
+ *  `Instruction.actionedAt` already get. */
+export async function markHandoverItem(
+  projectId: string,
+  field: keyof Omit<UpdateHandoverChecklist, 'version'>,
+  version: number,
+): Promise<void> {
+  await api.patch<HandoverStatus>(`/projects/${projectId}/handover`, { [field]: true, version });
   await refresh(`/projects/${projectId}`);
 }
 

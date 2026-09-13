@@ -757,6 +757,35 @@ model Modification {
   @@map("modification")
 }
 
+/// The Closure-phase items PRD names that no existing table already answers
+/// (docs/phase-10-plan.md §3) — final inspection, authority completion
+/// documents, mandatory tests, as-built, warranties and the final report.
+/// Each is a date-or-not field, the same treatment `Milestone.achievedDate`
+/// and `Instruction.actionedAt` already get. Open issues and missing
+/// documents are deliberately NOT columns here — `Issue.status` and
+/// `DocumentService.completeness()` are already the real answer, and a
+/// checkbox next to them would be a second, disagreeing source of truth.
+model HandoverChecklist {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  projectId String  @unique @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  finalInspectionAt       DateTime? @map("final_inspection_at") @db.Timestamptz(6)
+  authorityDocsReceivedAt DateTime? @map("authority_docs_received_at") @db.Timestamptz(6)
+  testsReceivedAt         DateTime? @map("tests_received_at") @db.Timestamptz(6)
+  asBuiltReceivedAt       DateTime? @map("as_built_received_at") @db.Timestamptz(6)
+  warrantiesReceivedAt    DateTime? @map("warranties_received_at") @db.Timestamptz(6)
+  finalReportIssuedAt     DateTime? @map("final_report_issued_at") @db.Timestamptz(6)
+
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("handover_checklist")
+}
+
 /// A registered document (PRD §6, "Document Management"). Deliberately not
 /// run through `ApprovalStatus` (docs/phase-3-plan.md §4) — most documents
 /// this system will hold have no approval step in practice, and forcing one
@@ -901,6 +930,7 @@ model Project {
   drawings           Drawing[]
   documents          Document[]
   modifications      Modification[]
+  handoverChecklist  HandoverChecklist?
   /// Set only if this project was minted by a Proposal conversion
   /// (docs/phase-5-plan.md §4) — absent for a project created directly.
   convertedFromProposal Proposal?

@@ -5,6 +5,7 @@ import { AuthorizationService } from '../../src/modules/access/authorization.ser
 import { AuditService } from '../../src/modules/audit/audit.service';
 import { ClientService } from '../../src/modules/directory/client.service';
 import { PropertyService } from '../../src/modules/directory/property.service';
+import { HandoverService } from '../../src/modules/handover';
 import { MembershipService } from '../../src/modules/projects/membership.service';
 import { ProjectService } from '../../src/modules/projects/project.service';
 import { WorkstreamService } from '../../src/modules/projects/workstream.service';
@@ -29,12 +30,56 @@ describe('projects', () => {
   const authorization = new AuthorizationService(prisma);
   const clients = new ClientService(prisma, audit);
   const properties = new PropertyService(prisma, audit);
-  const projects = new ProjectService(prisma, audit, authorization, new SequenceService());
+  const handover = new HandoverService(prisma, audit);
+  const projects = new ProjectService(
+    prisma,
+    audit,
+    authorization,
+    new SequenceService(),
+    handover,
+  );
   const members = new MembershipService(prisma, audit);
   const workstreams = new WorkstreamService(prisma, audit);
 
   const requestId = '55555555-4444-4333-8222-111111111111';
   const inContext = <T>(fn: () => Promise<T>): Promise<T> => runInRequestContext({ requestId }, fn);
+
+  // Closing is gated on a complete handover checklist
+  // (docs/phase-10-plan.md §4): no open issues, no missing required
+  // documents (the Phase 9 seed applies its six ANY-scoped categories to
+  // every project), and every checklist item ticked.
+  async function completeHandover(projectId: string): Promise<void> {
+    const requirements = await prisma.requiredDocument.findMany({
+      where: { archivedAt: null },
+    });
+    const existing = await prisma.document.findMany({
+      where: { projectId, archivedAt: null },
+      select: { category: true },
+    });
+    const covered = new Set(existing.map((d) => d.category.trim().toLowerCase()));
+    for (const requirement of requirements) {
+      if (covered.has(requirement.category.trim().toLowerCase())) continue;
+      await prisma.document.create({
+        data: {
+          projectId,
+          category: requirement.category,
+          title: `${requirement.category} (test fixture)`,
+          uploadStatus: 'ACTIVE',
+        },
+      });
+    }
+
+    const status = await handover.status(projectId);
+    await handover.update(projectId, {
+      finalInspectionDone: true,
+      authorityDocsReceived: true,
+      testsReceived: true,
+      asBuiltReceived: true,
+      warrantiesReceived: true,
+      finalReportIssued: true,
+      version: status.version,
+    });
+  }
 
   const createdUsers: string[] = [];
 
@@ -280,6 +325,7 @@ describe('projects', () => {
     expect(project.status).toBe('COMPLETED');
     expect(project.actualEndDate).not.toBeNull();
 
+    await completeHandover(projectId);
     project = await inContext(() =>
       projects.transition(projectId, 'close', { version: project.version }, admin),
     );
@@ -317,6 +363,7 @@ describe('projects', () => {
     project = await inContext(() =>
       projects.transition(projectId, 'complete', { version: project.version }, admin),
     );
+    await completeHandover(projectId);
     project = await inContext(() =>
       projects.transition(projectId, 'close', { version: project.version }, admin),
     );
