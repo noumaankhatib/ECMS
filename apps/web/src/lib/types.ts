@@ -15,6 +15,7 @@ import type {
   IssueStatus,
   ProjectStatus,
   ProjectType,
+  ProposalStatus,
   Role,
   SubmissionStatus,
   UserStatus,
@@ -221,6 +222,40 @@ export interface DrawingRevision {
   supersededAt: string | null;
   version: number;
   createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5 — proposals and the sketch-type pick list
+// ---------------------------------------------------------------------------
+
+export interface Proposal {
+  id: string;
+  clientId: string | null;
+  propertyId: string | null;
+  contactName: string;
+  contactPhone: string | null;
+  sketchNumber: string;
+  sketchTypeId: string | null;
+  projectType: ProjectType | null;
+  approxAreaSqm: string | null;
+  source: string | null;
+  assignedArchitectId: string | null;
+  status: ProposalStatus;
+  receivedAt: string | null;
+  dueAt: string | null;
+  notes: string | null;
+  convertedProjectId: string | null;
+  convertedAt: string | null;
+  version: number;
+  createdAt: string;
+}
+
+export interface ProposalSketchType {
+  id: string;
+  code: string;
+  label: string;
+  sortOrder: number;
+  archivedAt: string | null;
 }
 
 export interface Document {

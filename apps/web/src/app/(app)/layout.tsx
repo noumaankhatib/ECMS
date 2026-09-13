@@ -20,8 +20,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   // the API; this only decides what is worth showing them.
   const links = [
     { href: '/projects', label: 'Projects', show: true },
+    { href: '/proposals', label: 'Proposals', show: session.can('proposal:view') },
     { href: '/clients', label: 'Clients', show: session.can('client:view') },
     { href: '/properties', label: 'Properties', show: session.can('property:view') },
+    { href: '/sketch-types', label: 'Sketch types', show: session.can('sketch_type:admin') },
     { href: '/users', label: 'Users', show: session.can('user:view') },
   ]
     .filter((link) => link.show)

@@ -15,6 +15,10 @@ annual-reset numbering service replacing the free-typed project code. The first 
 roadmap derived from the client's own documents and registers, not just the PRD — see
 `docs/phase-4-plan.md` and `~/.claude/plans/swirling-singing-book.md`. Complete.
 
+**Phase 5 — Proposal / sketch intake**: a real record for an inquiry from first contact to either a
+lost/on-hold outcome or a one-click conversion into a numbered Planning project, replacing the Excel
+sketch register staff run this workflow in today. See `docs/phase-5-plan.md`. Complete.
+
 | Step | Track point                                            | Status  |
 | ---- | ------------------------------------------------------ | ------- |
 | 0    | Project skeleton and tooling                           | ✅ Done |
@@ -41,6 +45,7 @@ roadmap derived from the client's own documents and registers, not just the PRD 
 | 21   | Proposal data model, sketch numbering, CRUD            | ✅ Done |
 | 22   | Proposal status machine — the transition endpoint      | ✅ Done |
 | 23   | Convert action — WON proposal to a real numbered project | ✅ Done |
+| 24   | Web interface for Phase 5                              | ✅ Done |
 
 ---
 
@@ -1596,3 +1601,66 @@ edits on the same resource.
 
 **Not yet built:** the web interface (Step 24) — proposal list/detail/create/edit pages, the sketch-type
 admin screen, and a "Convert to project" button on `WON` proposals.
+
+---
+
+## Step 24 — Web interface for Phase 5 ✅
+
+The last step of Phase 5, and the one that makes proposal intake, the status machine and conversion usable
+by somebody who is not holding a terminal — the same role Steps 8/12/16/20 played for the prior phases.
+
+**Built:** `/proposals` (list, with search and a status filter), `/proposals/new`, `/proposals/[id]`
+(details, the status-transition buttons, and a "Convert to project" form) and `/proposals/[id]/edit`,
+following the clients-page pattern exactly — server actions in one `actions.ts`, `ActionForm`/`ActionButton`
+for mutation, `requirePermission`/`session.can` for what to show. `/sketch-types`, a single admin page behind
+`sketch_type:admin` with an inline rename/re-order form and a "Retire" action per row, plus an add form below
+— the shape this codebase's Team/Contacts cards already use for "list plus an add-form beneath it", adapted
+for rename since no prior page needed one. Both new links added to the sidebar, gated by
+`proposal:view`/`sketch_type:admin` respectively. `apps/web/tests/e2e/phase-5.spec.ts` added alongside the
+existing one-file-per-phase Playwright suite.
+
+**Verified — 3 new browser tests, all passing (30 total across the suite; see the known limit below):**
+
+| Behaviour                                                                              | Result |
+| --------------------------------------------------------------------------------------- | ------ |
+| A proposal is logged from just a contact name and phone and gets a real `26-SB-NNN` sketch number | ✅ |
+| A `WON` proposal with a property attached converts to a real numbered project through the browser, and the converted project is linked from the detail page | ✅ |
+| Converting with no property attached is refused, and the API's own reason ("Attach a property to this proposal before converting it.") reaches the screen | ✅ |
+
+**Decisions:**
+
+- **`startConcept`'s route is reused for `ON_HOLD → CONCEPT`, not given a second UI action for "resume."**
+  `ProposalService.transition` checks only the resulting status, not which named action reached it — so
+  `start-concept` and `resume` are two routes to an identical outcome from `ON_HOLD`. Rather than show both
+  buttons whenever `CONCEPT` is legal (confusing — one screen offering two ways to do the same thing), the
+  detail page shows a single button per target status and asks the current status for its label: "Resume"
+  when on hold, "Move to concept" otherwise. Both labels post to `start-concept`; the API accepts either
+  source status because canTransitionProposal only inspects the target.
+- **The convert action runs through `ActionForm`/`runAction`, not the bare `ActionButton` every other
+  transition uses.** It is the one action in this module that can be refused for a reason worth reading —
+  "attach a property first" — and `ActionButton`'s raw `<form action>` has nowhere to put that refusal
+  except an error boundary. This is a small, deliberate exception to the transition-button pattern, not a
+  new general rule: ordinary transitions stay on `ActionButton` because none of their refusals need more
+  than "reload and try again."
+- **A proposal's own sketch type is fetched from `GET /proposal-sketch-types` and matched by id, not read
+  from a per-id endpoint.** There isn't one — the API only exposes the active-only list route (Step 21's
+  `ProposalSketchTypeController` has no `GET /:id`) — and this is also what makes a retired entry still
+  resolvable: the detail and edit pages find it by id in the full response rather than assuming
+  membership in "the current pick list," which is exactly the property Step 21's "retired, never deleted"
+  design depends on somebody upholding.
+- **`/sketch-types` sits behind `sketch_type:admin` outright, not the weaker `proposal:view` its own GET
+  route accepts.** The page exists only to manage the list; someone who can merely view proposals has
+  nothing to do on it, so gating on the stronger permission avoids a page that renders successfully and
+  then shows no controls.
+
+**Known limit, not introduced by this step:** running the full `pnpm e2e` suite together, three unrelated
+tests (`phase-1.spec.ts`, `phase-2.spec.ts`, `phase-3.spec.ts`, each the "admin creates a client, a
+property and a project" test) timed out on `getByLabel('Client')`/`getByLabel('Name')` against the
+properties form. This is the exact, already-documented limit `phase-4.spec.ts`'s own comment names ("the
+same happens on the unmodified Phase 1-3 pages once the dev database grows past a couple of hundred rows,
+which it now has") — not a regression from this step, and not something Phase 5's own three tests hit,
+since they were written id-first from the start the way Phase 4's were.
+
+Phase 5 is complete. All of `docs/phase-5-plan.md` §9's definition of done is demonstrated either by an
+API-level test (Steps 21-23) or by a browser test (this step), matching the standard every prior phase in
+this codebase has been held to.

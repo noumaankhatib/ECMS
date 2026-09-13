@@ -6,7 +6,7 @@
 > `docs/PROGRESS.md`'s roadmap note and `~/.claude/plans/swirling-singing-book.md` (the approved 8-phase
 > roadmap) for how this fits after Phase 4.
 >
-> **Status:** Plan for review. Nothing built yet.
+> **Status:** Complete — see `docs/PROGRESS.md` Steps 21-24.
 > **Prerequisite:** Phase 4 (done — see `docs/PROGRESS.md`, `docs/phase-4-plan.md`).
 
 ---
