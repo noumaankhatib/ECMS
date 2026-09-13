@@ -18,6 +18,7 @@ import type { FormState } from '@/lib/form-state';
 export function Field({
   label,
   name,
+  id,
   type = 'text',
   defaultValue,
   required,
@@ -27,6 +28,12 @@ export function Field({
 }: {
   label: string;
   name: string;
+  /** Overrides the element's `id` (and its label/hint association) without
+   *  changing `name` — needed wherever the same field repeats once per row
+   *  (a table of per-row edit forms plus an "Add" form below it), since
+   *  `id` must be unique across the whole page even though `name` is scoped
+   *  to each row's own `<form>`. Defaults to `name`. */
+  id?: string;
   type?: string;
   defaultValue?: string | null | undefined;
   required?: boolean;
@@ -34,23 +41,24 @@ export function Field({
   wide?: boolean;
   autoComplete?: string;
 }) {
+  const fieldId = id ?? name;
   return (
     <div className={`field${wide ? ' field--wide' : ''}`}>
-      <label htmlFor={name}>
+      <label htmlFor={fieldId}>
         {label}
         {required ? <span aria-hidden="true"> *</span> : null}
       </label>
       <input
-        id={name}
+        id={fieldId}
         name={name}
         type={type}
         defaultValue={defaultValue ?? ''}
         required={required ?? false}
-        {...(hint ? { 'aria-describedby': `${name}-hint` } : {})}
+        {...(hint ? { 'aria-describedby': `${fieldId}-hint` } : {})}
         {...(autoComplete ? { autoComplete } : {})}
       />
       {hint ? (
-        <span className="hint" id={`${name}-hint`}>
+        <span className="hint" id={`${fieldId}-hint`}>
           {hint}
         </span>
       ) : null}
@@ -107,6 +115,7 @@ export function TextArea({
 export function Select({
   label,
   name,
+  id,
   options,
   defaultValue,
   required,
@@ -115,19 +124,29 @@ export function Select({
 }: {
   label: string;
   name: string;
+  /** See `Field`'s `id` — overrides the element's `id` without changing
+   *  `name`, for the same reason: uniqueness across the page when the same
+   *  field repeats once per row. Defaults to `name`. */
+  id?: string;
   options: readonly { value: string; label: string }[];
   defaultValue?: string | undefined;
   required?: boolean;
   hint?: string;
   wide?: boolean;
 }) {
+  const fieldId = id ?? name;
   return (
     <div className={`field${wide ? ' field--wide' : ''}`}>
-      <label htmlFor={name}>
+      <label htmlFor={fieldId}>
         {label}
         {required ? <span aria-hidden="true"> *</span> : null}
       </label>
-      <select id={name} name={name} defaultValue={defaultValue ?? ''} required={required ?? false}>
+      <select
+        id={fieldId}
+        name={name}
+        defaultValue={defaultValue ?? ''}
+        required={required ?? false}
+      >
         {required ? null : <option value="">—</option>}
         {options.map((option) => (
           <option key={option.value} value={option.value}>

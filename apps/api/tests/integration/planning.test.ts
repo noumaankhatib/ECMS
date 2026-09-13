@@ -7,6 +7,8 @@ import { ClientService } from '../../src/modules/directory/client.service';
 import { PropertyService } from '../../src/modules/directory/property.service';
 import { ActivityService } from '../../src/modules/planning/activity.service';
 import { MilestoneService } from '../../src/modules/planning/milestone.service';
+import { SubmissionMeetingService } from '../../src/modules/planning/submission-meeting.service';
+import { SubmissionReviewService } from '../../src/modules/planning/submission-review.service';
 import { SubmissionService } from '../../src/modules/planning/submission.service';
 import { ProjectService } from '../../src/modules/projects/project.service';
 import { SequenceService } from '../../src/modules/sequence';
@@ -35,6 +37,8 @@ describe('planning', () => {
   const activities = new ActivityService(prisma, audit);
   const milestones = new MilestoneService(prisma, audit);
   const submissions = new SubmissionService(prisma, audit);
+  const reviews = new SubmissionReviewService(prisma, audit);
+  const meetings = new SubmissionMeetingService(prisma, audit);
 
   const requestId = '33333333-2222-4111-8000-999999999999';
   const inContext = <T>(fn: () => Promise<T>): Promise<T> => runInRequestContext({ requestId }, fn);
@@ -372,11 +376,12 @@ describe('planning', () => {
         projectId,
         submission.id,
         'approve',
-        { version: current.version },
+        { version: current.version, permitReference: 'MOH-2026-0118' },
         reviewer,
       ),
     );
     expect(current.status).toBe('APPROVED');
+    expect(current.permitReference).toBe('MOH-2026-0118');
   });
 
   it('refuses a reviewer approving their own submission', async () => {
@@ -482,6 +487,259 @@ describe('planning', () => {
         submissions.create(closingProject.id, { reference: 'X', authorityName: 'Y' }, admin),
       ),
     ).rejects.toMatchObject({ code: 'ILLEGAL_TRANSITION' });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Phase 6 — authority application tracking (docs/phase-6-plan.md)
+  // ---------------------------------------------------------------------------
+
+  it('refuses to approve a submission with no permit reference on record', async () => {
+    const reviewer = await userWithRole('PLANNING');
+    await prisma.projectMember.create({
+      data: { projectId, userId: reviewer, roleCode: 'PLANNING' },
+    });
+
+    const submission = await inContext(() =>
+      submissions.create(
+        projectId,
+        { reference: 'SUB-007', authorityName: 'Ministry of Housing' },
+        owningManager,
+      ),
+    );
+    let current = await inContext(() =>
+      submissions.transition(projectId, submission.id, 'submit', { version: 1 }, owningManager),
+    );
+    current = await inContext(() =>
+      submissions.transition(
+        projectId,
+        submission.id,
+        'review',
+        { version: current.version },
+        owningManager,
+      ),
+    );
+
+    await expect(
+      inContext(() =>
+        submissions.transition(
+          projectId,
+          submission.id,
+          'approve',
+          { version: current.version },
+          reviewer,
+        ),
+      ),
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+    // Approving is refused before any illegal-jump check would even apply —
+    // a submission not yet eligible at all should hear the real reason.
+    const approved = await inContext(() =>
+      submissions.transition(
+        projectId,
+        submission.id,
+        'approve',
+        { version: current.version, permitReference: 'MUN-2026-9981' },
+        reviewer,
+      ),
+    );
+    expect(approved.status).toBe('APPROVED');
+  });
+
+  it('halts a submission and resumes it back to the status it was halted from', async () => {
+    const submission = await inContext(() =>
+      submissions.create(
+        projectId,
+        { reference: 'SUB-008', authorityName: 'Muscat Municipality' },
+        owningManager,
+      ),
+    );
+    let current = await inContext(() =>
+      submissions.transition(projectId, submission.id, 'submit', { version: 1 }, owningManager),
+    );
+    current = await inContext(() =>
+      submissions.transition(
+        projectId,
+        submission.id,
+        'review',
+        { version: current.version },
+        owningManager,
+      ),
+    );
+    expect(current.status).toBe('UNDER_REVIEW');
+
+    current = await inContext(() =>
+      submissions.transition(
+        projectId,
+        submission.id,
+        'halt',
+        { version: current.version, reason: 'Awaiting a survey document' },
+        owningManager,
+      ),
+    );
+    expect(current.status).toBe('HALTED');
+
+    current = await inContext(() =>
+      submissions.resume(projectId, submission.id, { version: current.version }, owningManager),
+    );
+    expect(current.status).toBe('UNDER_REVIEW');
+  });
+
+  it('cancels a halted submission, and a cancelled submission accepts no further transitions', async () => {
+    const submission = await inContext(() =>
+      submissions.create(
+        projectId,
+        { reference: 'SUB-009', authorityName: 'Muscat Municipality' },
+        owningManager,
+      ),
+    );
+    let current = await inContext(() =>
+      submissions.transition(projectId, submission.id, 'submit', { version: 1 }, owningManager),
+    );
+    current = await inContext(() =>
+      submissions.transition(
+        projectId,
+        submission.id,
+        'halt',
+        { version: current.version },
+        owningManager,
+      ),
+    );
+    current = await inContext(() =>
+      submissions.transition(
+        projectId,
+        submission.id,
+        'cancel',
+        { version: current.version },
+        owningManager,
+      ),
+    );
+    expect(current.status).toBe('CANCELLED');
+
+    await expect(
+      inContext(() =>
+        submissions.resume(projectId, submission.id, { version: current.version }, owningManager),
+      ),
+    ).rejects.toMatchObject({ code: 'ILLEGAL_TRANSITION' });
+  });
+
+  it('round-trips a clarification request and response without disturbing status', async () => {
+    const submission = await inContext(() =>
+      submissions.create(
+        projectId,
+        { reference: 'SUB-010', authorityName: 'Ministry of Housing' },
+        owningManager,
+      ),
+    );
+    let current = await inContext(() =>
+      submissions.transition(projectId, submission.id, 'submit', { version: 1 }, owningManager),
+    );
+    current = await inContext(() =>
+      submissions.transition(
+        projectId,
+        submission.id,
+        'review',
+        { version: current.version },
+        owningManager,
+      ),
+    );
+
+    current = await inContext(() =>
+      submissions.requestClarification(
+        projectId,
+        submission.id,
+        { version: current.version },
+        owningManager,
+      ),
+    );
+    expect(current.status).toBe('UNDER_REVIEW');
+    expect(current.clarificationRequested).toBe(true);
+
+    current = await inContext(() =>
+      submissions.respondClarification(
+        projectId,
+        submission.id,
+        { version: current.version, response: 'Site plan attached.' },
+        owningManager,
+      ),
+    );
+    expect(current.status).toBe('UNDER_REVIEW');
+    expect(current.clarificationRequested).toBe(false);
+    expect(current.clarificationResponse).toBe('Site plan attached.');
+  });
+
+  it('logs reviews and meetings against a submission, never deleted, optimistic-locked', async () => {
+    const submission = await inContext(() =>
+      submissions.create(
+        projectId,
+        { reference: 'SUB-011', authorityName: 'Muscat Municipality', department: 'PLANNING' },
+        owningManager,
+      ),
+    );
+
+    const review = await inContext(() =>
+      reviews.create(
+        projectId,
+        submission.id,
+        {
+          reviewDate: new Date('2026-09-01'),
+          reviewerName: 'Eng. Salim',
+          comments: 'Missing setback dimensions',
+        },
+        owningManager,
+      ),
+    );
+    expect(review.submissionId).toBe(submission.id);
+
+    const updatedReview = await inContext(() =>
+      reviews.update(
+        projectId,
+        submission.id,
+        review.id,
+        { responseText: 'Setback dimensions added', version: review.version },
+        owningManager,
+      ),
+    );
+    expect(updatedReview.responseText).toBe('Setback dimensions added');
+
+    await expect(
+      inContext(() =>
+        reviews.update(
+          projectId,
+          submission.id,
+          review.id,
+          { comments: 'stale write', version: review.version },
+          owningManager,
+        ),
+      ),
+    ).rejects.toMatchObject({ code: 'STALE_RECORD' });
+
+    const meeting = await inContext(() =>
+      meetings.create(
+        projectId,
+        submission.id,
+        { required: true, purpose: 'Discuss setback objection' },
+        owningManager,
+      ),
+    );
+    expect(meeting.submissionId).toBe(submission.id);
+
+    const heldMeeting = await inContext(() =>
+      meetings.update(
+        projectId,
+        submission.id,
+        meeting.id,
+        { outcome: 'Resolved', heldAt: new Date(), version: meeting.version },
+        owningManager,
+      ),
+    );
+    expect(heldMeeting.outcome).toBe('Resolved');
+
+    const page = await reviews.list(projectId, submission.id, {
+      page: 1,
+      pageSize: 20,
+      includeArchived: false,
+    });
+    expect(page.items.some((r) => r.id === review.id)).toBe(true);
   });
 
   it('holds every seeded Phase 2 permission in the shared catalogue', async () => {

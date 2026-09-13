@@ -1,8 +1,5 @@
-import {
-  canTransitionSubmission,
-  type SubmissionAction,
-  type SubmissionStatus,
-} from '@ecms/contracts';
+import type { SubmissionStatus } from '@ecms/contracts';
+import Link from 'next/link';
 
 import { ActionButton, ActionForm, Field, Select, TextArea } from '@/components/form';
 import {
@@ -36,7 +33,6 @@ import {
   createSubmission,
   markMilestoneReached,
   setActivityDone,
-  transitionSubmission,
 } from './actions';
 
 export const metadata = { title: 'Planning — ECMS' };
@@ -49,32 +45,14 @@ const SUBMISSION_LABEL: Record<SubmissionStatus, string> = {
   REJECTED: 'Rejected',
   RETURNED_FOR_REVISION: 'Returned for revision',
   WITHDRAWN: 'Withdrawn',
+  HALTED: 'Halted',
+  CANCELLED: 'Cancelled',
 };
 
-/**
- * The named actions, and the word for each — the same shape the project and
- * issue pages use. `approve`, `reject` and `returnForRevision` are decisions
- * and sit behind `planning:approve`; the rest are ordinary editing.
- */
-const SUBMISSION_ACTION_DEFS: {
-  action: SubmissionAction;
-  to: SubmissionStatus;
-  label: string;
-  decision?: boolean;
-  variant?: 'secondary' | 'danger';
-}[] = [
-  { action: 'submit', to: 'SUBMITTED', label: 'Submit' },
-  { action: 'review', to: 'UNDER_REVIEW', label: 'Start review' },
-  { action: 'approve', to: 'APPROVED', label: 'Approve', decision: true },
-  { action: 'reject', to: 'REJECTED', label: 'Reject', decision: true, variant: 'danger' },
-  {
-    action: 'returnForRevision',
-    to: 'RETURNED_FOR_REVISION',
-    label: 'Return for revision',
-    decision: true,
-  },
-  { action: 'withdraw', to: 'WITHDRAWN', label: 'Withdraw', variant: 'danger' },
-];
+const DEPARTMENT_LABEL: Record<string, string> = {
+  PLANNING: 'Planning',
+  HOUSING: 'Housing',
+};
 
 /**
  * Planning — activities, milestones and submissions (docs/phase-2-plan.md).
@@ -105,7 +83,6 @@ export default async function PlanningPage({ params }: { params: Promise<{ id: s
   const closed = project.status === 'CLOSED';
   const mayCreate = session.can('planning:create', id) && !closed;
   const mayEdit = session.can('planning:edit', id) && !closed;
-  const mayApprove = session.can('planning:approve', id) && !closed;
 
   return (
     <>
@@ -278,45 +255,44 @@ export default async function PlanningPage({ params }: { params: Promise<{ id: s
                 <tr>
                   <th>Reference</th>
                   <th>Authority</th>
+                  <th>Department</th>
                   <th>Status</th>
                   <th />
                 </tr>
               </thead>
               <tbody>
-                {submissions.items.map((submission) => {
-                  const available = SUBMISSION_ACTION_DEFS.filter(
-                    (candidate) =>
-                      canTransitionSubmission(submission.status, candidate.to) &&
-                      (candidate.decision ? mayApprove : mayEdit),
-                  );
-                  return (
-                    <tr key={submission.id}>
-                      <td className="mono">{submission.reference}</td>
-                      <td>{submission.authorityName}</td>
-                      <td>
-                        <Badge>{SUBMISSION_LABEL[submission.status]}</Badge>
-                      </td>
-                      <td className="right">
-                        <div className="row" style={{ justifyContent: 'flex-end' }}>
-                          {available.map((candidate) => (
-                            <ActionButton
-                              key={candidate.action}
-                              action={transitionSubmission.bind(
-                                null,
-                                id,
-                                submission.id,
-                                candidate.action,
-                                submission.version,
-                              )}
-                              label={candidate.label}
-                              variant={candidate.variant ?? 'secondary'}
-                            />
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {submissions.items.map((submission) => (
+                  <tr key={submission.id}>
+                    <td className="mono">
+                      <Link href={`/projects/${id}/planning/submissions/${submission.id}`}>
+                        {submission.reference}
+                      </Link>
+                    </td>
+                    <td>{submission.authorityName}</td>
+                    <td>
+                      <Value>
+                        {DEPARTMENT_LABEL[submission.department] ?? submission.department}
+                      </Value>
+                    </td>
+                    <td>
+                      <Badge>{SUBMISSION_LABEL[submission.status]}</Badge>
+                      {submission.clarificationRequested ? (
+                        <>
+                          {' '}
+                          <span className="badge">Clarification pending</span>
+                        </>
+                      ) : null}
+                    </td>
+                    <td className="right">
+                      <Link
+                        href={`/projects/${id}/planning/submissions/${submission.id}`}
+                        className="button button--small button--secondary"
+                      >
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
@@ -327,6 +303,20 @@ export default async function PlanningPage({ params }: { params: Promise<{ id: s
                 <div className="form-grid">
                   <Field label="Reference" name="reference" required />
                   <Field label="Authority" name="authorityName" required />
+                  <Select
+                    label="Department"
+                    name="department"
+                    options={[
+                      { value: 'PLANNING', label: 'Planning' },
+                      { value: 'HOUSING', label: 'Housing' },
+                    ]}
+                    defaultValue="PLANNING"
+                  />
+                  <Field
+                    label="Pending with"
+                    name="pendingWith"
+                    hint="Who currently holds this — the client, the authority, us…"
+                  />
                 </div>
                 <TextArea label="Notes" name="notes" />
               </ActionForm>

@@ -79,6 +79,7 @@ export const RESOURCES = [
   'issue',
   'drawing',
   'document',
+  'required_document',
   'user',
   'role',
 ] as const;
@@ -145,6 +146,14 @@ export const PERMISSIONS = [
   'document:create',
   'document:edit',
   'document:archive',
+
+  /** Managing the admin-configurable required-documents catalogue
+   *  (docs/phase-9-plan.md §5). There is no `required_document:view` —
+   *  anyone who can view documents already needs to see the checklist to
+   *  know what is missing, so seeing it is bundled into `document:view`
+   *  rather than checked separately, the same reasoning `sketch_type:admin`
+   *  already gives. */
+  'required_document:admin',
 
   'user:view',
   'user:admin',
@@ -817,17 +826,30 @@ export function canTransitionApproval(from: ApprovalStatus, to: ApprovalStatus):
 // submission-specific edge; the shared table has no reason to know about it.
 // ---------------------------------------------------------------------------
 
-export const SUBMISSION_STATUSES = [...APPROVAL_STATUSES, 'WITHDRAWN'] as const;
+// docs/phase-6-plan.md §4 adds two more submission-specific edges, HALTED and
+// CANCELLED, for the real drawing register's own halted/cancelled entries.
+// HALTED is deliberately resumable (back to SUBMITTED or UNDER_REVIEW,
+// whichever it was paused from) while WITHDRAWN/CANCELLED stay dead ends —
+// the same asymmetry the table already draws between WITHDRAWN and
+// RETURNED_FOR_REVISION.
+export const SUBMISSION_STATUSES = [
+  ...APPROVAL_STATUSES,
+  'WITHDRAWN',
+  'HALTED',
+  'CANCELLED',
+] as const;
 export type SubmissionStatus = (typeof SUBMISSION_STATUSES)[number];
 
 export const SUBMISSION_TRANSITIONS = {
   DRAFT: [...APPROVAL_TRANSITIONS.DRAFT, 'WITHDRAWN'],
-  SUBMITTED: [...APPROVAL_TRANSITIONS.SUBMITTED, 'WITHDRAWN'],
-  UNDER_REVIEW: [...APPROVAL_TRANSITIONS.UNDER_REVIEW],
+  SUBMITTED: [...APPROVAL_TRANSITIONS.SUBMITTED, 'WITHDRAWN', 'HALTED'],
+  UNDER_REVIEW: [...APPROVAL_TRANSITIONS.UNDER_REVIEW, 'HALTED'],
   APPROVED: [...APPROVAL_TRANSITIONS.APPROVED],
   REJECTED: [...APPROVAL_TRANSITIONS.REJECTED],
-  RETURNED_FOR_REVISION: [...APPROVAL_TRANSITIONS.RETURNED_FOR_REVISION],
+  RETURNED_FOR_REVISION: [...APPROVAL_TRANSITIONS.RETURNED_FOR_REVISION, 'HALTED'],
   WITHDRAWN: [],
+  HALTED: ['SUBMITTED', 'UNDER_REVIEW', 'CANCELLED'],
+  CANCELLED: [],
 } as const satisfies Record<SubmissionStatus, readonly SubmissionStatus[]>;
 
 export function canTransitionSubmission(from: SubmissionStatus, to: SubmissionStatus): boolean {
@@ -843,6 +865,12 @@ export function canTransitionSubmission(from: SubmissionStatus, to: SubmissionSt
  * `PROJECT_ACTIONS` — the target is identical, and the transition table
  * already says which starting states are legal.
  */
+// `resume` (HALTED -> SUBMITTED or UNDER_REVIEW) is deliberately not in this
+// map: unlike every other action here, its target is not fixed — it depends
+// on which status the submission was halted from (`Submission.preHaltStatus`,
+// docs/phase-6-plan.md §4) — so `SubmissionService.resume` computes it
+// directly rather than forcing a single-target action to describe a
+// two-target move.
 export const SUBMISSION_ACTIONS = {
   submit: 'SUBMITTED',
   review: 'UNDER_REVIEW',
@@ -850,6 +878,8 @@ export const SUBMISSION_ACTIONS = {
   reject: 'REJECTED',
   returnForRevision: 'RETURNED_FOR_REVISION',
   withdraw: 'WITHDRAWN',
+  halt: 'HALTED',
+  cancel: 'CANCELLED',
 } as const satisfies Record<string, SubmissionStatus>;
 
 export type SubmissionAction = keyof typeof SUBMISSION_ACTIONS;
@@ -899,10 +929,15 @@ export const updateMilestoneSchema = z
 
 export type UpdateMilestone = z.infer<typeof updateMilestoneSchema>;
 
+export const SUBMISSION_DEPARTMENTS = ['PLANNING', 'HOUSING'] as const;
+export type SubmissionDepartment = (typeof SUBMISSION_DEPARTMENTS)[number];
+
 export const createSubmissionSchema = z
   .object({
     reference: z.string().trim().min(1, 'A reference is required').max(100),
     authorityName: z.string().trim().min(1, 'The authority is required').max(200),
+    department: z.enum(SUBMISSION_DEPARTMENTS).optional(),
+    pendingWith: z.string().trim().max(100).optional(),
     notes: optionalText(5000),
   })
   .strict();
@@ -913,6 +948,8 @@ export const updateSubmissionSchema = z
   .object({
     reference: z.string().trim().min(1).max(100).optional(),
     authorityName: z.string().trim().min(1).max(200).optional(),
+    department: z.enum(SUBMISSION_DEPARTMENTS).optional(),
+    pendingWith: z.string().trim().max(100).nullish(),
     notes: optionalText(5000),
     version: z.number().int().min(1),
   })
@@ -930,6 +967,79 @@ export const submissionTransitionSchema = z
   .strict();
 
 export type SubmissionTransition = z.infer<typeof submissionTransitionSchema>;
+
+/**
+ * `approve` alone (docs/phase-6-plan.md §4) also carries the authority's own
+ * permit reference — required unless the submission already has one from an
+ * earlier approval attempt. Every other transition uses the plain
+ * `submissionTransitionSchema` above.
+ */
+export const submissionApproveSchema = submissionTransitionSchema.extend({
+  permitReference: z.string().trim().min(1).max(100).optional(),
+});
+
+export type SubmissionApprove = z.infer<typeof submissionApproveSchema>;
+
+export const submissionRequestClarificationSchema = z
+  .object({
+    version: z.number().int().min(1),
+  })
+  .strict();
+
+export type SubmissionRequestClarification = z.infer<typeof submissionRequestClarificationSchema>;
+
+export const submissionRespondClarificationSchema = z
+  .object({
+    version: z.number().int().min(1),
+    response: z.string().trim().min(1, 'A response is required').max(5000),
+  })
+  .strict();
+
+export type SubmissionRespondClarification = z.infer<typeof submissionRespondClarificationSchema>;
+
+// ---------------------------------------------------------------------------
+// Submission reviews and meetings (docs/phase-6-plan.md §4/§5) — records of
+// things that happened or are scheduled to happen, not entities with their
+// own lifecycle: create/list/update only, no transition table.
+// ---------------------------------------------------------------------------
+
+export const createSubmissionReviewSchema = z
+  .object({
+    reviewDate: z.coerce.date(),
+    reviewerName: z.string().trim().max(200).optional(),
+    comments: optionalText(5000),
+    responseDueAt: optionalDate,
+    responseText: optionalText(5000),
+    respondedAt: optionalDate,
+  })
+  .strict();
+
+export type CreateSubmissionReview = z.infer<typeof createSubmissionReviewSchema>;
+
+export const updateSubmissionReviewSchema = createSubmissionReviewSchema.partial().extend({
+  version: z.number().int().min(1),
+});
+
+export type UpdateSubmissionReview = z.infer<typeof updateSubmissionReviewSchema>;
+
+export const createSubmissionMeetingSchema = z
+  .object({
+    required: z.boolean().optional(),
+    meetingAt: optionalDate,
+    attendees: optionalText(2000),
+    purpose: optionalText(2000),
+    outcome: optionalText(2000),
+    heldAt: optionalDate,
+  })
+  .strict();
+
+export type CreateSubmissionMeeting = z.infer<typeof createSubmissionMeetingSchema>;
+
+export const updateSubmissionMeetingSchema = createSubmissionMeetingSchema.partial().extend({
+  version: z.number().int().min(1),
+});
+
+export type UpdateSubmissionMeeting = z.infer<typeof updateSubmissionMeetingSchema>;
 
 // ---------------------------------------------------------------------------
 // Supervision — site visits, observations and instructions
@@ -1002,6 +1112,56 @@ export const updateInstructionSchema = createInstructionSchema.partial().extend(
 });
 
 export type UpdateInstruction = z.infer<typeof updateInstructionSchema>;
+
+// ---------------------------------------------------------------------------
+// Supervision agreements (docs/phase-7-plan.md) — the commercial arrangement
+// site visits happen under. No status/lifecycle of its own — a period, a
+// quota, and a renewal fact, the same "not every entity needs a state
+// machine" posture PlanningActivity/Milestone/SiteVisit already take.
+// ---------------------------------------------------------------------------
+
+export const SUPERVISION_AGREEMENT_TYPES = ['MONTHLY', 'ON_CALL'] as const;
+export type SupervisionAgreementType = (typeof SUPERVISION_AGREEMENT_TYPES)[number];
+
+export const createSupervisionAgreementSchema = z
+  .object({
+    type: z.enum(SUPERVISION_AGREEMENT_TYPES),
+    visitsAllowed: z.coerce.number().int().min(1, 'Must allow at least one visit'),
+    amount: z.coerce.number().min(0),
+    startDate: z.coerce.date(),
+    endDate: optionalDate,
+    notes: optionalText(5000),
+  })
+  .strict();
+
+export type CreateSupervisionAgreement = z.infer<typeof createSupervisionAgreementSchema>;
+
+export const updateSupervisionAgreementSchema = createSupervisionAgreementSchema.partial().extend({
+  version: z.number().int().min(1),
+});
+
+export type UpdateSupervisionAgreement = z.infer<typeof updateSupervisionAgreementSchema>;
+
+/**
+ * A renewal's own inputs — `type`/`visitsAllowed`/`amount` default to the
+ * source agreement's own values (a renewal usually keeps most terms) but
+ * are overridable, since a renewal often does change the amount.
+ * `startDate` defaults to the day after the source's `endDate` (or today, if
+ * the source had none) when not supplied.
+ */
+export const renewSupervisionAgreementSchema = z
+  .object({
+    version: z.number().int().min(1),
+    type: z.enum(SUPERVISION_AGREEMENT_TYPES).optional(),
+    visitsAllowed: z.coerce.number().int().min(1).optional(),
+    amount: z.coerce.number().min(0).optional(),
+    startDate: z.coerce.date().optional(),
+    endDate: optionalDate,
+    notes: optionalText(5000),
+  })
+  .strict();
+
+export type RenewSupervisionAgreement = z.infer<typeof renewSupervisionAgreementSchema>;
 
 // ---------------------------------------------------------------------------
 // Issues — the fourth state machine in the system (phase-1-plan.md §5a).
@@ -1177,6 +1337,79 @@ export const DRAWING_REVISION_ACTION_NAMES = Object.keys(
 ) as readonly DrawingRevisionAction[];
 
 // ---------------------------------------------------------------------------
+// Modifications — client-requested mid-construction changes (docs/phase-8-plan.md),
+// optionally raised against a drawing revision or an observation. Status is
+// `ApprovalStatus`, consumed directly with no extra edge, the same treatment
+// `DrawingRevision` already gets.
+// ---------------------------------------------------------------------------
+
+export const MODIFICATION_IMPACT_AREAS = ['ARCHITECTURE', 'STRUCTURAL', 'MEP'] as const;
+export type ModificationImpactArea = (typeof MODIFICATION_IMPACT_AREAS)[number];
+
+export const modificationListQuerySchema = z
+  .object({
+    search: z.string().trim().max(200).optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(25),
+    status: z.enum(APPROVAL_STATUSES).optional(),
+  })
+  .strict();
+
+export type ModificationListQuery = z.infer<typeof modificationListQuerySchema>;
+
+export const createModificationSchema = z
+  .object({
+    requestText: z.string().trim().min(1, 'A description of the request is required').max(5000),
+    impactArea: z.enum(MODIFICATION_IMPACT_AREAS),
+    costImpact: optionalText(1000),
+    timeImpact: optionalText(1000),
+    drawingRevisionId: z.string().uuid().nullish(),
+    observationId: z.string().uuid().nullish(),
+  })
+  .strict();
+
+export type CreateModification = z.infer<typeof createModificationSchema>;
+
+export const updateModificationSchema = z
+  .object({
+    requestText: z.string().trim().min(1).max(5000).optional(),
+    impactArea: z.enum(MODIFICATION_IMPACT_AREAS).optional(),
+    costImpact: optionalText(1000),
+    timeImpact: optionalText(1000),
+    version: z.number().int().min(1),
+  })
+  .strict();
+
+export type UpdateModification = z.infer<typeof updateModificationSchema>;
+
+export const modificationTransitionSchema = z
+  .object({
+    version: z.number().int().min(1),
+    reason: optionalText(1000),
+  })
+  .strict();
+
+export type ModificationTransition = z.infer<typeof modificationTransitionSchema>;
+
+/**
+ * Reuses `ApprovalStatus`/`canTransitionApproval` directly, the same
+ * treatment `DrawingRevision` gets — no submission-style extra edge.
+ */
+export const MODIFICATION_ACTIONS = {
+  submit: 'SUBMITTED',
+  review: 'UNDER_REVIEW',
+  approve: 'APPROVED',
+  reject: 'REJECTED',
+  returnForRevision: 'RETURNED_FOR_REVISION',
+} as const satisfies Record<string, ApprovalStatus>;
+
+export type ModificationAction = keyof typeof MODIFICATION_ACTIONS;
+
+export const MODIFICATION_ACTION_NAMES = Object.keys(
+  MODIFICATION_ACTIONS,
+) as readonly ModificationAction[];
+
+// ---------------------------------------------------------------------------
 // Documents (docs/phase-3-plan.md §6). Deliberately NOT run through
 // `ApprovalStatus` — most documents this system will hold (site photographs,
 // reports, correspondence) have no approval step in practice, and PRD §22
@@ -1195,7 +1428,13 @@ export type DocumentUploadStatus = (typeof DOCUMENT_UPLOAD_STATUSES)[number];
  * approval currently lives (step 13), so "approvals" here means Submission.
  * Not a foreign key — see `linkedId` below and `docs/phase-3-plan.md` §6.
  */
-export const DOCUMENT_LINKED_TYPES = ['ACTIVITY', 'SITE_VISIT', 'ISSUE', 'SUBMISSION'] as const;
+export const DOCUMENT_LINKED_TYPES = [
+  'ACTIVITY',
+  'SITE_VISIT',
+  'ISSUE',
+  'SUBMISSION',
+  'MODIFICATION',
+] as const;
 export type DocumentLinkedType = (typeof DOCUMENT_LINKED_TYPES)[number];
 
 export const documentListQuerySchema = z
@@ -1252,3 +1491,44 @@ export const updateDocumentSchema = z
   .strict();
 
 export type UpdateDocument = z.infer<typeof updateDocumentSchema>;
+
+// ---------------------------------------------------------------------------
+// Required documents (docs/phase-9-plan.md) — the admin-configurable
+// checklist behind a project's completeness. A global catalogue, the same
+// shape `ProposalSketchType` already is: small, hand maintained, no
+// pagination or search of its own.
+// ---------------------------------------------------------------------------
+
+/**
+ * Which workstream a requirement applies to. `ANY` applies regardless of
+ * `Project.type` — not `PROJECT_TYPES` itself, because a BOTH project runs
+ * both workstreams (`WORKSTREAMS_FOR_TYPE`), so a requirement scoped to
+ * PLANNING must still apply to a BOTH project, not only a PLANNING-type one.
+ */
+export const REQUIRED_DOCUMENT_SCOPES = ['PLANNING', 'SUPERVISION', 'ANY'] as const;
+export type RequiredDocumentScope = (typeof REQUIRED_DOCUMENT_SCOPES)[number];
+
+export const createRequiredDocumentSchema = z
+  .object({
+    category: z.string().trim().min(1, 'A category is required').max(100),
+    label: z.string().trim().min(1, 'A label is required').max(200),
+    scope: z.enum(REQUIRED_DOCUMENT_SCOPES).default('ANY'),
+    sortOrder: z.number().int().default(0),
+  })
+  .strict();
+
+export type CreateRequiredDocument = z.infer<typeof createRequiredDocumentSchema>;
+
+/** `category` is not editable — it is the value a completeness check
+ *  matches against `Document.category` by; changing it would silently
+ *  re-point what the requirement means. Retire and add a new one instead,
+ *  the same rule `ProposalSketchType.code` already follows. */
+export const updateRequiredDocumentSchema = z
+  .object({
+    label: z.string().trim().min(1).max(200).optional(),
+    scope: z.enum(REQUIRED_DOCUMENT_SCOPES).optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .strict();
+
+export type UpdateRequiredDocument = z.infer<typeof updateRequiredDocumentSchema>;

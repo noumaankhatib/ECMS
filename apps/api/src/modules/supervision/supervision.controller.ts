@@ -2,18 +2,24 @@ import {
   createInstructionSchema,
   createObservationSchema,
   createSiteVisitSchema,
+  createSupervisionAgreementSchema,
+  renewSupervisionAgreementSchema,
   supervisionListQuerySchema,
   updateInstructionSchema,
   updateObservationSchema,
   updateSiteVisitSchema,
+  updateSupervisionAgreementSchema,
   type CreateInstruction,
   type CreateObservation,
   type CreateSiteVisit,
+  type CreateSupervisionAgreement,
   type Page,
+  type RenewSupervisionAgreement,
   type SupervisionListQuery,
   type UpdateInstruction,
   type UpdateObservation,
   type UpdateSiteVisit,
+  type UpdateSupervisionAgreement,
 } from '@ecms/contracts';
 import {
   Body,
@@ -36,6 +42,10 @@ import { RequirePermission } from '../access';
 import { InstructionService } from './instruction.service';
 import { ObservationService } from './observation.service';
 import { SiteVisitService } from './site-visit.service';
+import {
+  SupervisionAgreementService,
+  type SupervisionAgreementWithUsage,
+} from './supervision-agreement.service';
 
 /** The signed-in user. The guard guarantees it; this keeps the assertion in one place. */
 function actorOf(req: Request): string {
@@ -193,5 +203,75 @@ export class InstructionController {
     @Req() req: Request,
   ): Promise<Instruction> {
     return this.instructions.update(projectId, siteVisitId, id, body, actorOf(req));
+  }
+}
+
+/**
+ * The commercial agreement site visits happen under (docs/phase-7-plan.md).
+ * Rides the same `supervision:*` verbs as site visits — no new resource,
+ * the same reasoning Phase 6 used to avoid a permission per submission
+ * child table.
+ */
+@Controller('projects/:projectId/supervision/agreements')
+export class SupervisionAgreementController {
+  constructor(private readonly agreements: SupervisionAgreementService) {}
+
+  @Get()
+  @RequirePermission('supervision:view')
+  list(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Query(new ZodValidationPipe(supervisionListQuerySchema)) query: SupervisionListQuery,
+  ): Promise<Page<SupervisionAgreementWithUsage>> {
+    return this.agreements.list(projectId, query);
+  }
+
+  /** Registered ahead of `:id` so "current" is never mistaken for an id. */
+  @Get('current')
+  @RequirePermission('supervision:view')
+  current(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+  ): Promise<SupervisionAgreementWithUsage | null> {
+    return this.agreements.current(projectId);
+  }
+
+  @Get(':id')
+  @RequirePermission('supervision:view')
+  byId(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<SupervisionAgreementWithUsage> {
+    return this.agreements.byId(projectId, id);
+  }
+
+  @Post()
+  @RequirePermission('supervision:create')
+  create(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Body(new ZodValidationPipe(createSupervisionAgreementSchema)) body: CreateSupervisionAgreement,
+    @Req() req: Request,
+  ): Promise<SupervisionAgreementWithUsage> {
+    return this.agreements.create(projectId, body, actorOf(req));
+  }
+
+  @Patch(':id')
+  @RequirePermission('supervision:edit')
+  update(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(updateSupervisionAgreementSchema)) body: UpdateSupervisionAgreement,
+    @Req() req: Request,
+  ): Promise<SupervisionAgreementWithUsage> {
+    return this.agreements.update(projectId, id, body, actorOf(req));
+  }
+
+  @Post(':id/renew')
+  @RequirePermission('supervision:edit')
+  renew(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(renewSupervisionAgreementSchema)) body: RenewSupervisionAgreement,
+    @Req() req: Request,
+  ): Promise<SupervisionAgreementWithUsage> {
+    return this.agreements.renew(projectId, id, body, actorOf(req));
   }
 }

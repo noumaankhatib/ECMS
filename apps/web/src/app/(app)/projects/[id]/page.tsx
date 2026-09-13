@@ -28,6 +28,7 @@ import type {
   Project,
   ProjectMember,
   Property,
+  SupervisionAgreement,
   UserRow,
   Workstream,
 } from '@/lib/types';
@@ -85,7 +86,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
   // Only fetched when this person may see them. A Planner on the project can
   // read it without being able to read the client list.
-  const [client, property, users] = await Promise.all([
+  const isSupervised = project.type === 'SUPERVISION' || project.type === 'BOTH';
+
+  const [client, property, users, currentAgreement] = await Promise.all([
     session.can('client:view')
       ? api.get<Client>(`/clients/${project.clientId}`).catch(() => null)
       : null,
@@ -94,6 +97,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       : null,
     session.can('user:view')
       ? api.get<ApiPage<UserRow>>('/users?pageSize=100').catch(() => null)
+      : null,
+    isSupervised && session.can('supervision:view', id)
+      ? api
+          .get<SupervisionAgreement | null>(`/projects/${id}/supervision/agreements/current`)
+          .catch(() => null)
       : null,
   ]);
 
@@ -161,6 +169,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         {session.can('document:view', id) ? (
           <Link href={`/projects/${id}/documents`} className="button button--secondary">
             Documents
+          </Link>
+        ) : null}
+        {session.can('planning:view', id) ? (
+          <Link href={`/projects/${id}/modifications`} className="button button--secondary">
+            Modifications
           </Link>
         ) : null}
       </div>
@@ -243,6 +256,46 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
               </table>
             )}
           </Card>
+
+          {isSupervised && session.can('supervision:view', id) ? (
+            <Card>
+              <CardHead title="Supervision agreement">
+                <Link
+                  href={`/projects/${id}/supervision/agreements`}
+                  className="button button--small button--secondary"
+                >
+                  View history
+                </Link>
+              </CardHead>
+              <CardBody>
+                {currentAgreement ? (
+                  <dl className="definition">
+                    <dt>Type</dt>
+                    <dd>{currentAgreement.type === 'MONTHLY' ? 'Monthly' : 'On call'}</dd>
+                    <dt>Amount</dt>
+                    <dd>{currentAgreement.amount}</dd>
+                    <dt>Period</dt>
+                    <dd>
+                      <DateText value={currentAgreement.startDate} /> –{' '}
+                      {currentAgreement.endDate ? (
+                        <DateText value={currentAgreement.endDate} />
+                      ) : (
+                        <span className="faint">ongoing</span>
+                      )}
+                    </dd>
+                    <dt>Visits used</dt>
+                    <dd>
+                      {currentAgreement.visitsUsed} / {currentAgreement.visitsAllowed}
+                    </dd>
+                  </dl>
+                ) : (
+                  <Empty title="No active agreement">
+                    Record one from the agreements page to start tracking a visit quota.
+                  </Empty>
+                )}
+              </CardBody>
+            </Card>
+          ) : null}
 
           <Card>
             <CardHead title="Team">

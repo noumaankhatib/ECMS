@@ -1,21 +1,35 @@
 import {
   createMilestoneSchema,
   createPlanningActivitySchema,
+  createSubmissionMeetingSchema,
+  createSubmissionReviewSchema,
   createSubmissionSchema,
   listQuerySchema,
+  submissionApproveSchema,
+  submissionRequestClarificationSchema,
+  submissionRespondClarificationSchema,
   submissionTransitionSchema,
   updateMilestoneSchema,
   updatePlanningActivitySchema,
+  updateSubmissionMeetingSchema,
+  updateSubmissionReviewSchema,
   updateSubmissionSchema,
   type CreateMilestone,
   type CreatePlanningActivity,
   type CreateSubmission,
+  type CreateSubmissionMeeting,
+  type CreateSubmissionReview,
   type ListQuery,
   type Page,
+  type SubmissionApprove,
+  type SubmissionRequestClarification,
+  type SubmissionRespondClarification,
   type SubmissionTransition,
   type UpdateMilestone,
   type UpdatePlanningActivity,
   type UpdateSubmission,
+  type UpdateSubmissionMeeting,
+  type UpdateSubmissionReview,
 } from '@ecms/contracts';
 import {
   Body,
@@ -30,7 +44,13 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
-import type { Milestone, PlanningActivity, Submission } from '@prisma/client';
+import type {
+  Milestone,
+  PlanningActivity,
+  Submission,
+  SubmissionMeeting,
+  SubmissionReview,
+} from '@prisma/client';
 import type { Request } from 'express';
 
 import { appError } from '../../shared/errors/app-error';
@@ -39,6 +59,8 @@ import { RequirePermission } from '../access';
 
 import { ActivityService } from './activity.service';
 import { MilestoneService } from './milestone.service';
+import { SubmissionMeetingService } from './submission-meeting.service';
+import { SubmissionReviewService } from './submission-review.service';
 import { SubmissionService } from './submission.service';
 
 /** The signed-in user. The guard guarantees it; this keeps the assertion in one place. */
@@ -242,7 +264,7 @@ export class SubmissionController {
   approve(
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body(new ZodValidationPipe(submissionTransitionSchema)) body: SubmissionTransition,
+    @Body(new ZodValidationPipe(submissionApproveSchema)) body: SubmissionApprove,
     @Req() req: Request,
   ): Promise<Submission> {
     return this.submissions.transition(projectId, id, 'approve', body, actorOf(req));
@@ -279,5 +301,165 @@ export class SubmissionController {
     @Req() req: Request,
   ): Promise<Submission> {
     return this.submissions.transition(projectId, id, 'withdraw', body, actorOf(req));
+  }
+
+  @Post(':id/halt')
+  @RequirePermission('planning:edit')
+  halt(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(submissionTransitionSchema)) body: SubmissionTransition,
+    @Req() req: Request,
+  ): Promise<Submission> {
+    return this.submissions.transition(projectId, id, 'halt', body, actorOf(req));
+  }
+
+  @Post(':id/resume')
+  @RequirePermission('planning:edit')
+  resume(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(submissionTransitionSchema)) body: SubmissionTransition,
+    @Req() req: Request,
+  ): Promise<Submission> {
+    return this.submissions.resume(projectId, id, body, actorOf(req));
+  }
+
+  @Post(':id/cancel')
+  @RequirePermission('planning:edit')
+  cancel(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(submissionTransitionSchema)) body: SubmissionTransition,
+    @Req() req: Request,
+  ): Promise<Submission> {
+    return this.submissions.transition(projectId, id, 'cancel', body, actorOf(req));
+  }
+
+  @Post(':id/request-clarification')
+  @RequirePermission('planning:edit')
+  requestClarification(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(submissionRequestClarificationSchema))
+    body: SubmissionRequestClarification,
+    @Req() req: Request,
+  ): Promise<Submission> {
+    return this.submissions.requestClarification(projectId, id, body, actorOf(req));
+  }
+
+  @Post(':id/respond-clarification')
+  @RequirePermission('planning:edit')
+  respondClarification(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(submissionRespondClarificationSchema))
+    body: SubmissionRespondClarification,
+    @Req() req: Request,
+  ): Promise<Submission> {
+    return this.submissions.respondClarification(projectId, id, body, actorOf(req));
+  }
+}
+
+/**
+ * Reviews and meetings always nest under a specific submission — there is no
+ * standalone "all reviews across the portfolio" endpoint, matching
+ * `ActivityController`'s own reasoning for why `RequirePermissionAnywhere`
+ * does not apply here either. Both ride the existing `planning:*` verbs
+ * (docs/phase-6-plan.md §6) rather than a new resource.
+ */
+@Controller('projects/:projectId/planning/submissions/:submissionId/reviews')
+export class SubmissionReviewController {
+  constructor(private readonly reviews: SubmissionReviewService) {}
+
+  @Get()
+  @RequirePermission('planning:view')
+  list(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('submissionId', ParseUUIDPipe) submissionId: string,
+    @Query(new ZodValidationPipe(listQuerySchema)) query: ListQuery,
+  ): Promise<Page<SubmissionReview>> {
+    return this.reviews.list(projectId, submissionId, query);
+  }
+
+  @Get(':id')
+  @RequirePermission('planning:view')
+  byId(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('submissionId', ParseUUIDPipe) submissionId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<SubmissionReview> {
+    return this.reviews.byId(projectId, submissionId, id);
+  }
+
+  @Post()
+  @RequirePermission('planning:create')
+  create(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('submissionId', ParseUUIDPipe) submissionId: string,
+    @Body(new ZodValidationPipe(createSubmissionReviewSchema)) body: CreateSubmissionReview,
+    @Req() req: Request,
+  ): Promise<SubmissionReview> {
+    return this.reviews.create(projectId, submissionId, body, actorOf(req));
+  }
+
+  @Patch(':id')
+  @RequirePermission('planning:edit')
+  update(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('submissionId', ParseUUIDPipe) submissionId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(updateSubmissionReviewSchema)) body: UpdateSubmissionReview,
+    @Req() req: Request,
+  ): Promise<SubmissionReview> {
+    return this.reviews.update(projectId, submissionId, id, body, actorOf(req));
+  }
+}
+
+@Controller('projects/:projectId/planning/submissions/:submissionId/meetings')
+export class SubmissionMeetingController {
+  constructor(private readonly meetings: SubmissionMeetingService) {}
+
+  @Get()
+  @RequirePermission('planning:view')
+  list(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('submissionId', ParseUUIDPipe) submissionId: string,
+    @Query(new ZodValidationPipe(listQuerySchema)) query: ListQuery,
+  ): Promise<Page<SubmissionMeeting>> {
+    return this.meetings.list(projectId, submissionId, query);
+  }
+
+  @Get(':id')
+  @RequirePermission('planning:view')
+  byId(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('submissionId', ParseUUIDPipe) submissionId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<SubmissionMeeting> {
+    return this.meetings.byId(projectId, submissionId, id);
+  }
+
+  @Post()
+  @RequirePermission('planning:create')
+  create(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('submissionId', ParseUUIDPipe) submissionId: string,
+    @Body(new ZodValidationPipe(createSubmissionMeetingSchema)) body: CreateSubmissionMeeting,
+    @Req() req: Request,
+  ): Promise<SubmissionMeeting> {
+    return this.meetings.create(projectId, submissionId, body, actorOf(req));
+  }
+
+  @Patch(':id')
+  @RequirePermission('planning:edit')
+  update(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('submissionId', ParseUUIDPipe) submissionId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(updateSubmissionMeetingSchema)) body: UpdateSubmissionMeeting,
+    @Req() req: Request,
+  ): Promise<SubmissionMeeting> {
+    return this.meetings.update(projectId, submissionId, id, body, actorOf(req));
   }
 }

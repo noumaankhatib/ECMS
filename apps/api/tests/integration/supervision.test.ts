@@ -10,6 +10,7 @@ import { SequenceService } from '../../src/modules/sequence';
 import { InstructionService } from '../../src/modules/supervision/instruction.service';
 import { ObservationService } from '../../src/modules/supervision/observation.service';
 import { SiteVisitService } from '../../src/modules/supervision/site-visit.service';
+import { SupervisionAgreementService } from '../../src/modules/supervision/supervision-agreement.service';
 import { runInRequestContext } from '../../src/shared/context/request-context';
 import type { PrismaService } from '../../src/shared/database/prisma.service';
 
@@ -34,6 +35,7 @@ describe('supervision', () => {
   const siteVisits = new SiteVisitService(prisma, audit);
   const observations = new ObservationService(prisma, audit);
   const instructions = new InstructionService(prisma, audit);
+  const agreements = new SupervisionAgreementService(prisma, audit);
 
   const requestId = '44444444-2222-4111-8000-999999999999';
   const inContext = <T>(fn: () => Promise<T>): Promise<T> => runInRequestContext({ requestId }, fn);
@@ -262,6 +264,139 @@ describe('supervision', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Supervision agreements (docs/phase-7-plan.md)
+  // ---------------------------------------------------------------------------
+
+  it('computes visitsUsed for a MONTHLY agreement from the current calendar month only', async () => {
+    const now = new Date();
+    const agreement = await inContext(() =>
+      agreements.create(
+        projectId,
+        { type: 'MONTHLY', visitsAllowed: 4, amount: 500, startDate: new Date('2026-01-01') },
+        owningSupervisor,
+      ),
+    );
+    // The beforeAll site visit is dated 2026-06-01 — outside the current
+    // month unless this suite happens to run in June, so it must not count.
+    expect(agreement.visitsUsed).toBe(0);
+
+    await inContext(() => siteVisits.create(projectId, { visitDate: now }, owningSupervisor));
+
+    const after = await agreements.byId(projectId, agreement.id);
+    expect(after.visitsUsed).toBe(1);
+  });
+
+  it('computes visitsUsed for an ON_CALL agreement across its whole period', async () => {
+    const agreement = await inContext(() =>
+      agreements.create(
+        projectId,
+        {
+          type: 'ON_CALL',
+          visitsAllowed: 10,
+          amount: 5000,
+          startDate: new Date('2026-01-01'),
+          endDate: new Date('2026-12-31'),
+        },
+        owningSupervisor,
+      ),
+    );
+    // Covers the beforeAll visit (2026-06-01) and every visit created above.
+    expect(agreement.visitsUsed).toBeGreaterThanOrEqual(1);
+  });
+
+  it('finds the active agreement without the caller naming an id', async () => {
+    const property = await inContext(() =>
+      properties.create({ clientId, name: 'Current Agreement House' }, admin),
+    );
+    const project = await inContext(() =>
+      projects.create(
+        {
+          clientId,
+          propertyId: property.id,
+          code: `SUP-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+          name: 'Current Agreement Project',
+          type: 'SUPERVISION',
+        },
+        admin,
+      ),
+    );
+
+    expect(await agreements.current(project.id)).toBeNull();
+
+    const agreement = await inContext(() =>
+      agreements.create(
+        project.id,
+        { type: 'ON_CALL', visitsAllowed: 6, amount: 3000, startDate: new Date('2026-01-01') },
+        admin,
+      ),
+    );
+
+    const current = await agreements.current(project.id);
+    expect(current?.id).toBe(agreement.id);
+  });
+
+  it('renews an agreement, linking both directions, and refuses a second renewal', async () => {
+    const agreement = await inContext(() =>
+      agreements.create(
+        projectId,
+        {
+          type: 'ON_CALL',
+          visitsAllowed: 8,
+          amount: 4000,
+          startDate: new Date('2026-01-01'),
+          endDate: new Date('2026-06-30'),
+        },
+        owningSupervisor,
+      ),
+    );
+
+    const renewal = await inContext(() =>
+      agreements.renew(projectId, agreement.id, { version: agreement.version }, owningSupervisor),
+    );
+    expect(renewal.renewedFromId).toBe(agreement.id);
+    expect(renewal.startDate.toISOString().slice(0, 10)).toBe('2026-07-01');
+
+    const source = await agreements.byId(projectId, agreement.id);
+    expect(source.renewedAt).not.toBeNull();
+
+    await expect(
+      inContext(() =>
+        agreements.renew(projectId, agreement.id, { version: source.version }, owningSupervisor),
+      ),
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+  });
+
+  it('refuses an agreement reached through the wrong project in the URL', async () => {
+    const property = await inContext(() =>
+      properties.create({ clientId, name: 'Other Agreement House' }, admin),
+    );
+    const otherProject = await inContext(() =>
+      projects.create(
+        {
+          clientId,
+          propertyId: property.id,
+          code: `SUP-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+          name: 'Other Agreement Project',
+          type: 'SUPERVISION',
+        },
+        admin,
+      ),
+    );
+
+    const agreement = await inContext(() =>
+      agreements.create(
+        projectId,
+        { type: 'MONTHLY', visitsAllowed: 2, amount: 200, startDate: new Date('2026-01-01') },
+        owningSupervisor,
+      ),
+    );
+
+    await expect(agreements.byId(otherProject.id, agreement.id)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // A closed project accepts no new supervision work
   // ---------------------------------------------------------------------------
 
@@ -294,6 +429,16 @@ describe('supervision', () => {
 
     await expect(
       inContext(() => siteVisits.create(closingProject.id, { visitDate: new Date() }, admin)),
+    ).rejects.toMatchObject({ code: 'ILLEGAL_TRANSITION' });
+
+    await expect(
+      inContext(() =>
+        agreements.create(
+          closingProject.id,
+          { type: 'ON_CALL', visitsAllowed: 1, amount: 100, startDate: new Date() },
+          admin,
+        ),
+      ),
     ).rejects.toMatchObject({ code: 'ILLEGAL_TRANSITION' });
   });
 });

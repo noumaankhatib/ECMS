@@ -13,9 +13,11 @@ import type {
   IssuePriority,
   IssueSeverity,
   IssueStatus,
+  ModificationImpactArea,
   ProjectStatus,
   ProjectType,
   ProposalStatus,
+  RequiredDocumentScope,
   Role,
   SubmissionStatus,
   UserStatus,
@@ -146,8 +148,42 @@ export interface Submission {
   projectId: string;
   reference: string;
   authorityName: string;
+  department: string;
+  pendingWith: string | null;
+  permitReference: string | null;
+  preHaltStatus: SubmissionStatus | null;
+  clarificationRequested: boolean;
+  clarificationRequestedAt: string | null;
+  clarificationResponse: string | null;
+  clarificationRespondedAt: string | null;
   notes: string | null;
   status: SubmissionStatus;
+  version: number;
+  createdAt: string;
+}
+
+export interface SubmissionReview {
+  id: string;
+  submissionId: string;
+  reviewDate: string;
+  reviewerName: string | null;
+  comments: string | null;
+  responseDueAt: string | null;
+  responseText: string | null;
+  respondedAt: string | null;
+  version: number;
+  createdAt: string;
+}
+
+export interface SubmissionMeeting {
+  id: string;
+  submissionId: string;
+  required: boolean;
+  meetingAt: string | null;
+  attendees: string | null;
+  purpose: string | null;
+  outcome: string | null;
+  heldAt: string | null;
   version: number;
   createdAt: string;
 }
@@ -158,6 +194,22 @@ export interface SiteVisit {
   visitDate: string;
   attendees: string | null;
   notes: string | null;
+  version: number;
+  createdAt: string;
+}
+
+export interface SupervisionAgreement {
+  id: string;
+  projectId: string;
+  type: string;
+  visitsAllowed: number;
+  amount: string;
+  startDate: string;
+  endDate: string | null;
+  renewedAt: string | null;
+  renewedFromId: string | null;
+  notes: string | null;
+  visitsUsed: number;
   version: number;
   createdAt: string;
 }
@@ -274,4 +326,47 @@ export interface Document {
   version: number;
   createdAt: string;
   archivedAt: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 8 — client modifications / deviations
+// ---------------------------------------------------------------------------
+
+export interface Modification {
+  id: string;
+  projectId: string;
+  requestText: string;
+  impactArea: ModificationImpactArea;
+  costImpact: string | null;
+  timeImpact: string | null;
+  drawingRevisionId: string | null;
+  observationId: string | null;
+  status: ApprovalStatus;
+  version: number;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 9 — document completeness
+// ---------------------------------------------------------------------------
+
+export interface RequiredDocument {
+  id: string;
+  category: string;
+  label: string;
+  scope: RequiredDocumentScope;
+  sortOrder: number;
+  archivedAt: string | null;
+}
+
+export interface DocumentCompletenessItem {
+  requiredDocumentId: string;
+  category: string;
+  label: string;
+  satisfied: boolean;
+}
+
+export interface DocumentCompleteness {
+  items: DocumentCompletenessItem[];
+  missingCount: number;
 }

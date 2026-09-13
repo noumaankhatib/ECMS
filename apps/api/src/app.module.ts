@@ -6,6 +6,7 @@ import { DirectoryModule } from './modules/directory';
 import { DocumentsModule } from './modules/documents';
 import { DrawingsModule } from './modules/drawings';
 import { IssuesModule } from './modules/issues';
+import { ModificationsModule } from './modules/modifications';
 import { PlanningModule } from './modules/planning';
 import { ProjectsModule } from './modules/projects';
 import { ProposalsModule } from './modules/proposals';
@@ -32,6 +33,7 @@ import { LOGGER } from './shared/logging/logger.token';
     IssuesModule,
     DrawingsModule,
     DocumentsModule,
+    ModificationsModule,
   ],
   controllers: [HealthController],
   providers: [HttpLoggerMiddleware, { provide: LOGGER, useFactory: (): Logger => createLogger() }],

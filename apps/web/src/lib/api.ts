@@ -69,10 +69,9 @@ async function parseResponse<T>(response: Response): Promise<T> {
   if (response.status === 204) return undefined as T;
 
   const text = await response.text();
-  const parsed: unknown = text === '' ? {} : JSON.parse(text);
 
   if (!response.ok) {
-    const payload = parsed as ErrorBody;
+    const payload = (text === '' ? {} : JSON.parse(text)) as ErrorBody;
     throw new ApiError(
       response.status,
       payload.error?.code ?? 'INTERNAL',
@@ -82,7 +81,13 @@ async function parseResponse<T>(response: Response): Promise<T> {
     );
   }
 
-  return parsed as T;
+  // Nest sends an empty body (not the literal text "null") for a controller
+  // that returns `null` or `undefined` — e.g. "no active agreement"
+  // (docs/phase-7-plan.md §4), the first endpoint in this codebase whose
+  // successful response is genuinely absent rather than always some object.
+  if (text === '') return null as T;
+
+  return JSON.parse(text) as T;
 }
 
 async function request<T>(

@@ -24,6 +24,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     { href: '/clients', label: 'Clients', show: session.can('client:view') },
     { href: '/properties', label: 'Properties', show: session.can('property:view') },
     { href: '/sketch-types', label: 'Sketch types', show: session.can('sketch_type:admin') },
+    {
+      href: '/required-documents',
+      label: 'Required documents',
+      show: session.can('required_document:admin'),
+    },
     { href: '/users', label: 'Users', show: session.can('user:view') },
   ]
     .filter((link) => link.show)

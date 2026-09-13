@@ -37,7 +37,11 @@ export default async function SupervisionPage({ params }: { params: Promise<{ id
           { label: 'Supervision' },
         ]}
       />
-      <PageHead title="Supervision" description={project.name} />
+      <PageHead title="Supervision" description={project.name}>
+        <Link href={`/projects/${id}/supervision/agreements`} className="button button--secondary">
+          Agreements
+        </Link>
+      </PageHead>
 
       <div className="stack">
         <Card>

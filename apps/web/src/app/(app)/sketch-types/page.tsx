@@ -57,10 +57,16 @@ export default async function SketchTypesPage() {
                     <ActionForm action={updateSketchType} submitLabel="Save">
                       <input type="hidden" name="id" value={sketchType.id} />
                       <div className="row">
-                        <Field label="Label" name="label" defaultValue={sketchType.label} />
+                        <Field
+                          label="Label"
+                          name="label"
+                          id={`label-${sketchType.id}`}
+                          defaultValue={sketchType.label}
+                        />
                         <Field
                           label="Sort order"
                           name="sortOrder"
+                          id={`sortOrder-${sketchType.id}`}
                           type="number"
                           defaultValue={String(sketchType.sortOrder)}
                         />

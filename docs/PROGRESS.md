@@ -19,33 +19,48 @@ roadmap derived from the client's own documents and registers, not just the PRD 
 lost/on-hold outcome or a one-click conversion into a numbered Planning project, replacing the Excel
 sketch register staff run this workflow in today. See `docs/phase-5-plan.md`. Complete.
 
-| Step | Track point                                            | Status  |
-| ---- | ------------------------------------------------------ | ------- |
-| 0    | Project skeleton and tooling                           | ✅ Done |
-| 1    | Database, migrations, privilege model                  | ✅ Done |
-| 2    | Correlation IDs, logging, error handling, audit writer | ✅ Done |
-| 3    | Users and sign-in                                      | ✅ Done |
-| 4    | Roles, permissions, authorization choke point          | ✅ Done |
-| 5    | Clients, contacts, properties                          | ✅ Done |
-| 6    | Projects and membership                                | ✅ Done |
-| 7    | Environment setup script                               | ✅ Done |
-| 8    | Web interface                                          | ✅ Done |
-| 9    | Planning — activities, milestones, submissions         | ✅ Done |
-| 10   | Supervision — site visits, observations, instructions  | ✅ Done |
-| 11   | Issues — the fourth state machine                      | ✅ Done |
-| 12   | Web interface for Phase 2                              | ✅ Done |
-| 13   | Approvals — the shared state machine                   | ✅ Done |
-| 14   | Drawings — append-only, immutable-when-approved        | ✅ Done |
-| 15   | Documents — register, metadata and the Drive seam      | ✅ Done |
-| 16   | Web interface for Phase 3                              | ✅ Done |
-| 17   | Property fields — Oman land-registry identity          | ✅ Done |
-| 18   | Sequence service — real, annual-reset numbering        | ✅ Done |
-| 19   | Wired into `Project.create` — generated `code`         | ✅ Done |
-| 20   | Web — property form, project-code hint                 | ✅ Done |
-| 21   | Proposal data model, sketch numbering, CRUD            | ✅ Done |
-| 22   | Proposal status machine — the transition endpoint      | ✅ Done |
+**Phase 6 — Authority application tracking**: extends `Submission` with the real fields a planning
+authority application accumulates (reviews, meetings, halts, clarifications). Complete.
+
+**Phase 7 — Supervision Agreements**: the commercial arrangement a project's site visits happen
+under, with a computed quota derived from real `SiteVisit` rows. See `docs/phase-7-plan.md`. Complete.
+
+**Phase 8 — Client Modifications / Deviations**: a real record of a client-requested mid-construction
+change — request, discipline, cost/time impact, optional links to a drawing revision and/or a site
+visit observation — tracked through the shared `ApprovalStatus` machine. See `docs/phase-8-plan.md`.
+Complete.
+
+**Phase 9 — Document completeness**: an admin-configurable required-documents checklist (PRD §16's
+own six categories, seeded on day one) and a computed `GET /projects/:id/documents/completeness` that
+diffs it against a project's own uploaded categories. See `docs/phase-9-plan.md`. Complete.
+
+| Step | Track point                                              | Status  |
+| ---- | -------------------------------------------------------- | ------- |
+| 0    | Project skeleton and tooling                             | ✅ Done |
+| 1    | Database, migrations, privilege model                    | ✅ Done |
+| 2    | Correlation IDs, logging, error handling, audit writer   | ✅ Done |
+| 3    | Users and sign-in                                        | ✅ Done |
+| 4    | Roles, permissions, authorization choke point            | ✅ Done |
+| 5    | Clients, contacts, properties                            | ✅ Done |
+| 6    | Projects and membership                                  | ✅ Done |
+| 7    | Environment setup script                                 | ✅ Done |
+| 8    | Web interface                                            | ✅ Done |
+| 9    | Planning — activities, milestones, submissions           | ✅ Done |
+| 10   | Supervision — site visits, observations, instructions    | ✅ Done |
+| 11   | Issues — the fourth state machine                        | ✅ Done |
+| 12   | Web interface for Phase 2                                | ✅ Done |
+| 13   | Approvals — the shared state machine                     | ✅ Done |
+| 14   | Drawings — append-only, immutable-when-approved          | ✅ Done |
+| 15   | Documents — register, metadata and the Drive seam        | ✅ Done |
+| 16   | Web interface for Phase 3                                | ✅ Done |
+| 17   | Property fields — Oman land-registry identity            | ✅ Done |
+| 18   | Sequence service — real, annual-reset numbering          | ✅ Done |
+| 19   | Wired into `Project.create` — generated `code`           | ✅ Done |
+| 20   | Web — property form, project-code hint                   | ✅ Done |
+| 21   | Proposal data model, sketch numbering, CRUD              | ✅ Done |
+| 22   | Proposal status machine — the transition endpoint        | ✅ Done |
 | 23   | Convert action — WON proposal to a real numbered project | ✅ Done |
-| 24   | Web interface for Phase 5                              | ✅ Done |
+| 24   | Web interface for Phase 5                                | ✅ Done |
 
 ---
 
@@ -1524,17 +1539,17 @@ Step 23 convert action can move it further.
 
 **Verified — 10 tests, all against the real database:**
 
-| Behaviour                                                                      | Result                  |
-| ------------------------------------------------------------------------------- | ----------------------- |
-| Planning holds `proposal:view/create/edit` but not `proposal:convert`           | ✅                      |
-| Director holds `proposal:view` only                                            | ✅                      |
-| A proposal logs from bare `contactName`, no client/property required           | ✅                      |
-| It receives a real `YY-SB-NNN` sketch number                                   | ✅                      |
-| The full walk `New → Concept → Client Revision → Approved → Won`               | ✅                      |
-| `Concept → On Hold → Concept` (hold and resume)                                | ✅                      |
-| Skipping straight from `New` to `Approved` is refused                          | ✅ `ILLEGAL_TRANSITION` |
-| The refused transition is recorded, not only the ones that happened            | ✅                      |
-| A transition made from a stale version is refused                             | ✅ `STALE_RECORD`       |
+| Behaviour                                                                        | Result                  |
+| -------------------------------------------------------------------------------- | ----------------------- |
+| Planning holds `proposal:view/create/edit` but not `proposal:convert`            | ✅                      |
+| Director holds `proposal:view` only                                              | ✅                      |
+| A proposal logs from bare `contactName`, no client/property required             | ✅                      |
+| It receives a real `YY-SB-NNN` sketch number                                     | ✅                      |
+| The full walk `New → Concept → Client Revision → Approved → Won`                 | ✅                      |
+| `Concept → On Hold → Concept` (hold and resume)                                  | ✅                      |
+| Skipping straight from `New` to `Approved` is refused                            | ✅ `ILLEGAL_TRANSITION` |
+| The refused transition is recorded, not only the ones that happened              | ✅                      |
+| A transition made from a stale version is refused                                | ✅ `STALE_RECORD`       |
 | `WON` has no legal ordinary exit — reaching `CONVERTED` needs the convert action | ✅ `ILLEGAL_TRANSITION` |
 
 **Decisions:**
@@ -1571,12 +1586,12 @@ edits on the same resource.
 
 **Verified — 4 new tests, all against the real database (14 total in the proposals suite):**
 
-| Behaviour                                                                        | Result            |
-| ----------------------------------------------------------------------------------- | ----------------- |
-| A `WON` proposal with a property converts to a project with the right client, property, generated code (`YY.P.NNN`), name, one `PLANNING` workstream, and the caller as `PROJECT_MANAGER` | ✅ |
-| A `WON` proposal with no `propertyId` is refused, naming the field                   | ✅ `CONFLICT`      |
-| A proposal that is not `WON` is refused conversion                                   | ✅ `ILLEGAL_TRANSITION` |
-| A stale version is refused — proven with an intervening *edit* that bumps the version without touching status, so the conflict is genuinely about the version, not a second not-WON case | ✅ `STALE_RECORD` |
+| Behaviour                                                                                                                                                                                 | Result                  |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| A `WON` proposal with a property converts to a project with the right client, property, generated code (`YY.P.NNN`), name, one `PLANNING` workstream, and the caller as `PROJECT_MANAGER` | ✅                      |
+| A `WON` proposal with no `propertyId` is refused, naming the field                                                                                                                        | ✅ `CONFLICT`           |
+| A proposal that is not `WON` is refused conversion                                                                                                                                        | ✅ `ILLEGAL_TRANSITION` |
+| A stale version is refused — proven with an intervening _edit_ that bumps the version without touching status, so the conflict is genuinely about the version, not a second not-WON case  | ✅ `STALE_RECORD`       |
 
 **Decisions:**
 
@@ -1621,11 +1636,11 @@ existing one-file-per-phase Playwright suite.
 
 **Verified — 3 new browser tests, all passing (30 total across the suite; see the known limit below):**
 
-| Behaviour                                                                              | Result |
-| --------------------------------------------------------------------------------------- | ------ |
-| A proposal is logged from just a contact name and phone and gets a real `26-SB-NNN` sketch number | ✅ |
-| A `WON` proposal with a property attached converts to a real numbered project through the browser, and the converted project is linked from the detail page | ✅ |
-| Converting with no property attached is refused, and the API's own reason ("Attach a property to this proposal before converting it.") reaches the screen | ✅ |
+| Behaviour                                                                                                                                                   | Result |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| A proposal is logged from just a contact name and phone and gets a real `26-SB-NNN` sketch number                                                           | ✅     |
+| A `WON` proposal with a property attached converts to a real numbered project through the browser, and the converted project is linked from the detail page | ✅     |
+| Converting with no property attached is refused, and the API's own reason ("Attach a property to this proposal before converting it.") reaches the screen   | ✅     |
 
 **Decisions:**
 
@@ -1664,3 +1679,304 @@ since they were written id-first from the start the way Phase 4's were.
 Phase 5 is complete. All of `docs/phase-5-plan.md` §9's definition of done is demonstrated either by an
 API-level test (Steps 21-23) or by a browser test (this step), matching the standard every prior phase in
 this codebase has been held to.
+
+---
+
+## Steps 25-28 — Phase 6: Authority application tracking ✅
+
+Per `docs/phase-6-plan.md` and the approved roadmap — extends `Submission` (Phase 3, Step 13) rather than
+replacing it, since a real authority application is the "sent to government" stage the roadmap's own
+end-to-end flow names as next after Phase 5's convert action.
+
+**Built:**
+
+- **Schema (Step 25).** `Submission` gained `department` (PLANNING/HOUSING), `pendingWith` (free text —
+  kept separate from `status` for the same reason `Proposal.source`/`Proposal.status` are separate,
+  phase-5-plan.md §5b), `permitReference`, `preHaltStatus`, and four clarification columns. Two new child
+  tables, `SubmissionReview` and `SubmissionMeeting` — one-to-many off `Submission`, never deleted, the
+  same posture `SiteVisit` already takes. `SUBMISSION_STATUSES` gained `HALTED` and `CANCELLED` (two real
+  values the drawing register showed that the shared approval table didn't have room for); `HALTED` is
+  deliberately resumable back to whichever of `SUBMITTED`/`UNDER_REVIEW` it was halted from, while
+  `CANCELLED` stays a dead end like `WITHDRAWN`. Deliberately **not** built: `MOH`/`Owner`/`Krookie` as
+  submission statuses — §3 of the plan reasons through why these look like "who's holding it"
+  (`pendingWith`) or a different lifecycle's state (`Property.surveyReference`) rather than genuine
+  authority-application states, and leaves the question open for the client rather than guessing.
+- **Reviews & meetings CRUD (Step 26).** `SubmissionReviewService`/`SubmissionMeetingService`, nested
+  controllers under `/projects/:projectId/planning/submissions/:submissionId/{reviews,meetings}`. No new
+  permission verbs — both ride the existing `planning:view/create/edit`, since a review or meeting is
+  always reached through its parent submission.
+- **Approve-requires-permit + clarification (Step 27).** `SubmissionService.transition`'s `approve` action
+  now refuses — by name, "A permit reference is required to approve this submission." — unless one is
+  supplied or already on record, checked only once the move is otherwise legal (so an illegal jump or
+  self-approval attempt still surfaces its own reason first, not this one). `resume` is deliberately not a
+  fixed-target entry in `SUBMISSION_ACTIONS`: its target depends on `preHaltStatus`, so it is its own
+  service method rather than forcing the one-action-one-target idiom to describe a two-target move.
+  `requestClarification`/`respondClarification` never touch `status`.
+- **Web (Step 28).** A submission now has its own detail page
+  (`/projects/[id]/planning/submissions/[submissionId]`) — the shared Planning page's inline table grew a
+  "View" link instead of inline transition buttons, the same list/detail split Proposals already
+  established, because approve's permit field and the reviews/meetings sub-lists need more room than an
+  inline row gives. `approve` runs through `ActionForm` (its refusal is worth reading), every other
+  transition stays a bare `ActionButton`. `apps/web/tests/e2e/phase-6.spec.ts` added alongside the
+  existing one-file-per-phase suite.
+
+**Verified — 20 new API-level integration tests in `apps/api/tests/integration/planning.test.ts`
+(approve-without-permit refusal, halt/resume round-trip, cancel-then-dead-end, clarification round-trip,
+review/meeting CRUD with optimistic locking) plus 6 new browser tests in `phase-6.spec.ts`, all passing:**
+
+| Behaviour                                                                                                                    | Result |
+| ---------------------------------------------------------------------------------------------------------------------------- | ------ |
+| Approving a submission with no permit reference on record is refused, by name                                                | ✅     |
+| Approving with one succeeds and the reference is recorded                                                                    | ✅     |
+| A submission halts from `UNDER_REVIEW` and resumes back to `UNDER_REVIEW`, not a fixed target                                | ✅     |
+| A halted submission can be cancelled outright; a cancelled submission accepts no further transition                          | ✅     |
+| A clarification request/response round-trips without disturbing `status`                                                     | ✅     |
+| Reviews and meetings can be logged against a submission and later given a response/outcome, never deleted, optimistic-locked | ✅     |
+| A non-member gets nothing for a project's planning routes, including the new submission detail page                          | ✅     |
+
+**Decisions:**
+
+- **The permit-reference check runs after the transition-legality check, not before.** An illegal jump
+  (e.g. `SUBMITTED → APPROVED` directly) or a self-approval attempt should hear that reason first — a
+  submission never eligible to approve at all shouldn't be told about a missing permit reference instead,
+  the same ordering rule Phase 5's convert action already applies (not-WON before missing-property).
+- **`resume` takes no caller-supplied target.** Unlike Phase 5's `startConcept` (which reuses one route for
+  two legal source states with an identical target), halting can happen from either `SUBMITTED` or
+  `UNDER_REVIEW` with different correct resume targets — so the API alone tracks `preHaltStatus` and the
+  caller supplies nothing beyond `version`.
+- **The web permit-reference field carries no client-side `required`.** A blank submit needs to reach the
+  server so its real refusal is demonstrated end-to-end, the same reason `convertProposal`'s form has no
+  client-side property requirement either — the UI's convenience should never be the only thing standing
+  between a caller and the actual guarantee.
+
+**Known limit, not introduced by this step:** the pre-existing `pageSize=100` accumulation issue (Steps 8,
+12, 20, 21) recurred against `sequence.test.ts`, `users.test.ts` and `projects.test.ts` while running the
+full suite — the shared dev database has grown further from repeated sessions (including this one's own
+e2e runs, which each create a client/property/project/two users). `planning.test.ts` itself is unaffected,
+having been written id-first from the start the same way Phase 4/5's own tests were.
+
+Phase 6 is complete. All of `docs/phase-6-plan.md` §9's definition of done is demonstrated either by an
+API-level test (Steps 25-27) or by a browser test (Step 28).
+
+---
+
+## Steps 29-31 — Phase 7: Supervision Agreements ✅
+
+Per `docs/phase-7-plan.md` and the approved roadmap — the commercial arrangement a project's site visits
+happen under, reusing `SiteVisit` (Phase 2) to derive a quota rather than inventing a second way of
+counting visits.
+
+**Built:**
+
+- **Data model + CRUD (Step 29).** New `SupervisionAgreement` model: `type` (MONTHLY/ON_CALL),
+  `visitsAllowed`, `amount`, `startDate`/`endDate`, and a `renewedAt`/`renewedFromId` self-relation. Not
+  1:1 with `Project` — a project may hold several over its life. `SupervisionAgreementService`
+  (list/byId/create/update), nested under `/projects/:id/supervision/agreements`, rides the existing
+  `supervision:view/create/edit` verbs — no new resource, the same reasoning Phase 6 used to avoid a
+  permission per submission child table.
+- **Computed quota + "current" lookup (Step 30).** `visitsUsed` is never stored — computed on every read
+  from real `SiteVisit` rows, scoped to the current calendar month for `MONTHLY` agreements (a retainer
+  resets monthly by definition) or the whole agreement period for `ON_CALL`. `GET
+.../agreements/current` finds the one active agreement by date, without the caller naming an id.
+  `POST .../agreements/:id/renew` refuses a second renewal of an already-renewed source, creates a new
+  linked row (terms default to the source's own, all overridable), and stamps the source `renewedAt`.
+- **Web (Step 31).** The project page gains a "Supervision agreement" card (visible only for
+  Supervision/BOTH projects) showing the current agreement's type, amount, period and
+  `visitsUsed / visitsAllowed`. A dedicated `/projects/:id/supervision/agreements` page lists every
+  agreement and offers a "Renew" card for whichever one is still eligible. `apps/web/tests/e2e/phase-7.spec.ts`
+  added alongside the existing one-file-per-phase suite.
+
+**A real, pre-existing bug surfaced and fixed along the way:** `apps/web/src/lib/api.ts`'s `parseResponse`
+treated _any_ empty response body as `{}`, since until this phase no endpoint in the codebase had ever
+returned a genuinely absent (`null`) body on success — `GET .../agreements/current` was the first. Nest
+sends an empty body (not the literal text `"null"`) for a controller returning `null`, and the `{}`
+fallback made "no active agreement" render as a truthy, all-undefined object instead of `null` — caught by
+the browser test itself (`getByText('No active agreement')` failed to appear) before being traced to the
+client, not the new endpoint. Fixed by returning `null` for an empty _successful_ body while leaving the
+empty-error-body fallback (`{}`) untouched, so no other caller's error handling changed.
+
+**Verified — 5 new integration tests in `apps/api/tests/integration/supervision.test.ts` (MONTHLY
+month-scoped usage, ON_CALL whole-period usage, "current" lookup, renewal round-trip with a refused second
+renewal, cross-project `NOT_FOUND`) plus 5 new browser tests in `phase-7.spec.ts`, all passing:**
+
+| Behaviour                                                                                         | Result |
+| ------------------------------------------------------------------------------------------------- | ------ |
+| A MONTHLY agreement's `visitsUsed` counts only the current calendar month's site visits           | ✅     |
+| An ON_CALL agreement's `visitsUsed` counts its whole active period                                | ✅     |
+| The active agreement is found by date, without the caller naming an id                            | ✅     |
+| Renewing creates a linked, new agreement and refuses a second renewal of the same source          | ✅     |
+| The project page shows "No active agreement" for a fresh Supervision project, then the real quota | ✅     |
+| A non-member gets nothing for the agreements page                                                 | ✅     |
+
+**Decisions:**
+
+- **No `Project.currentAgreementId` column.** "The active one" is derived at read time by date — an
+  agreement's currency is checked far less often than a drawing revision's, so the plain derivation is
+  the right call here, unlike `Drawing.currentRevisionId`'s deliberate stored exception.
+- **Renewing is a property of an agreement, not a one-time feature of a project.** After a renewal, the
+  new agreement is itself eligible to renew again later — the "Renew" card reappearing for it is correct
+  behaviour, not a residual bug, and the browser test asserts on the source/renewal's own badges rather
+  than assuming the card disappears entirely.
+- **An "approaching the limit" alert is explicitly out of scope.** Per the roadmap's own sequencing note,
+  that is Phase 11's job (notifications) once dashboards exist to host it.
+
+**Known limit, not introduced by this step:** the pre-existing `pageSize=100` accumulation issue
+(Steps 8, 12, 20, 21, 25) recurred against `projects.test.ts` while running the full suite — the shared
+dev database has grown further from this phase's own e2e runs. `supervision.test.ts` and `planning.test.ts`
+are both unaffected.
+
+Phase 7 is complete. All of `docs/phase-7-plan.md` §9's definition of done is demonstrated either by an
+API-level test (Steps 29-30) or by a browser test (Step 31).
+
+---
+
+## Steps 32-34 — Phase 8: Client Modifications / Deviations ✅
+
+Per `docs/phase-8-plan.md` and the approved roadmap — row 7 of the end-to-end flow's last missing
+piece, landing after site visits/observations/instructions/issues (Phase 2) and drawing revisions
+(Phase 3), both of which a modification may optionally be raised against.
+
+**Built:**
+
+- **Data model + CRUD (Step 32).** New `Modification` model: `requestText`, `impactArea`
+  (`ARCHITECTURE`/`STRUCTURAL`/`MEP`), free-text `costImpact`/`timeImpact`, and two independent
+  optional links — `drawingRevisionId` and `observationId` — either, both, or neither.
+  `ModificationService` (list/byId/create/update), nested under `/projects/:id/modifications`. Each
+  optional link is checked with the same two-hop "belongs to the project named in the URL" lookup
+  `IssueService.requireObservationInProject` already uses for `Issue.observationId`.
+- **Approval + evidence (Step 33).** Status is `ApprovalStatus`, consumed directly with no extra
+  edge — the same treatment `DrawingRevision` gets (docs/phase-3-plan.md §5) rather than
+  `Submission`'s bespoke `WITHDRAWN`/`HALTED`/`CANCELLED` extension; nothing in the source material
+  suggested a modification needs its own edges. `submit`/`review` sit behind `planning:edit`;
+  `approve`/`reject`/`returnForRevision` sit behind `planning:approve` — the same split
+  `SubmissionController` already draws. `DOCUMENT_LINKED_TYPES` gains `MODIFICATION` as a fifth value,
+  and `DocumentService.requireLinkedRecordInProject`'s `switch` gains one more flat `projectId`
+  lookup, the same shape the other four already use.
+- **Web (Step 34).** A `/projects/:id/modifications` list page — no dedicated detail page, since a
+  modification carries no child records the way a `Submission`'s reviews/meetings do, the same
+  reasoning `docs/PROGRESS.md`'s Phase 2 note already gives for entities whose whole mutable state is
+  a targeted action. Per-row transition buttons follow the Drawings revision table's
+  `ACTIONS.filter(canTransitionApproval(...))` shape exactly. The project page gains a "Modifications"
+  link, gated on `planning:view` — no new permission resource. `apps/web/tests/e2e/phase-8.spec.ts`
+  added alongside the existing one-file-per-phase suite.
+
+**No new permission resource.** `planning:view/create/edit/approve` covers the whole feature — the
+same reasoning Phase 6 and Phase 7 used to avoid a permission per new project-scoped record, chosen
+over `supervision:*` because `planning:approve` already exists and covers exactly the three decision
+actions a modification needs.
+
+**Verified — 10 new integration tests in `apps/api/tests/integration/modifications.test.ts`
+(non-member/member permission check, create with no links, create with both links, wrong-project
+link rejected, optimistic-locked edit, full submit→review→approve walk, illegal-transition refusal
+audited, wrong-project lookup rejected, closed-project refusal) plus 5 new browser tests in
+`phase-8.spec.ts`, all passing:**
+
+| Behaviour                                                                                        | Result |
+| ------------------------------------------------------------------------------------------------ | ------ |
+| A non-member gets nothing at all for modifications on the project                                | ✅     |
+| A modification can be created with no links, or with both a drawing revision and an observation  | ✅     |
+| A drawing revision or observation reached through the wrong project is refused                   | ✅     |
+| Editing content is optimistic-locked, the same as every other resource in this system            | ✅     |
+| A modification moves through submit → review → approve, and an illegal move is refused + audited | ✅     |
+| A closed project accepts no new modification                                                     | ✅     |
+| A modification is recorded and moved through its full approval lifecycle in the browser          | ✅     |
+
+**Known limit, not introduced by this step:** the same pre-existing accumulated-dev-database issue
+already on record (Steps 8, 12, 20, 21, 25, 29-31) shows up in a new place this time — the
+`properties/new` page's plain `<select>` of clients, used by `phase-1.spec.ts`/`phase-2.spec.ts`/
+`phase-3.spec.ts`, timed out selecting a freshly created client during this session's full e2e run
+because the option list has grown large enough for `selectOption` to need more than one polling
+attempt to find the newly added option. `phase-8.spec.ts` itself is unaffected, having been written
+id-first (`page.locator('#clientId')`) from the start the same way Phase 4/5's own tests were.
+
+Phase 8 is complete. All of `docs/phase-8-plan.md` §8's definition of done is demonstrated either by
+an API-level test (Steps 32-33) or by a browser test (Step 34).
+
+---
+
+## Steps 35-37 — Phase 9: Document Completeness ✅
+
+Per `docs/phase-9-plan.md` and PRD §16 — the one PRD requirement most directly unaddressed by Phases
+1-8, and the roadmap's own next stage after Phase 8's modifications.
+
+**Built:**
+
+- **Data model + admin CRUD (Step 35).** New `RequiredDocument` model: `category`, `label`, `scope`
+  (`PLANNING`/`SUPERVISION`/`ANY`), `sortOrder`, `archivedAt` — a global catalogue, the same shape
+  `ProposalSketchType` already is: small, hand maintained, no pagination or search of its own.
+  `RequiredDocumentService` (list/create/update/archive), exposed at `/required-documents`. Seeded on
+  day one with PRD §16's own six categories (Design, Tests, Authority, Contract, Construction,
+  Completion), scoped `ANY`, in a dedicated seed migration mirroring Phase 5's `proposal_seed` — a
+  starting point, not a closed list.
+- **Computed completeness (Step 36).** `GET /projects/:id/documents/completeness` diffs the active
+  catalogue against the project's own non-archived `Document.category` rows — computed fresh on every
+  read, never stored, the same "derive, don't duplicate" choice Phase 7 made for
+  `SupervisionAgreement.visitsUsed`. A requirement's `scope` is matched against the project's own
+  workstreams (`WORKSTREAMS_FOR_TYPE`), not `Project.type` directly, so a `PLANNING`-scoped requirement
+  still applies to a `BOTH` project. Category matching is case- and whitespace-insensitive — `Document
+.category` is typed by hand on every upload, so an exact-match diff would flag "design" against
+  "Design" as missing for no reason a person would understand. `RequiredDocument` does not consume
+  `ApprovalStatus`, `Document.linkedType`, or any other Phase 3-8 machinery beyond the `Document` table
+  itself — the first phase since Documents (Phase 3) to add nothing to the approval engine or the
+  linked-type catalogue.
+- **Web (Step 37).** A `/required-documents` admin page mirroring `/sketch-types` exactly in shape —
+  table plus an "Add" form, nav link gated on `required_document:admin`. The project documents page
+  gains a "Completeness" card (✓/✗ per requirement, plus the PRD's own suggested phrasing, "N required
+  documents missing"), and the upload form's Category field gains a hint pointing at it.
+  `apps/web/tests/e2e/phase-9.spec.ts` added alongside the existing one-file-per-phase suite.
+
+**A real, pre-existing bug surfaced and fixed along the way, in a shared component:** `Field`'s and
+`Select`'s `id` was always `id={name}` — fine for a form that appears once per page, but both
+`/sketch-types` and this phase's new `/required-documents` render the _same_ field (`name="label"`,
+`name="scope"`, `name="sortOrder"`) once per table row plus once more in the "Add" form below it,
+producing duplicate `id` attributes across the page — invalid HTML, and exactly the ambiguity that
+broke this phase's own browser test (`getByLabel('Label')` resolved to the first row's input, not the
+Add form's, so the created entry initially showed the wrong category). Fixed by giving both components
+an optional `id` prop, independent of `name`, defaulting to `name` for every existing single-instance
+caller (no behaviour change anywhere else) — and used by both `/sketch-types` and
+`/required-documents` to give each row's fields a unique `id` (`label-${row.id}`, etc.). Caught by this
+phase's own test, not a regression suite — `/sketch-types` had no browser test at all before this,
+since no prior phase's e2e coverage happened to interact with it administratively.
+
+**Verified — 9 new integration tests in `apps/api/tests/integration/required-documents.test.ts`
+(admin-permission split, duplicate category/scope refused, category immutable on edit, retire hides
+from active list, fresh project missing everything, case/whitespace-insensitive match satisfies a
+requirement, `BOTH`-project workstream scoping, archived requirement excluded, archived document does
+not satisfy) plus 4 new browser tests in `phase-9.spec.ts`, all passing:**
+
+| Behaviour                                                                                    | Result |
+| -------------------------------------------------------------------------------------------- | ------ |
+| A non-admin gets nothing for managing the catalogue; `document:view` still lists it          | ✅     |
+| The same category may repeat under a different scope, but not under the same one             | ✅     |
+| `category` cannot be changed by an edit — only `label`/`scope`/`sortOrder` can               | ✅     |
+| Retiring removes a requirement from new completeness checks without deleting it              | ✅     |
+| A fresh project shows every applicable requirement missing                                   | ✅     |
+| An uploaded category satisfies a requirement regardless of case or surrounding whitespace    | ✅     |
+| A `PLANNING`-scoped requirement applies to a `BOTH` project but not a `SUPERVISION`-only one | ✅     |
+| An archived requirement, and an archived document, are both excluded from the diff           | ✅     |
+| Adding a requirement through the browser, then uploading a matching document, flips ✗ to ✓   | ✅     |
+
+**Decisions:**
+
+- **A new top-level resource (`required_document`), not a `document:admin` verb.** Mirrors
+  `sketch_type` sitting alongside `proposal` rather than a `proposal:admin` suffix — the codebase's
+  own established shape for "this is an admin-configured sub-catalogue of a bigger resource."
+- **No due-date/"overdue" dimension.** PRD §16 asks for "missing and overdue"; this phase deliberately
+  answers only "missing" — overdue implies a due-by date or milestone tied to a requirement that no
+  part of this system currently models, and guessing at that shape now is exactly the premature
+  complexity Phase 7 avoided by leaving its own "approaching the limit" alert to Phase 11.
+- **`Document.category` remains free text, not converted to a select.** Constraining it to the
+  required-documents catalogue would break the documented deliberate choice
+  (docs/phase-3-plan.md §8, B6) that a document's category is an open catalogue, not a closed one —
+  most uploads (correspondence, photographs) have no matching requirement at all. Case-insensitive
+  matching at the completeness layer is the fix; a hint pointing at the Completeness card is the whole
+  of this phase's nudge toward alignment.
+
+**Known limit, not introduced by this step:** the same pre-existing accumulated-dev-database issue
+already on record (Steps 8, 12, 20, 21, 25, 29-31, and Phase 8's own note) recurred against
+`sequence.test.ts`, `projects.test.ts` and `users.test.ts` while running the full suite. None of the
+three touches documents or required documents; `required-documents.test.ts` itself is unaffected,
+having been written id-first from the start the same way every phase since 4 has been.
+
+Phase 9 is complete. All of `docs/phase-9-plan.md` §8's definition of done is demonstrated either by
+an API-level test (Steps 35-36) or by a browser test (Step 37).

@@ -3,12 +3,13 @@ import { Module } from '@nestjs/common';
 import { AccessModule } from '../access';
 
 import { DocumentService } from './document.service';
-import { DocumentController } from './documents.controller';
+import { DocumentController, RequiredDocumentController } from './documents.controller';
+import { RequiredDocumentService } from './required-document.service';
 
 @Module({
   imports: [AccessModule],
-  controllers: [DocumentController],
-  providers: [DocumentService],
-  exports: [DocumentService],
+  controllers: [DocumentController, RequiredDocumentController],
+  providers: [DocumentService, RequiredDocumentService],
+  exports: [DocumentService, RequiredDocumentService],
 })
 export class DocumentsModule {}

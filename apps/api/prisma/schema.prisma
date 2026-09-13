@@ -356,10 +356,37 @@ model Submission {
 
   /// The shared approval state machine (DRAFT, SUBMITTED, UNDER_REVIEW,
   /// APPROVED, REJECTED, RETURNED_FOR_REVISION — docs/phase-3-plan.md §4)
-  /// plus WITHDRAWN, a submission-specific edge. Moves only through a
-  /// checked transition, the same rule as every status column in this system.
+  /// plus WITHDRAWN, HALTED and CANCELLED — three submission-specific edges
+  /// (docs/phase-6-plan.md §4; HALTED/CANCELLED added for the real drawing
+  /// register's own values). Moves only through a checked transition, the
+  /// same rule as every status column in this system.
   /// VarChar(30): RETURNED_FOR_REVISION alone is 21 characters.
   status String @default("DRAFT") @db.VarChar(30)
+
+  /// PLANNING or HOUSING — which authority this application is with.
+  /// Distinct from `authorityName` (a free-text label like "Muscat
+  /// Municipality"): this is the fixed pair docs/phase-6-plan.md §4 actually
+  /// distinguishes.
+  department String @default("PLANNING") @db.VarChar(20)
+
+  /// Free text describing who currently holds the ball (client, authority,
+  /// the consultancy itself) — kept separate from `status` for the same
+  /// reason `Proposal.source`/`Proposal.status` are separate
+  /// (docs/phase-5-plan.md §5b).
+  pendingWith String? @map("pending_with") @db.VarChar(100)
+
+  /// Set once, the moment `status` reaches APPROVED via the dedicated
+  /// action, and never editable afterward through the plain update endpoint.
+  permitReference String? @map("permit_reference") @db.VarChar(100)
+
+  /// The status this submission was in immediately before being HALTED, so
+  /// `resume` knows where to send it back to. Cleared on resume or cancel.
+  preHaltStatus String? @map("pre_halt_status") @db.VarChar(30)
+
+  clarificationRequested   Boolean   @default(false) @map("clarification_requested")
+  clarificationRequestedAt DateTime? @map("clarification_requested_at") @db.Timestamptz(6)
+  clarificationResponse    String?   @map("clarification_response") @db.Text
+  clarificationRespondedAt DateTime? @map("clarification_responded_at") @db.Timestamptz(6)
 
   version Int @default(1)
 
@@ -367,8 +394,64 @@ model Submission {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdBy String?  @map("created_by") @db.Uuid
 
+  reviews  SubmissionReview[]
+  meetings SubmissionMeeting[]
+
   @@index([projectId, status])
   @@map("submission")
+}
+
+/// One authority review round against a `Submission` (docs/phase-6-plan.md
+/// §4). Never deleted — a review that happened is a fact, the same posture
+/// `SiteVisit` already takes and for the same reason.
+model SubmissionReview {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  submissionId String     @map("submission_id") @db.Uuid
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+
+  reviewDate    DateTime  @map("review_date") @db.Date
+  reviewerName  String?   @map("reviewer_name") @db.VarChar(200)
+  comments      String?   @db.Text
+  responseDueAt DateTime? @map("response_due_at") @db.Date
+  responseText  String?   @map("response_text") @db.Text
+  respondedAt   DateTime? @map("responded_at") @db.Timestamptz(6)
+
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+
+  @@index([submissionId])
+  @@map("submission_review")
+}
+
+/// One authority meeting against a `Submission` (docs/phase-6-plan.md §4).
+/// Never deleted, for the same reason as `SubmissionReview` above.
+model SubmissionMeeting {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  submissionId String     @map("submission_id") @db.Uuid
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+
+  required  Boolean   @default(false)
+  meetingAt DateTime? @map("meeting_at") @db.Timestamptz(6)
+  attendees String?   @db.Text
+  purpose   String?   @db.Text
+  outcome   String?   @db.Text
+  /// Set once the meeting has actually happened, distinct from `meetingAt`
+  /// (which may just be scheduled).
+  heldAt DateTime? @map("held_at") @db.Timestamptz(6)
+
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+
+  @@index([submissionId])
+  @@map("submission_meeting")
 }
 
 /// A recorded site visit (PRD §6, "Supervision Workflow"). Not archived and
@@ -398,6 +481,46 @@ model SiteVisit {
   @@map("site_visit")
 }
 
+/// The commercial agreement a supervision project's site visits happen
+/// under (docs/phase-7-plan.md) — monthly retainer or a fixed on-call quota.
+/// Not 1:1 with Project: a project may hold more than one over its life
+/// (renewals, or a changed arrangement), so "the active one" is derived at
+/// read time (§4 of the plan) rather than stored as a pointer on Project.
+model SupervisionAgreement {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  /// MONTHLY (visitsAllowed is a per-month figure) or ON_CALL (a fixed quota
+  /// for the whole agreement period).
+  type String @db.VarChar(20)
+
+  visitsAllowed Int       @map("visits_allowed")
+  amount        Decimal   @db.Decimal(12, 2)
+  startDate     DateTime  @map("start_date") @db.Date
+  endDate       DateTime? @map("end_date") @db.Date
+
+  /// Set only by the renew action, never a plain edit — an agreement that
+  /// renews is a fact about its own history, the same reason
+  /// DrawingRevision.supersededAt is never hand-edited either.
+  renewedAt     DateTime? @map("renewed_at") @db.Timestamptz(6)
+  renewedFromId String?   @map("renewed_from_id") @db.Uuid
+  renewedFrom   SupervisionAgreement?  @relation("AgreementRenewal", fields: [renewedFromId], references: [id], onDelete: SetNull)
+  renewals      SupervisionAgreement[] @relation("AgreementRenewal")
+
+  notes String? @db.Text
+
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+
+  @@index([projectId])
+  @@map("supervision_agreement")
+}
+
 /// Something seen on a site visit. PRD §6 gives this no lifecycle of its own —
 /// it is a record, not a task. An Issue (below) is what an observation turns
 /// into when it needs to be tracked to closure.
@@ -416,7 +539,8 @@ model Observation {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdBy String?  @map("created_by") @db.Uuid
 
-  issues Issue[]
+  issues        Issue[]
+  modifications Modification[]
 
   @@index([siteVisitId])
   @@map("observation")
@@ -575,10 +699,62 @@ model DrawingRevision {
   createdBy String?  @map("created_by") @db.Uuid
 
   drawingAsCurrentRevision Drawing? @relation("DrawingCurrentRevision")
+  modifications            Modification[]
 
   @@unique([drawingId, revisionCode])
   @@index([drawingId, supersededAt])
   @@map("drawing_revision")
+}
+
+/// A client-requested mid-construction change (PRD §6, row 7 of the
+/// end-to-end flow) — Phase 8 of the roadmap
+/// (~/.claude/plans/swirling-singing-book.md), landing after site
+/// visits/observations/instructions (Phase 2) since a modification is often
+/// raised against something already seen on one, or against a drawing
+/// revision already on file (Phase 3). Both links are optional and
+/// independent — one, the other, both, or neither.
+///
+/// Status is `ApprovalStatus`, consumed directly like `DrawingRevision` —
+/// no extra edge; a modification is approved, rejected or sent back for
+/// revision through the one shared machine, not a bespoke state set.
+model Modification {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  /// What the client is asking for.
+  requestText String @map("request_text") @db.Text
+
+  /// ARCHITECTURE, STRUCTURAL or MEP — which discipline the change lands on.
+  impactArea String @map("impact_area") @db.VarChar(20)
+
+  /// Free text, not a structured figure — the PRD gives no fixed cost/time
+  /// impact format, matching how `Issue.severity` started as a catalogue
+  /// rather than a computed field.
+  costImpact String? @map("cost_impact") @db.Text
+  timeImpact String? @map("time_impact") @db.Text
+
+  drawingRevisionId String?          @map("drawing_revision_id") @db.Uuid
+  drawingRevision   DrawingRevision? @relation(fields: [drawingRevisionId], references: [id], onDelete: Restrict)
+
+  observationId String?      @map("observation_id") @db.Uuid
+  observation   Observation? @relation(fields: [observationId], references: [id], onDelete: Restrict)
+
+  /// DRAFT, SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED or
+  /// RETURNED_FOR_REVISION — the shared approval state machine, unchanged.
+  status String @default("DRAFT") @db.VarChar(30)
+
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+
+  @@index([projectId, status])
+  @@index([drawingRevisionId])
+  @@index([observationId])
+  @@map("modification")
 }
 
 /// A registered document (PRD §6, "Document Management"). Deliberately not
@@ -634,6 +810,40 @@ model Document {
   @@map("document")
 }
 
+/// The admin-configurable required-documents checklist (docs/phase-9-plan.md,
+/// PRD §16). A global catalogue, not per-project — the same shape
+/// `ProposalSketchType` already is (docs/phase-5-plan.md §5c): small, hand
+/// maintained, no pagination or search of its own.
+///
+/// Matched against `Document.category` by value at read time, not by a
+/// foreign key — `Document.category` is deliberately free text
+/// (docs/phase-3-plan.md §8, B6), so there is nothing here to point a real
+/// relation at.
+model RequiredDocument {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  category String @db.VarChar(100)
+  label    String @db.VarChar(200)
+
+  /// PLANNING, SUPERVISION or ANY — which workstream this requirement
+  /// applies to. Deliberately not `Project.type` directly: a BOTH project
+  /// runs both workstreams (`WORKSTREAMS_FOR_TYPE`), so a requirement scoped
+  /// to PLANNING must still apply to a BOTH project, not only to a
+  /// PLANNING-type one.
+  scope String @default("ANY") @db.VarChar(20)
+
+  sortOrder Int @default(0) @map("sort_order")
+
+  /// Retired, never deleted — a project already missing a since-retired
+  /// requirement should not have that count vanish from its history. Excluded
+  /// only from the checklist offered to NEW completeness checks, the same
+  /// treatment `ProposalSketchType.archivedAt` already gets.
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+
+  @@unique([category, scope])
+  @@map("required_document")
+}
+
 /// A piece of work for a client, at a property (PRD §4).
 ///
 /// The project is the unit of authorization for the whole system. Every
@@ -686,9 +896,11 @@ model Project {
   milestones         Milestone[]
   submissions        Submission[]
   siteVisits         SiteVisit[]
+  supervisionAgreements SupervisionAgreement[]
   issues             Issue[]
   drawings           Drawing[]
   documents          Document[]
+  modifications      Modification[]
   /// Set only if this project was minted by a Proposal conversion
   /// (docs/phase-5-plan.md §4) — absent for a project created directly.
   convertedFromProposal Proposal?

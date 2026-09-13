@@ -5,6 +5,8 @@ import {
   type ListQuery,
   type Page,
   type SubmissionAction,
+  type SubmissionRequestClarification,
+  type SubmissionRespondClarification,
   type SubmissionStatus,
   type SubmissionTransition,
   type UpdateSubmission,
@@ -20,10 +22,11 @@ import { requireOpenProject } from './project-guard';
 
 /**
  * A planning authority application. Its status is the shared approval state
- * machine (docs/phase-3-plan.md §4) plus one submission-specific edge,
- * `WITHDRAWN` — not a one-off copy of it. `ApprovalStatus`/
- * `canTransitionApproval` live in `@ecms/contracts` for drawing revisions to
- * reuse later, the same way this module reuses them now.
+ * machine (docs/phase-3-plan.md §4) plus three submission-specific edges,
+ * `WITHDRAWN`/`HALTED`/`CANCELLED` (docs/phase-6-plan.md §4) — not a one-off
+ * copy of it. `ApprovalStatus`/`canTransitionApproval` live in `@ecms/contracts`
+ * for drawing revisions to reuse later, the same way this module reuses them
+ * now.
  */
 @Injectable()
 export class SubmissionService {
@@ -73,6 +76,8 @@ export class SubmissionService {
           projectId,
           reference: input.reference,
           authorityName: input.authorityName,
+          department: input.department ?? 'PLANNING',
+          pendingWith: input.pendingWith ?? null,
           notes: input.notes ?? null,
           createdBy: actorId,
         },
@@ -141,19 +146,25 @@ export class SubmissionService {
    * approved (docs/phase-3-plan.md §4's starting answer to B3) — a reviewer
    * rejecting or returning their own submission is not the conflict of
    * interest self-approval is, so only this one action carries the check.
+   *
+   * `approve` also requires a `permitReference` (docs/phase-6-plan.md §4),
+   * unless one was already recorded by an earlier approval attempt —
+   * refused by name, the same way Phase 5's convert action refuses a missing
+   * property. `halt` additionally records `preHaltStatus` so `resume` (below)
+   * knows where to send the submission back to.
    */
   async transition(
     projectId: string,
     id: string,
     action: SubmissionAction,
-    input: SubmissionTransition,
+    input: SubmissionTransition & { permitReference?: string | undefined },
     actorId: string,
   ): Promise<Submission> {
     const target: SubmissionStatus = SUBMISSION_ACTIONS[action];
 
     const current = await this.prisma.submission.findUnique({
       where: { id },
-      select: { id: true, projectId: true, status: true, createdBy: true },
+      select: { id: true, projectId: true, status: true, createdBy: true, permitReference: true },
     });
     if (!current || current.projectId !== projectId) throw appError('NOT_FOUND');
 
@@ -180,12 +191,35 @@ export class SubmissionService {
       });
     }
 
+    // Checked only once the move is otherwise legal — a submission never
+    // eligible to approve at all should hear that reason first, the same
+    // ordering rule Phase 5's convert action already applies (not-WON before
+    // missing-property).
+    const permitReference = input.permitReference ?? current.permitReference ?? null;
+    if (action === 'approve' && !permitReference) {
+      throw appError('CONFLICT', {
+        fields: [
+          {
+            field: 'permitReference',
+            reason: 'A permit reference is required to approve this submission.',
+          },
+        ],
+      });
+    }
+
     return this.prisma.$transaction(async (tx) => {
       await requireOpenProject(tx, projectId);
 
+      const data: Prisma.SubmissionUpdateManyMutationInput = {
+        status: target,
+        version: { increment: 1 },
+      };
+      if (action === 'halt') data.preHaltStatus = from;
+      if (action === 'approve') data.permitReference = permitReference;
+
       const { count } = await tx.submission.updateMany({
         where: { id, status: from, version: input.version },
-        data: { status: target, version: { increment: 1 } },
+        data,
       });
       if (count === 0) throw appError('STALE_RECORD', { context: { submission_id: id } });
 
@@ -196,6 +230,130 @@ export class SubmissionService {
         projectId,
         before: { status: from },
         after: { status: target, reason: input.reason ?? null },
+      });
+
+      return tx.submission.findUniqueOrThrow({ where: { id } });
+    });
+  }
+
+  /**
+   * `resume` is not in `SUBMISSION_ACTIONS` because its target is not fixed —
+   * a submission halted from `SUBMITTED` resumes to `SUBMITTED`, one halted
+   * from `UNDER_REVIEW` resumes to `UNDER_REVIEW` — so this reads
+   * `preHaltStatus` rather than forcing a single-target action to describe a
+   * two-target move (docs/phase-6-plan.md §4).
+   */
+  async resume(
+    projectId: string,
+    id: string,
+    input: SubmissionTransition,
+    _actorId: string,
+  ): Promise<Submission> {
+    const current = await this.prisma.submission.findUnique({
+      where: { id },
+      select: { id: true, projectId: true, status: true, preHaltStatus: true },
+    });
+    if (!current || current.projectId !== projectId) throw appError('NOT_FOUND');
+
+    const from = current.status as SubmissionStatus;
+    const target = (current.preHaltStatus as SubmissionStatus | null) ?? 'SUBMITTED';
+
+    if (!canTransitionSubmission(from, target)) {
+      throw appError('ILLEGAL_TRANSITION', {
+        fields: [{ field: 'status', reason: `A submission cannot go from ${from} to ${target}.` }],
+      });
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await requireOpenProject(tx, projectId);
+
+      const { count } = await tx.submission.updateMany({
+        where: { id, status: from, version: input.version },
+        data: { status: target, preHaltStatus: null, version: { increment: 1 } },
+      });
+      if (count === 0) throw appError('STALE_RECORD', { context: { submission_id: id } });
+
+      await this.audit.record(tx, {
+        action: 'STATUS_CHANGED',
+        entityType: 'Submission',
+        entityId: id,
+        projectId,
+        before: { status: from },
+        after: { status: target, reason: input.reason ?? null },
+      });
+
+      return tx.submission.findUniqueOrThrow({ where: { id } });
+    });
+  }
+
+  /**
+   * Clarification request/response (docs/phase-6-plan.md §4) never touches
+   * `status` — a submission under review that needs clarification is still
+   * `UNDER_REVIEW`, just with a flag raised.
+   */
+  async requestClarification(
+    projectId: string,
+    id: string,
+    input: SubmissionRequestClarification,
+    _actorId: string,
+  ): Promise<Submission> {
+    return this.prisma.$transaction(async (tx) => {
+      await requireOpenProject(tx, projectId);
+
+      const before = await tx.submission.findUnique({ where: { id } });
+      if (!before || before.projectId !== projectId) throw appError('NOT_FOUND');
+
+      const { count } = await tx.submission.updateMany({
+        where: { id, version: input.version },
+        data: {
+          clarificationRequested: true,
+          clarificationRequestedAt: new Date(),
+          version: { increment: 1 },
+        },
+      });
+      if (count === 0) throw appError('STALE_RECORD', { context: { submission_id: id } });
+
+      await this.audit.record(tx, {
+        action: 'UPDATED',
+        entityType: 'Submission',
+        entityId: id,
+        projectId,
+        after: { clarificationRequested: true },
+      });
+
+      return tx.submission.findUniqueOrThrow({ where: { id } });
+    });
+  }
+
+  async respondClarification(
+    projectId: string,
+    id: string,
+    input: SubmissionRespondClarification,
+    _actorId: string,
+  ): Promise<Submission> {
+    return this.prisma.$transaction(async (tx) => {
+      await requireOpenProject(tx, projectId);
+
+      const before = await tx.submission.findUnique({ where: { id } });
+      if (!before || before.projectId !== projectId) throw appError('NOT_FOUND');
+
+      const { count } = await tx.submission.updateMany({
+        where: { id, version: input.version },
+        data: {
+          clarificationRequested: false,
+          clarificationResponse: input.response,
+          clarificationRespondedAt: new Date(),
+          version: { increment: 1 },
+        },
+      });
+      if (count === 0) throw appError('STALE_RECORD', { context: { submission_id: id } });
+
+      await this.audit.record(tx, {
+        action: 'UPDATED',
+        entityType: 'Submission',
+        entityId: id,
+        projectId,
+        after: { clarificationRequested: false },
       });
 
       return tx.submission.findUniqueOrThrow({ where: { id } });

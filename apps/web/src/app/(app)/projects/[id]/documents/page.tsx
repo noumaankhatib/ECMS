@@ -1,10 +1,10 @@
 import Link from 'next/link';
 
 import { ActionButton, ActionForm, Field, FileField, TextArea } from '@/components/form';
-import { Badge, Breadcrumb, Card, CardBody, Empty, PageHead } from '@/components/ui';
+import { Badge, Breadcrumb, Card, CardBody, CardHead, Empty, PageHead } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
-import type { Document, Page as ApiPage, Project } from '@/lib/types';
+import type { Document, DocumentCompleteness, Page as ApiPage, Project } from '@/lib/types';
 
 import { archiveDocument, createDocument } from './actions';
 
@@ -26,9 +26,10 @@ export default async function DocumentsPage({ params }: { params: Promise<{ id: 
   const session = await requireSession();
   const { id } = await params;
 
-  const [project, documents] = await Promise.all([
+  const [project, documents, completeness] = await Promise.all([
     api.get<Project>(`/projects/${id}`),
     api.get<ApiPage<Document>>(`/projects/${id}/documents?pageSize=100`),
+    api.get<DocumentCompleteness>(`/projects/${id}/documents/completeness`),
   ]);
 
   const closed = project.status === 'CLOSED';
@@ -47,6 +48,26 @@ export default async function DocumentsPage({ params }: { params: Promise<{ id: 
       <PageHead title="Documents" description={project.name} />
 
       <div className="stack">
+        {completeness.items.length > 0 ? (
+          <Card>
+            <CardHead title="Completeness" />
+            <CardBody>
+              <p className="hint">
+                {completeness.missingCount === 0
+                  ? 'Every required document has been uploaded.'
+                  : `${completeness.missingCount} required document${completeness.missingCount === 1 ? '' : 's'} missing.`}
+              </p>
+              <div className="row" style={{ flexWrap: 'wrap', marginTop: 'var(--space-3)' }}>
+                {completeness.items.map((item) => (
+                  <Badge key={item.requiredDocumentId}>
+                    {item.satisfied ? '✓' : '✗'} {item.label}
+                  </Badge>
+                ))}
+              </div>
+            </CardBody>
+          </Card>
+        ) : null}
+
         <Card>
           {documents.items.length === 0 ? (
             <Empty title="No documents registered yet" />
@@ -96,7 +117,7 @@ export default async function DocumentsPage({ params }: { params: Promise<{ id: 
                     label="Category"
                     name="category"
                     required
-                    hint="Report, drawing, photograph…"
+                    hint="Report, drawing, photograph… Match a required-document category (see Completeness above) to have this count toward it."
                   />
                   <Field label="Title" name="title" required />
                 </div>

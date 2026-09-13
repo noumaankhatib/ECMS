@@ -1,4 +1,12 @@
-import type { CreateDocument, DocumentListQuery, Page, UpdateDocument } from '@ecms/contracts';
+import {
+  WORKSTREAMS_FOR_TYPE,
+  type CreateDocument,
+  type DocumentListQuery,
+  type Page,
+  type ProjectType,
+  type UpdateDocument,
+  type WorkstreamType,
+} from '@ecms/contracts';
 import { Inject, Injectable } from '@nestjs/common';
 import type { Document, Prisma } from '@prisma/client';
 
@@ -16,6 +24,18 @@ export interface UploadedFile {
   readonly originalname: string;
   readonly mimetype: string;
   readonly size: number;
+}
+
+export interface DocumentCompletenessItem {
+  requiredDocumentId: string;
+  category: string;
+  label: string;
+  satisfied: boolean;
+}
+
+export interface DocumentCompleteness {
+  items: DocumentCompletenessItem[];
+  missingCount: number;
 }
 
 /**
@@ -66,6 +86,65 @@ export class DocumentService {
     const document = await this.prisma.document.findUnique({ where: { id } });
     if (!document || document.projectId !== projectId) throw appError('NOT_FOUND');
     return document;
+  }
+
+  /**
+   * Diffs the active `RequiredDocument` checklist against this project's own
+   * uploaded categories — computed fresh on every read, never stored, the
+   * same "derive, don't duplicate" choice Phase 7 made for
+   * `SupervisionAgreement.visitsUsed` (docs/phase-9-plan.md §4).
+   *
+   * A requirement applies if its `scope` is `ANY`, or if the project's own
+   * workstreams (`WORKSTREAMS_FOR_TYPE`) include it — not a direct
+   * `Project.type` match, so a requirement scoped to PLANNING still applies
+   * to a BOTH project, which runs a planning workstream too.
+   *
+   * Matched case- and whitespace-insensitively against `Document.category`:
+   * that column is free text (docs/phase-3-plan.md §8, B6), typed by hand on
+   * every upload, so an exact-match diff would flag "design" against
+   * "Design" as missing for no reason a person would understand.
+   */
+  async completeness(projectId: string): Promise<DocumentCompleteness> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { type: true },
+    });
+    if (!project) throw appError('NOT_FOUND');
+
+    const workstreams: readonly WorkstreamType[] =
+      WORKSTREAMS_FOR_TYPE[project.type as ProjectType];
+
+    const [requirements, documents] = await this.prisma.$transaction([
+      this.prisma.requiredDocument.findMany({
+        where: { archivedAt: null },
+        orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
+      }),
+      this.prisma.document.findMany({
+        where: { projectId, archivedAt: null },
+        select: { category: true },
+      }),
+    ]);
+
+    const uploadedCategories = new Set(
+      documents.map((document) => normalizeCategory(document.category)),
+    );
+
+    const items = requirements
+      .filter(
+        (requirement) =>
+          requirement.scope === 'ANY' || workstreams.includes(requirement.scope as WorkstreamType),
+      )
+      .map((requirement) => ({
+        requiredDocumentId: requirement.id,
+        category: requirement.category,
+        label: requirement.label,
+        satisfied: uploadedCategories.has(normalizeCategory(requirement.category)),
+      }));
+
+    return {
+      items,
+      missingCount: items.filter((item) => !item.satisfied).length,
+    };
   }
 
   /**
@@ -269,6 +348,11 @@ export class DocumentService {
             where: { id: linkedId },
             select: { projectId: true },
           });
+        case 'MODIFICATION':
+          return tx.modification.findUnique({
+            where: { id: linkedId },
+            select: { projectId: true },
+          });
       }
     })();
 
@@ -279,4 +363,10 @@ export class DocumentService {
       });
     }
   }
+}
+
+/** Trims and lower-cases so "Design", " design " and "DESIGN" all match the
+ *  same requirement — see `completeness` above for why. */
+function normalizeCategory(category: string): string {
+  return category.trim().toLowerCase();
 }

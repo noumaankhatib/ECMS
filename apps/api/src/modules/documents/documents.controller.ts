@@ -1,11 +1,15 @@
 import {
   createDocumentSchema,
+  createRequiredDocumentSchema,
   documentListQuerySchema,
   updateDocumentSchema,
+  updateRequiredDocumentSchema,
   type CreateDocument,
+  type CreateRequiredDocument,
   type DocumentListQuery,
   type Page,
   type UpdateDocument,
+  type UpdateRequiredDocument,
 } from '@ecms/contracts';
 import {
   Body,
@@ -24,14 +28,19 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import type { Document } from '@prisma/client';
+import type { Document, RequiredDocument } from '@prisma/client';
 import type { Request, Response } from 'express';
 
 import { appError } from '../../shared/errors/app-error';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import { RequirePermission } from '../access';
 
-import { DocumentService, type UploadedFile as UploadedFileShape } from './document.service';
+import {
+  DocumentService,
+  type DocumentCompleteness,
+  type UploadedFile as UploadedFileShape,
+} from './document.service';
+import { RequiredDocumentService } from './required-document.service';
 
 /** The signed-in user. The guard guarantees it; this keeps the assertion in one place. */
 function actorOf(req: Request): string {
@@ -55,6 +64,20 @@ export class DocumentController {
     @Query(new ZodValidationPipe(documentListQuerySchema)) query: DocumentListQuery,
   ): Promise<Page<Document>> {
     return this.documents.list(projectId, query);
+  }
+
+  /**
+   * Declared before `:id` — Nest matches routes in declaration order, and
+   * `completeness` would otherwise be swallowed by the `:id` wildcard and
+   * fail `ParseUUIDPipe`, the same ordering rule every other literal-segment
+   * route in this system already follows.
+   */
+  @Get('completeness')
+  @RequirePermission('document:view')
+  completeness(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+  ): Promise<DocumentCompleteness> {
+    return this.documents.completeness(projectId);
   }
 
   @Get(':id')
@@ -120,5 +143,50 @@ export class DocumentController {
     @Req() req: Request,
   ): Promise<void> {
     return this.documents.archive(projectId, id, actorOf(req));
+  }
+}
+
+/**
+ * The admin-configurable required-documents catalogue (docs/phase-9-plan.md
+ * §5) — a global list, not project-scoped, the same shape
+ * `ProposalSketchTypeController` already is.
+ *
+ * There is no `required_document:view` permission — listing is gated by
+ * `document:view` because anyone who can see documents already needs to see
+ * the checklist to know what's missing; only mutating it needs the
+ * dedicated `required_document:admin` permission.
+ */
+@Controller('required-documents')
+export class RequiredDocumentController {
+  constructor(private readonly requiredDocuments: RequiredDocumentService) {}
+
+  @Get()
+  @RequirePermission('document:view')
+  list(): Promise<RequiredDocument[]> {
+    return this.requiredDocuments.list();
+  }
+
+  @Post()
+  @RequirePermission('required_document:admin')
+  create(
+    @Body(new ZodValidationPipe(createRequiredDocumentSchema)) body: CreateRequiredDocument,
+  ): Promise<RequiredDocument> {
+    return this.requiredDocuments.create(body);
+  }
+
+  @Patch(':id')
+  @RequirePermission('required_document:admin')
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(updateRequiredDocumentSchema)) body: UpdateRequiredDocument,
+  ): Promise<RequiredDocument> {
+    return this.requiredDocuments.update(id, body);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  @RequirePermission('required_document:admin')
+  archive(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
+    return this.requiredDocuments.archive(id);
   }
 }

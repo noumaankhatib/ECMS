@@ -8,13 +8,35 @@ import {
   ActivityController,
   MilestoneController,
   SubmissionController,
+  SubmissionMeetingController,
+  SubmissionReviewController,
 } from './planning.controller';
+import { SubmissionMeetingService } from './submission-meeting.service';
+import { SubmissionReviewService } from './submission-review.service';
 import { SubmissionService } from './submission.service';
 
 @Module({
   imports: [AccessModule],
-  controllers: [ActivityController, MilestoneController, SubmissionController],
-  providers: [ActivityService, MilestoneService, SubmissionService],
-  exports: [ActivityService, MilestoneService, SubmissionService],
+  controllers: [
+    ActivityController,
+    MilestoneController,
+    SubmissionController,
+    SubmissionReviewController,
+    SubmissionMeetingController,
+  ],
+  providers: [
+    ActivityService,
+    MilestoneService,
+    SubmissionService,
+    SubmissionReviewService,
+    SubmissionMeetingService,
+  ],
+  exports: [
+    ActivityService,
+    MilestoneService,
+    SubmissionService,
+    SubmissionReviewService,
+    SubmissionMeetingService,
+  ],
 })
 export class PlanningModule {}

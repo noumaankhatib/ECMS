@@ -13,3 +13,4 @@ export { SupervisionModule } from './supervision.module';
 export { SiteVisitService } from './site-visit.service';
 export { ObservationService } from './observation.service';
 export { InstructionService } from './instruction.service';
+export { SupervisionAgreementService } from './supervision-agreement.service';
