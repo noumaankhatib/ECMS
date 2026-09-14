@@ -55,7 +55,7 @@ export async function signIn(_state: FormState, form: FormData): Promise<FormSta
     ...(parsedCookie.expires ? { expires: parsedCookie.expires } : {}),
   });
 
-  redirect('/projects');
+  redirect('/dashboard');
 }
 
 /** Ends the session at the API as well as in this browser. */

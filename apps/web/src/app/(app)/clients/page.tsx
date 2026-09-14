@@ -1,25 +1,49 @@
 import Link from 'next/link';
 
-import { Card, DateText, Empty, PageHead, Value } from '@/components/ui';
+import { ActionButton } from '@/components/form';
+import { RowMenu } from '@/components/row-menu';
+import { Card, DateText, Empty, PageHead, Pagination } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requirePermission } from '@/lib/session';
 import type { Client, Page as ApiPage } from '@/lib/types';
 
+import { archiveClient } from './actions';
+
 export const metadata = { title: 'Clients — ECMS' };
+
+const PAGE_SIZE = 10;
+
+function initialsOf(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? '')
+    .join('');
+}
 
 export default async function ClientsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; archived?: string }>;
+  searchParams: Promise<{ search?: string; archived?: string; page?: string }>;
 }) {
   const session = await requirePermission('client:view');
   const params = await searchParams;
+  const page = Math.max(1, Number(params.page) || 1);
 
-  const query = new URLSearchParams({ pageSize: '100' });
+  const query = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
   if (params.search) query.set('search', params.search);
   if (params.archived === 'true') query.set('includeArchived', 'true');
 
-  const page = await api.get<ApiPage<Client>>(`/clients?${query.toString()}`);
+  const result = await api.get<ApiPage<Client>>(`/clients?${query.toString()}`);
+
+  function buildHref(targetPage: number): string {
+    const q = new URLSearchParams();
+    if (params.search) q.set('search', params.search);
+    if (params.archived === 'true') q.set('archived', 'true');
+    q.set('page', String(targetPage));
+    return `/clients?${q.toString()}`;
+  }
 
   return (
     <>
@@ -33,6 +57,14 @@ export default async function ClientsPage({
           </Link>
         ) : null}
       </PageHead>
+
+      <div className="summary-banner">
+        <div>
+          <span className="summary-banner__value">{result.total}</span>
+          <span className="summary-banner__label"> Total clients</span>
+        </div>
+        <p>Build strong relationships. Deliver greater impact.</p>
+      </div>
 
       <form className="row" style={{ marginBottom: 'var(--space-4)' }}>
         <input
@@ -54,12 +86,12 @@ export default async function ClientsPage({
           Include archived
         </label>
         <button type="submit" className="button button--secondary">
-          Search
+          Filters
         </button>
       </form>
 
       <Card>
-        {page.items.length === 0 ? (
+        {result.items.length === 0 ? (
           <Empty title="No clients found">
             {params.search ? 'Try a different search term.' : 'Create the first one to begin.'}
           </Empty>
@@ -70,23 +102,45 @@ export default async function ClientsPage({
                 <th>Name</th>
                 <th>Reference</th>
                 <th>Added</th>
+                <th>Status</th>
                 <th />
               </tr>
             </thead>
             <tbody>
-              {page.items.map((client) => (
+              {result.items.map((client) => (
                 <tr key={client.id}>
                   <td>
-                    <Link href={`/clients/${client.id}`}>{client.name}</Link>
+                    <div className="entity-cell">
+                      <span className="entity-cell__icon">{initialsOf(client.name)}</span>
+                      <Link href={`/clients/${client.id}`}>{client.name}</Link>
+                    </div>
                   </td>
-                  <td className="mono">
-                    <Value>{client.reference}</Value>
-                  </td>
+                  <td className="mono">{client.reference ?? <span className="faint">—</span>}</td>
                   <td className="nowrap">
                     <DateText value={client.createdAt} />
                   </td>
+                  <td>
+                    {client.archivedAt ? (
+                      <span className="badge">Archived</span>
+                    ) : (
+                      <span className="badge badge--active">Active</span>
+                    )}
+                  </td>
                   <td className="right">
-                    {client.archivedAt ? <span className="badge">Archived</span> : null}
+                    <RowMenu>
+                      <Link href={`/clients/${client.id}`}>View</Link>
+                      {session.can('client:edit') ? (
+                        <Link href={`/clients/${client.id}/edit`}>Edit</Link>
+                      ) : null}
+                      {session.can('client:archive') && !client.archivedAt ? (
+                        <ActionButton
+                          action={archiveClient.bind(null, client.id)}
+                          label="Archive"
+                          variant="danger"
+                          confirm={`Archive ${client.name}? Properties and projects linked to it are unaffected, but it will no longer appear in new-record pickers.`}
+                        />
+                      ) : null}
+                    </RowMenu>
                   </td>
                 </tr>
               ))}
@@ -95,9 +149,7 @@ export default async function ClientsPage({
         )}
       </Card>
 
-      <p className="muted" style={{ fontSize: 13, marginTop: 'var(--space-3)' }}>
-        {page.total} {page.total === 1 ? 'client' : 'clients'}
-      </p>
+      <Pagination page={page} pageSize={PAGE_SIZE} total={result.total} buildHref={buildHref} />
     </>
   );
 }

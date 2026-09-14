@@ -156,6 +156,39 @@ describe('insights', () => {
     );
   });
 
+  it('dashboard upcoming deadlines lists a real overdue milestone as OVERDUE, and drops it once achieved', async () => {
+    const project = await inContext(() =>
+      projects.create(
+        { clientId, propertyId, code: `DEAD-${codeSuffix}`, name: 'Deadline project', type: 'PLANNING' },
+        admin,
+      ),
+    );
+
+    const milestone = await prisma.milestone.create({
+      data: {
+        projectId: project.id,
+        name: 'Deadline milestone',
+        targetDate: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      },
+    });
+
+    const before = await dashboard.summary(admin);
+    const found = before.upcomingDeadlines?.find(
+      (d) => d.entityType === 'Milestone' && d.projectId === project.id,
+    );
+    expect(found?.status).toBe('OVERDUE');
+
+    await prisma.milestone.update({
+      where: { id: milestone.id },
+      data: { achievedDate: new Date() },
+    });
+
+    const after = await dashboard.summary(admin);
+    expect(
+      after.upcomingDeadlines?.some((d) => d.entityType === 'Milestone' && d.projectId === project.id),
+    ).toBeFalsy();
+  });
+
   it('search finds a project by its own code, and a client by name, but nothing for an unrelated term', async () => {
     const project = await inContext(() =>
       projects.create(

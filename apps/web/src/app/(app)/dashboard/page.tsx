@@ -1,5 +1,19 @@
-import type { DashboardSummary } from '@ecms/contracts';
+import type { ActivityItem, DashboardSummary, DeadlineItem, Trend } from '@ecms/contracts';
+import Link from 'next/link';
+import type { ComponentType, ReactNode, SVGProps } from 'react';
 
+import { DonutChart, Funnel } from '@/components/charts';
+import {
+  ClientsIcon,
+  DocumentsIcon,
+  IssuesIcon,
+  ProjectsIcon,
+  ProposalsIcon,
+  SettingsIcon,
+  TrendDownIcon,
+  TrendUpIcon,
+  UsersIcon,
+} from '@/components/icons';
 import { Card, CardBody, CardHead, Empty, PageHead } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
@@ -14,6 +28,14 @@ const PROJECT_STATUS_LABEL: Record<string, string> = {
   CLOSED: 'Closed',
 };
 
+const PROJECT_STATUS_COLOR: Record<string, string> = {
+  DRAFT: 'var(--status-draft)',
+  ACTIVE: 'var(--status-active)',
+  ON_HOLD: 'var(--status-hold)',
+  COMPLETED: 'var(--status-complete)',
+  CLOSED: 'var(--status-closed)',
+};
+
 const PROPOSAL_STATUS_LABEL: Record<string, string> = {
   NEW: 'New',
   CONCEPT: 'Concept',
@@ -25,30 +47,208 @@ const PROPOSAL_STATUS_LABEL: Record<string, string> = {
   CONVERTED: 'Converted',
 };
 
-function Stat({ value, label }: { value: number; label: string }) {
+const PROPOSAL_FUNNEL_ORDER = [
+  'NEW',
+  'CONCEPT',
+  'CLIENT_REVISION',
+  'APPROVED',
+  'WON',
+  'LOST',
+  'ON_HOLD',
+  'CONVERTED',
+];
+
+/** New/Concept are the same "in progress" blue family (concept a lighter
+ *  tint); Approved/Won are both success-green; Lost is the one failure state
+ *  in this funnel; Client revision/On hold are both waiting-on-someone
+ *  amber; Converted — a proposal becoming a real project — gets the
+ *  secondary-workflow purple, since it is the one stage that hands off to a
+ *  different module entirely. */
+const PROPOSAL_STAGE_COLOR: Record<string, string> = {
+  NEW: 'var(--brand-700)',
+  CONCEPT: '#7fb2f0',
+  CLIENT_REVISION: 'var(--warning)',
+  APPROVED: 'var(--success)',
+  WON: 'var(--success)',
+  LOST: 'var(--danger)',
+  ON_HOLD: 'var(--warning)',
+  CONVERTED: 'var(--purple)',
+};
+
+const ACTIVITY_VERB: Record<ActivityItem['action'], string> = {
+  CREATED: 'created',
+  UPDATED: 'updated',
+  ARCHIVED: 'archived',
+  RESTORED: 'restored',
+  STATUS_CHANGED: 'changed the status of',
+  MEMBER_ADDED: 'added a member to',
+  MEMBER_REMOVED: 'removed a member from',
+};
+
+/** One accent per entity family, the same identity the KPI cards and
+ *  status system use elsewhere — a client is always blue, a proposal
+ *  always purple, wherever either appears. Anything outside this named set
+ *  (Document, Milestone, ...) gets the neutral default rather than a guess. */
+const ACTIVITY_ACCENT: Record<string, { icon: ComponentType<SVGProps<SVGSVGElement>>; class: string }> = {
+  Client: { icon: ClientsIcon, class: 'activity-icon--blue' },
+  Proposal: { icon: ProposalsIcon, class: 'activity-icon--purple' },
+  Project: { icon: ProjectsIcon, class: 'activity-icon--green' },
+  Issue: { icon: IssuesIcon, class: 'activity-icon--red' },
+};
+const DEFAULT_ACTIVITY_ACCENT = { icon: DocumentsIcon, class: 'activity-icon--gray' };
+
+function ActivityIcon({ entityType }: { entityType: string }) {
+  const { icon: Icon, class: className } = ACTIVITY_ACCENT[entityType] ?? DEFAULT_ACTIVITY_ACCENT;
   return (
-    <div className="stat">
-      <span className="stat__value">{value}</span>
-      <span className="stat__label">{label}</span>
-    </div>
+    <span className={`activity-icon ${className}`}>
+      <Icon width={14} height={14} />
+    </span>
+  );
+}
+
+function TrendTag({ trend }: { trend: Trend | undefined }) {
+  if (!trend || trend.changePercent === null) return null;
+  const { changePercent } = trend;
+  if (changePercent === 0) {
+    return <span className="trend trend--flat">No change</span>;
+  }
+  const up = changePercent > 0;
+  const Icon = up ? TrendUpIcon : TrendDownIcon;
+  return (
+    <span className={`trend ${up ? 'trend--up' : 'trend--down'}`}>
+      <Icon width={12} height={12} />
+      {up ? '+' : ''}
+      {changePercent}%
+    </span>
+  );
+}
+
+function KpiCard({
+  icon: Icon,
+  value,
+  label,
+  trend,
+  href,
+  accent,
+}: {
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  value: number;
+  label: string;
+  trend?: Trend | undefined;
+  href: string;
+  /** One accent per metric identity, not a decorative rainbow — Projects is
+   *  blue (the primary/informational colour), Proposals purple (this
+   *  system's secondary-workflow colour), Clients green, Issues red. */
+  accent?: 'blue' | 'purple' | 'green' | 'red';
+}) {
+  return (
+    <Link href={href} className="kpi-card">
+      <div className="kpi-card__head">
+        <span
+          className={`kpi-card__icon ${accent && accent !== 'blue' ? `kpi-card__icon--${accent}` : ''}`}
+        >
+          <Icon width={18} height={18} />
+        </span>
+        <TrendTag trend={trend} />
+      </div>
+      <span className="kpi-card__value">{value.toLocaleString()}</span>
+      <span className="kpi-card__label">{label}</span>
+    </Link>
+  );
+}
+
+function activityLabel(item: ActivityItem): ReactNode {
+  return (
+    <>
+      Someone {ACTIVITY_VERB[item.action]} a <strong>{item.entityType}</strong>
+    </>
+  );
+}
+
+function timeAgo(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const minutes = Math.round(ms / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
+const DEADLINE_BADGE_CLASS: Record<DeadlineItem['status'], string> = {
+  OVERDUE: 'badge--critical',
+  PENDING: 'badge--warning',
+  UPCOMING: 'badge--info',
+};
+const DEADLINE_LABEL: Record<DeadlineItem['status'], string> = {
+  OVERDUE: 'Overdue',
+  PENDING: 'Pending',
+  UPCOMING: 'Upcoming',
+};
+
+function formatDeadlineDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+}
+
+function QuickAction({
+  href,
+  icon: Icon,
+  label,
+}: {
+  href: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  label: string;
+}) {
+  return (
+    <Link href={href} className="quick-action">
+      <Icon width={18} height={18} />
+      {label}
+    </Link>
   );
 }
 
 /**
- * The signed-in landing page (docs/phase-11-plan.md §8). Every card below is
- * rendered only when the summary carries that key — the API omits a section
- * entirely rather than sending zeros for something this person may not see.
+ * The signed-in landing page (docs/phase-11-plan.md §8, extended per the
+ * enterprise-redesign brief). Every card below is rendered only when the
+ * summary carries that key — the API omits a section entirely rather than
+ * sending zeros for something this person may not see.
  */
 export default async function DashboardPage() {
-  await requireSession();
+  const session = await requireSession();
   const summary = await api.get<DashboardSummary>('/dashboard');
 
   const hasAnything =
-    summary.projects || summary.proposals || summary.issues || summary.supervisionAgreements || summary.handover;
+    summary.projects ||
+    summary.proposals ||
+    summary.clients ||
+    summary.issues ||
+    summary.supervisionAgreements ||
+    summary.handover;
+
+  const today = new Date().toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
+  const projectsTotal = summary.projects
+    ? Object.entries(summary.projects)
+        .filter(([key]) => key !== 'trend')
+        .reduce((sum, [, count]) => sum + (typeof count === 'number' ? count : 0), 0)
+    : 0;
+  const proposalsTotal = summary.proposals
+    ? Object.entries(summary.proposals)
+        .filter(([key]) => key !== 'trend')
+        .reduce((sum, [, count]) => sum + (typeof count === 'number' ? count : 0), 0)
+    : 0;
 
   return (
     <>
-      <PageHead title="Dashboard" description="Where the portfolio stands right now." />
+      <PageHead
+        title="Dashboard"
+        description="Here's what's happening with your consultancy portfolio today."
+      />
 
       {!hasAnything ? (
         <Card>
@@ -58,72 +258,238 @@ export default async function DashboardPage() {
             </Empty>
           </CardBody>
         </Card>
-      ) : null}
+      ) : (
+        <>
+          <div className="hero-banner">
+            <div>
+              <h2>Build. Manage. Grow.</h2>
+              <p>Turning complex projects into meaningful outcomes.</p>
+            </div>
+            <div className="hero-banner__date">
+              <span>Signed in as {session.user.displayName}</span>
+              <strong>{today}</strong>
+            </div>
+          </div>
 
-      <div className="stack">
-        {summary.projects ? (
+          <div className="kpi-grid" style={{ marginBottom: 'var(--space-5)' }}>
+            {summary.projects ? (
+              <KpiCard
+                icon={ProjectsIcon}
+                value={projectsTotal}
+                label="Total projects"
+                trend={summary.projects.trend}
+                href="/projects"
+                accent="blue"
+              />
+            ) : null}
+            {summary.proposals ? (
+              <KpiCard
+                icon={ProposalsIcon}
+                value={proposalsTotal}
+                label="Total proposals"
+                trend={summary.proposals.trend}
+                href="/proposals"
+                accent="purple"
+              />
+            ) : null}
+            {summary.clients ? (
+              <KpiCard
+                icon={ClientsIcon}
+                value={summary.clients.total}
+                label="Total clients"
+                trend={summary.clients}
+                href="/clients"
+                accent="green"
+              />
+            ) : null}
+            {summary.issues ? (
+              <KpiCard
+                icon={IssuesIcon}
+                value={summary.issues.open}
+                label="Open issues"
+                href="/projects"
+                accent="red"
+              />
+            ) : null}
+          </div>
+
           <Card>
-            <CardHead title="Projects" />
+            <CardHead title="Quick actions" />
             <CardBody>
-              <div className="stat-grid">
-                {Object.entries(summary.projects).map(([status, count]) => (
-                  <Stat key={status} value={count} label={PROJECT_STATUS_LABEL[status] ?? status} />
-                ))}
+              <div className="quick-actions">
+                {session.can('project:create') ? (
+                  <QuickAction href="/projects/new" icon={ProjectsIcon} label="New project" />
+                ) : null}
+                {session.can('proposal:create') ? (
+                  <QuickAction href="/proposals/new" icon={ProposalsIcon} label="New proposal" />
+                ) : null}
+                {session.can('client:create') ? (
+                  <QuickAction href="/clients/new" icon={ClientsIcon} label="New client" />
+                ) : null}
+                {session.can('document:create') ? (
+                  <QuickAction href="/projects" icon={DocumentsIcon} label="Upload document" />
+                ) : null}
+                {session.can('user:view') ? (
+                  <QuickAction href="/users" icon={UsersIcon} label="Manage users" />
+                ) : null}
+                <QuickAction href="/settings" icon={SettingsIcon} label="System settings" />
               </div>
             </CardBody>
           </Card>
-        ) : null}
 
-        {summary.proposals ? (
-          <Card>
-            <CardHead title="Proposals" />
-            <CardBody>
-              <div className="stat-grid">
-                {Object.entries(summary.proposals).map(([status, count]) => (
-                  <Stat key={status} value={count} label={PROPOSAL_STATUS_LABEL[status] ?? status} />
-                ))}
-              </div>
-            </CardBody>
-          </Card>
-        ) : null}
+          <div className="grid-2" style={{ marginTop: 'var(--space-5)' }}>
+            <div className="stack">
+              {summary.projects ? (
+                <Card>
+                  <CardHead title="Project status" />
+                  <CardBody>
+                    <DonutChart
+                      segments={Object.entries(PROJECT_STATUS_LABEL).map(([status, label]) => ({
+                        label,
+                        value: (summary.projects as Record<string, number>)[status] ?? 0,
+                        color: PROJECT_STATUS_COLOR[status] ?? 'var(--slate-400)',
+                      }))}
+                    />
+                  </CardBody>
+                </Card>
+              ) : null}
 
-        {summary.issues ? (
-          <Card>
-            <CardHead title="Issues" />
-            <CardBody>
-              <div className="stat-grid">
-                <Stat value={summary.issues.open} label="Open" />
-                <Stat value={summary.issues.closed} label="Closed" />
-                <Stat value={summary.issues.overdue} label="Overdue" />
-              </div>
-            </CardBody>
-          </Card>
-        ) : null}
+              {summary.issues ? (
+                <Card>
+                  <CardHead title="Issues overview" />
+                  <CardBody>
+                    <div className="stat-grid">
+                      <div className="stat">
+                        <span className="stat__value stat__value--blue">{summary.issues.open}</span>
+                        <span className="stat__label">Open</span>
+                      </div>
+                      <div className="stat">
+                        <span className="stat__value stat__value--green">
+                          {summary.issues.closed}
+                        </span>
+                        <span className="stat__label">Closed</span>
+                      </div>
+                      <div className="stat">
+                        <span className="stat__value stat__value--red">
+                          {summary.issues.overdue}
+                        </span>
+                        <span className="stat__label">Overdue</span>
+                      </div>
+                    </div>
 
-        {summary.supervisionAgreements ? (
-          <Card>
-            <CardHead title="Supervision agreements" />
-            <CardBody>
-              <div className="stat-grid">
-                <Stat value={summary.supervisionAgreements.active} label="Active" />
-                <Stat value={summary.supervisionAgreements.nearingQuota} label="Nearing quota" />
-              </div>
-            </CardBody>
-          </Card>
-        ) : null}
+                    {summary.issues.overdue > 0 ? (
+                      <div className="alert-row">
+                        <IssuesIcon width={16} height={16} />
+                        <strong>{summary.issues.overdue}</strong> issue
+                        {summary.issues.overdue === 1 ? ' is' : 's are'} overdue and need attention.
+                      </div>
+                    ) : null}
+                  </CardBody>
+                </Card>
+              ) : null}
 
-        {summary.handover ? (
-          <Card>
-            <CardHead title="Handover" />
-            <CardBody>
-              <div className="stat-grid">
-                <Stat value={summary.handover.completedNotClosed} label="Completed, not closed" />
-                <Stat value={summary.handover.ready} label="Ready to close" />
-              </div>
-            </CardBody>
-          </Card>
-        ) : null}
-      </div>
+              {summary.supervisionAgreements ? (
+                <Card>
+                  <CardHead title="Supervision agreements" />
+                  <CardBody>
+                    <div className="stat-grid">
+                      <div className="stat">
+                        <span className="stat__value">{summary.supervisionAgreements.active}</span>
+                        <span className="stat__label">Active</span>
+                      </div>
+                      <div className="stat">
+                        <span className="stat__value">
+                          {summary.supervisionAgreements.nearingQuota}
+                        </span>
+                        <span className="stat__label">Nearing quota</span>
+                      </div>
+                    </div>
+                  </CardBody>
+                </Card>
+              ) : null}
+
+              {summary.handover ? (
+                <Card>
+                  <CardHead title="Handover" />
+                  <CardBody>
+                    <div className="stat-grid">
+                      <div className="stat">
+                        <span className="stat__value">{summary.handover.completedNotClosed}</span>
+                        <span className="stat__label">Completed, not closed</span>
+                      </div>
+                      <div className="stat">
+                        <span className="stat__value">{summary.handover.ready}</span>
+                        <span className="stat__label">Ready to close</span>
+                      </div>
+                    </div>
+                  </CardBody>
+                </Card>
+              ) : null}
+            </div>
+
+            <div className="stack">
+              {summary.upcomingDeadlines && summary.upcomingDeadlines.length > 0 ? (
+                <Card>
+                  <CardHead title="Upcoming deadlines" />
+                  <CardBody>
+                    <ul className="deadline-list">
+                      {summary.upcomingDeadlines.map((item, index) => (
+                        <li key={index}>
+                          <span className="deadline-list__date">
+                            {formatDeadlineDate(item.date).toUpperCase()}
+                          </span>
+                          <span className="deadline-list__text">
+                            <Link href={`/projects/${item.projectId}`}>{item.title}</Link>
+                          </span>
+                          <span className={`badge ${DEADLINE_BADGE_CLASS[item.status]}`}>
+                            {DEADLINE_LABEL[item.status]}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardBody>
+                </Card>
+              ) : null}
+
+              {summary.proposals ? (
+                <Card>
+                  <CardHead title="Proposal funnel">
+                    <Link href="/proposals" className="button button--secondary button--small">
+                      View all
+                    </Link>
+                  </CardHead>
+                  <CardBody>
+                    <Funnel
+                      stages={PROPOSAL_FUNNEL_ORDER.map((status) => ({
+                        label: PROPOSAL_STATUS_LABEL[status] ?? status,
+                        value: (summary.proposals as Record<string, number>)[status] ?? 0,
+                        color: PROPOSAL_STAGE_COLOR[status],
+                      }))}
+                    />
+                  </CardBody>
+                </Card>
+              ) : null}
+
+              {summary.recentActivity && summary.recentActivity.length > 0 ? (
+                <Card>
+                  <CardHead title="Recent activity" />
+                  <CardBody>
+                    <ul className="activity-list">
+                      {summary.recentActivity.map((item, index) => (
+                        <li key={index}>
+                          <ActivityIcon entityType={item.entityType} />
+                          <span className="activity-list__text">{activityLabel(item)}</span>
+                          <span className="activity-list__time">{timeAgo(item.occurredAt)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardBody>
+                </Card>
+              ) : null}
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }

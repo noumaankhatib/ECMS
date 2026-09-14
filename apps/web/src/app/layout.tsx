@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Serif } from 'next/font/google';
+import { IBM_Plex_Mono, IBM_Plex_Sans } from 'next/font/google';
 import type { ReactNode } from 'react';
 
 import './globals.css';
@@ -10,28 +10,18 @@ export const metadata: Metadata = {
 };
 
 /**
- * The IBM Plex superfamily, not a generic system stack.
- *
- * Chosen for what it is, not arbitrarily: Plex was drawn for technical and
- * engineering documentation, so a serif for report/title-block headings, a
- * grotesk for operational UI, and a monospace for reference codes come from
- * one coherent design rather than three unrelated picks. PRD §18's colour
- * palette and §19 direction ("professional, premium, clean and
- * architectural... avoid neon colours, excessive gradients, glassmorphism and
- * heavy shadows") are unchanged — this only supplies the typographic voice
- * they were missing.
+ * IBM Plex Sans and Mono — a clean, modern grotesk plus the monospace still
+ * used for reference codes (docs/globals.css's own note on this). The
+ * superfamily's serif cut was dropped in the 2026-09 visual refresh: it read
+ * as a "heavy" display face against the rest of that redesign, and a serif
+ * headline was never the point of choosing Plex in the first place — one
+ * coherent, technical-documentation-drawn family was. System-font fallbacks
+ * keep the page usable before/without the webfont.
  */
 const plexSans = IBM_Plex_Sans({
   subsets: ['latin'],
-  weight: ['400', '500', '600'],
+  weight: ['400', '500', '600', '700'],
   variable: '--font-plex-sans',
-  display: 'swap',
-});
-
-const plexSerif = IBM_Plex_Serif({
-  subsets: ['latin'],
-  weight: ['500', '600'],
-  variable: '--font-plex-serif',
   display: 'swap',
 });
 
@@ -44,10 +34,7 @@ const plexMono = IBM_Plex_Mono({
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html
-      lang="en-GB"
-      className={`${plexSans.variable} ${plexSerif.variable} ${plexMono.variable}`}
-    >
+    <html lang="en-GB" className={`${plexSans.variable} ${plexMono.variable}`}>
       <body>{children}</body>
     </html>
   );

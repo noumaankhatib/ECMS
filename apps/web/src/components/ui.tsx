@@ -141,3 +141,93 @@ export function Value({ children }: { children: ReactNode }) {
     <>{children}</>
   );
 }
+
+/**
+ * Page-number navigation for a real, server-paginated list — "Showing X–Y of
+ * Z", `Previous`/`Next`, and up to five nearby page numbers with an ellipsis
+ * either side once the total run is longer than that. `buildHref` is given
+ * the target page and returns the full URL, so this stays agnostic of
+ * whichever other filters a given list page also carries in its query string.
+ */
+export function Pagination({
+  page,
+  pageSize,
+  total,
+  buildHref,
+}: {
+  page: number;
+  pageSize: number;
+  total: number;
+  buildHref: (page: number) => string;
+}) {
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  if (pageCount <= 1) {
+    return (
+      <p className="muted" style={{ fontSize: 13 }}>
+        {total} {total === 1 ? 'record' : 'records'}
+      </p>
+    );
+  }
+
+  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const to = Math.min(total, page * pageSize);
+
+  const window = 2;
+  const pages = new Set<number>([1, pageCount]);
+  for (let p = page - window; p <= page + window; p += 1) {
+    if (p >= 1 && p <= pageCount) pages.add(p);
+  }
+  const sorted = [...pages].sort((a, b) => a - b);
+
+  const items: (number | 'ellipsis')[] = [];
+  let previous = 0;
+  for (const p of sorted) {
+    if (p - previous > 1) items.push('ellipsis');
+    items.push(p);
+    previous = p;
+  }
+
+  return (
+    <nav className="pagination" aria-label="Pagination">
+      <span className="pagination__summary">
+        Showing {from}–{to} of {total}
+      </span>
+      <div className="pagination__controls">
+        {page > 1 ? (
+          <Link href={buildHref(page - 1)} className="button button--secondary button--small">
+            Previous
+          </Link>
+        ) : (
+          <span className="button button--secondary button--small" aria-disabled="true">
+            Previous
+          </span>
+        )}
+        {items.map((item, index) =>
+          item === 'ellipsis' ? (
+            <span key={`e${index}`} className="pagination__ellipsis">
+              …
+            </span>
+          ) : (
+            <Link
+              key={item}
+              href={buildHref(item)}
+              className="pagination__page"
+              aria-current={item === page ? 'page' : undefined}
+            >
+              {item}
+            </Link>
+          ),
+        )}
+        {page < pageCount ? (
+          <Link href={buildHref(page + 1)} className="button button--secondary button--small">
+            Next
+          </Link>
+        ) : (
+          <span className="button button--secondary button--small" aria-disabled="true">
+            Next
+          </span>
+        )}
+      </div>
+    </nav>
+  );
+}

@@ -1583,12 +1583,65 @@ export interface HandoverStatus {
 // "absence, not a fake answer" rule §4 of that plan documents.
 // ---------------------------------------------------------------------------
 
+/** A percentage change over the trailing 30 days vs. the 30 days before
+ *  that, computed from real `createdAt` rows — `null` when there is nothing
+ *  in the prior window to compare against (division by zero), never a
+ *  fabricated figure. */
+export interface Trend {
+  total: number;
+  changePercent: number | null;
+}
+
 export interface DashboardSummary {
-  projects?: Record<ProjectStatus, number>;
-  proposals?: Record<ProposalStatus, number>;
+  projects?: Record<ProjectStatus, number> & { trend?: Trend };
+  proposals?: Record<ProposalStatus, number> & { trend?: Trend };
+  clients?: Trend;
   issues?: { open: number; closed: number; overdue: number };
   supervisionAgreements?: { active: number; nearingQuota: number };
   handover?: { completedNotClosed: number; ready: number };
+  recentActivity?: ActivityItem[];
+  upcomingDeadlines?: DeadlineItem[];
+}
+
+export const DEADLINE_STATUSES = ['OVERDUE', 'PENDING', 'UPCOMING'] as const;
+export type DeadlineStatus = (typeof DEADLINE_STATUSES)[number];
+
+/** A real `Milestone.targetDate` or `Issue.dueDate` that has not yet been
+ *  achieved/closed — never a fabricated example date. `OVERDUE` is the date
+ *  already past; `PENDING` is within the next three days; `UPCOMING` is
+ *  further out. */
+export interface DeadlineItem {
+  date: string;
+  title: string;
+  entityType: 'Milestone' | 'Issue';
+  projectId: string;
+  status: DeadlineStatus;
+}
+
+/** The subset of `AuditAction` (`apps/api/src/modules/audit/audit.types.ts`)
+ *  worth a business "recent activity" feed — sign-in/permission-refusal
+ *  noise is filtered server-side before this list is ever produced. */
+export const ACTIVITY_ACTIONS = [
+  'CREATED',
+  'UPDATED',
+  'ARCHIVED',
+  'RESTORED',
+  'STATUS_CHANGED',
+  'MEMBER_ADDED',
+  'MEMBER_REMOVED',
+] as const;
+export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number];
+
+/** One line of the append-only audit trail (docs/PROGRESS.md's own audit
+ *  design), reduced to the safe subset worth showing on a dashboard: never
+ *  `before`/`after`, which may carry a document's content reference or other
+ *  field-level detail a dashboard viewer may not be entitled to. */
+export interface ActivityItem {
+  action: ActivityAction;
+  entityType: string;
+  entityId: string | null;
+  projectId: string | null;
+  occurredAt: string;
 }
 
 export const NOTIFICATION_TYPES = [

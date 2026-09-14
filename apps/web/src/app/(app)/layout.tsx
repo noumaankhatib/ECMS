@@ -1,9 +1,9 @@
 import type { NotificationItem } from '@ecms/contracts';
-import Link from 'next/link';
+import { cookies } from 'next/headers';
 import type { ReactNode } from 'react';
 
-import { ActionButton } from '@/components/form';
-import { Nav } from '@/components/nav';
+import { AppShell } from '@/components/app-shell';
+import type { SidebarLink } from '@/components/sidebar';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
 
@@ -21,22 +21,42 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   // Only what this person can actually use. Each of these is enforced again by
   // the API; this only decides what is worth showing them.
-  const links = [
-    { href: '/dashboard', label: 'Dashboard', show: true },
-    { href: '/projects', label: 'Projects', show: true },
-    { href: '/proposals', label: 'Proposals', show: session.can('proposal:view') },
-    { href: '/clients', label: 'Clients', show: session.can('client:view') },
-    { href: '/properties', label: 'Properties', show: session.can('property:view') },
-    { href: '/sketch-types', label: 'Sketch types', show: session.can('sketch_type:admin') },
-    {
-      href: '/required-documents',
-      label: 'Required documents',
-      show: session.can('required_document:admin'),
-    },
-    { href: '/users', label: 'Users', show: session.can('user:view') },
-  ]
+  const links: SidebarLink[] = (
+    [
+      { href: '/dashboard', label: 'Dashboard', icon: 'dashboard', show: true },
+      { href: '/projects', label: 'Projects', icon: 'projects', show: true },
+      {
+        href: '/proposals',
+        label: 'Proposals',
+        icon: 'proposals',
+        show: session.can('proposal:view'),
+      },
+      { href: '/clients', label: 'Clients', icon: 'clients', show: session.can('client:view') },
+      {
+        href: '/properties',
+        label: 'Properties',
+        icon: 'properties',
+        show: session.can('property:view'),
+      },
+      {
+        href: '/sketch-types',
+        label: 'Sketch types',
+        icon: 'sketchTypes',
+        show: session.can('sketch_type:admin'),
+      },
+      {
+        href: '/required-documents',
+        label: 'Required documents',
+        icon: 'documents',
+        show: session.can('required_document:admin'),
+      },
+      { href: '/users', label: 'Users', icon: 'users', show: session.can('user:view') },
+      { href: '/settings', label: 'Settings', icon: 'settings', show: true },
+      { href: '/help', label: 'Help & Support', icon: 'help', show: true },
+    ] as const
+  )
     .filter((link) => link.show)
-    .map(({ href, label }) => ({ href, label }));
+    .map(({ href, label, icon }) => ({ href, label, icon }));
 
   // Recomputed on every navigation, never pushed — the same posture the
   // notifications page itself takes (docs/phase-11-plan.md §5).
@@ -45,39 +65,44 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     .then((items) => items.length)
     .catch(() => 0);
 
+  const cookieStore = await cookies();
+  const defaultCollapsed = cookieStore.get('ecms_sidebar_collapsed')?.value === '1';
+
   return (
-    <div className="shell">
-      <aside className="sidebar">
-        <div className="sidebar__brand">
-          ECMS
-          <span>Consultancy management</span>
-        </div>
-
-        <form action="/search" className="row" style={{ margin: '0 var(--space-3) var(--space-3)' }}>
-          <input
-            type="search"
-            name="q"
-            placeholder="Search..."
-            aria-label="Search"
-            style={{ width: '100%' }}
-          />
-        </form>
-
-        <Nav links={links} />
-
-        <div className="sidebar__footer">
-          <Link href="/notifications">
-            Notifications{notificationCount > 0 ? ` (${notificationCount})` : ''}
-          </Link>
-          <strong>{session.user.displayName}</strong>
-          {session.user.email}
-          <div style={{ marginTop: 'var(--space-3)' }}>
-            <ActionButton action={signOut} label="Sign out" />
+    <AppShell
+      links={links}
+      defaultCollapsed={defaultCollapsed}
+      brand={
+        <>
+          <span className="sidebar__brand-mark">EC</span>
+          <span className="sidebar__brand-full">
+            ECMS
+            <span>Consultancy management</span>
+          </span>
+        </>
+      }
+      footer={
+        <>
+          <span className="avatar avatar--sidebar">
+            {session.user.displayName
+              .trim()
+              .split(/\s+/)
+              .slice(0, 2)
+              .map((p) => p[0]?.toUpperCase())
+              .join('')}
+          </span>
+          <div className="sidebar__footer-detail">
+            <strong>{session.user.displayName}</strong>
+            <span>{session.user.email}</span>
           </div>
-        </div>
-      </aside>
-
-      <main className="main">{children}</main>
-    </div>
+        </>
+      }
+      displayName={session.user.displayName}
+      email={session.user.email}
+      notificationCount={notificationCount}
+      signOutAction={signOut}
+    >
+      {children}
+    </AppShell>
   );
 }
