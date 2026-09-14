@@ -49,6 +49,9 @@ export default async function IssuesPage({
         ]}
       />
       <PageHead title="Issues" description={project.name}>
+        <a href="/export/issues" className="button button--secondary">
+          Export CSV (all visible projects)
+        </a>
         {session.can('issue:create', id) && !closed ? (
           <Link href={`/projects/${id}/issues/new`} className="button">
             New issue

@@ -24,6 +24,9 @@ export default async function ClientsPage({
   return (
     <>
       <PageHead title="Clients" description="Organisations the consultancy works for.">
+        <a href="/export/clients" className="button button--secondary">
+          Export CSV
+        </a>
         {session.can('client:create') ? (
           <Link href="/clients/new" className="button">
             New client

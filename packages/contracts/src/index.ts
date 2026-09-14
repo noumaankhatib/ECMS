@@ -1572,3 +1572,63 @@ export interface HandoverStatus {
   missingDocumentCount: number;
   ready: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Insights (docs/phase-11-plan.md) — dashboard, notifications, search. All
+// three are computed fresh on every request from rows every earlier phase's
+// own tables already hold; none of this is stored, so there is no "create"/
+// "update" shape here, only what each endpoint returns. A section is OMITTED
+// (not present as a key), never zeroed or emptied, when the caller lacks the
+// permission that section's own resource already requires — the same
+// "absence, not a fake answer" rule §4 of that plan documents.
+// ---------------------------------------------------------------------------
+
+export interface DashboardSummary {
+  projects?: Record<ProjectStatus, number>;
+  proposals?: Record<ProposalStatus, number>;
+  issues?: { open: number; closed: number; overdue: number };
+  supervisionAgreements?: { active: number; nearingQuota: number };
+  handover?: { completedNotClosed: number; ready: number };
+}
+
+export const NOTIFICATION_TYPES = [
+  'MILESTONE_OVERDUE',
+  'ISSUE_OVERDUE',
+  'SUBMISSION_AWAITING_RESPONSE',
+  'SUPERVISION_QUOTA_APPROACHING',
+  'DOCUMENT_MISSING',
+  'HANDOVER_INCOMPLETE',
+] as const;
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+export const NOTIFICATION_SEVERITIES = ['INFO', 'WARNING', 'CRITICAL'] as const;
+export type NotificationSeverity = (typeof NOTIFICATION_SEVERITIES)[number];
+
+export interface NotificationItem {
+  type: NotificationType;
+  severity: NotificationSeverity;
+  message: string;
+  projectId: string | null;
+  /** Where the web app should send the person to act on it. */
+  link: string | null;
+}
+
+export const SEARCH_RESULT_TYPES = ['CLIENT', 'PROPERTY', 'PROJECT', 'PROPOSAL'] as const;
+export type SearchResultType = (typeof SEARCH_RESULT_TYPES)[number];
+
+export interface SearchResult {
+  type: SearchResultType;
+  id: string;
+  label: string;
+  sublabel: string | null;
+  /** Only set for a PROJECT result, so the web app can route straight to it. */
+  projectId: string | null;
+}
+
+export const searchQuerySchema = z
+  .object({
+    q: z.string().trim().min(1).max(200),
+  })
+  .strict();
+
+export type SearchQuery = z.infer<typeof searchQuerySchema>;

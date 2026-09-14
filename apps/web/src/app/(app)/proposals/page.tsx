@@ -39,6 +39,9 @@ export default async function ProposalsPage({
         title="Proposals"
         description="Inquiries and sketches, from first contact to conversion."
       >
+        <a href="/export/proposals" className="button button--secondary">
+          Export CSV
+        </a>
         {session.can('proposal:create') ? (
           <Link href="/proposals/new" className="button">
             New proposal

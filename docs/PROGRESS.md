@@ -2060,3 +2060,86 @@ across many prior local runs. Confirmed absent in a fresh database (CI provision
 
 Phase 10 is complete. All of `docs/phase-10-plan.md` §8's definition of done is demonstrated by an
 API-level test (Steps 38-39) or by a browser check (Step 40).
+
+---
+
+## Steps 41-43 — Phase 11: Dashboards, Notifications, Search & Export ✅
+
+The last phase in the roadmap — deliberately last, because it only reads what every earlier phase
+already recorded. See `docs/phase-11-plan.md`.
+
+**Built:**
+
+- **No new Prisma model, no migration.** Every one of this phase's four surfaces is computed fresh
+  on every request from tables Phases 1–10 already own — the same "derive, don't duplicate" choice
+  `SupervisionAgreement.visitsUsed`, `RequiredDocument` completeness, and `HandoverChecklist`'s own
+  counts already made, applied a fourth time because this phase has nothing to store: no
+  notification is dismissed, no dashboard figure is cached, no search index is built.
+- **`InsightsModule` (Step 41-42)** — `apps/api/src/modules/insights` — owns nothing, and imports
+  the seven modules it reads from (access, directory, projects, proposals, documents, handover,
+  supervision) rather than re-querying their tables through a second path. `DashboardService`
+  groups projects/proposals by status and computes issue/supervision/handover counts, each gated
+  independently by `visibleProjectIds`/`canAnywhere` and simply omitted (not zeroed) from the
+  response when the caller lacks that section's own permission. `NotificationsService` derives six
+  alert kinds (overdue milestone, overdue issue, submission awaiting a clarification response,
+  supervision quota approaching, missing required document, incomplete handover) the same way.
+  `SearchService` fans out to `ClientService`/`PropertyService`/`ProjectService`/`ProposalService`'s
+  own existing `list({ search })`, reusing their case-insensitive name/reference/code matching and
+  their own scoping rather than writing a second search implementation. `ExportService` serializes
+  each already-listable register to CSV via a small dependency-free `toCsv` helper
+  (`apps/api/src/shared/csv/to-csv.ts`) — no `csv`/`exceljs`/`pdfkit` package added; PDF is dropped
+  from this phase's scope (spec names it, but nothing in this codebase's history builds a shape
+  ahead of a confirmed need, and CSV alone opens fine in Excel). `Issue` has no portfolio-wide list
+  of its own (Phase 2 only ever reads it one project at a time), so its export scopes directly by
+  `visibleProjectIds` — the identical filter `ProjectService.list` already applies.
+- **No new permission, and `/dashboard`/`/notifications`/`/search` carry no single gating
+  permission at all** — only authentication stands between a request and them. An earlier attempt
+  gated all three on `RequirePermissionAnywhere('project:view')` (the list-route pattern every other
+  module uses) and was caught by hand-testing with a zero-grant `CLIENT_STAKEHOLDER` account: it
+  403'd instead of returning `{}`/`[]`/`[]`, because that role holds no `project:view` grant at all
+  even though it might hold others. Fixed by removing the route-level gate entirely — each section
+  or result decides for itself, inside the service, against the permission its own resource already
+  requires. The five `/export/*.csv` routes keep per-resource `RequirePermissionAnywhere`, since
+  export genuinely is resource-specific the way a list route is.
+- **Web (Step 43)** — `/dashboard` (new signed-in landing page; `/` now redirects there instead of
+  `/projects`), `/notifications` (flat list, recomputed on every visit, nothing to mark read),
+  `/search` (results grouped by type), and an "Export CSV" link on the Clients/Properties/Projects/
+  Proposals list pages and the project Issues page. Each export link is a plain `<a>` to a
+  `(app)/export/<resource>/route.ts` route handler — the same cookie-forwarding pass-through
+  `projects/[id]/documents/[documentId]/content/route.ts` already established for a document's
+  bytes, since a CSV cannot go through `api.get` any more than a document's content can.
+
+**Verified — 6 new integration tests in `apps/api/tests/integration/insights.test.ts`** (a
+zero-grant user gets `{}`/`[]`/`[]` from all three read endpoints, never a 403; dashboard counts a
+freshly created project under its own status; an overdue milestone raises an alert that clears once
+achieved; search finds a project by code and a client by name but nothing for an unrelated term; a
+client CSV export contains a created client and starts with the right header row; issues export is
+scoped by `visibleProjectIds` the same way the project list is) plus manual verification through the
+actual running web app (dashboard stat cards, notifications list, grouped search results, and a
+downloaded CSV all confirmed against a real dev database, both as a full-grants admin and as a
+zero-grant account).
+
+**Decisions:**
+
+- **Dashboard sections are omitted, not zeroed, for a permission the caller lacks.** A `0` would
+  claim "there are none"; an absent key says "not shown to you" — the same distinction
+  `visibleProjectIds` returning `null` vs. `[]` already draws between "no restriction" and "nothing
+  visible."
+- **Search does not cover `RequiredDocument`, `SupervisionAgreement` or `Submission`.** None of the
+  three has a caller-facing free-text label distinct enough from its parent project to earn a fifth
+  result type; `Submission.permitReference` is reachable through the Project result's own detail
+  page instead of a fifth entry in the same flat list.
+- **CSV, not Excel or PDF.** The spec names "Excel/CSV/PDF export"; a `.csv` file already opens
+  natively in Excel, and PDF is the one part of that list this phase does not build — the three real
+  registers in hand are Excel-first, and a print-formatted PDF is exactly the kind of speculative
+  shape nothing in this codebase's history has built ahead of a confirmed need.
+
+**Known limit, not introduced by this step:** `NotificationsService.missingDocuments` and
+`incompleteHandovers` call `DocumentService.completeness`/`HandoverService.isReady` once per visible
+project in `ACTIVE`/`ON_HOLD`/`COMPLETED`/`COMPLETED` status respectively — fine at this portfolio's
+real size, but an O(projects) fan-out rather than a single aggregate query; worth revisiting only if
+the portfolio grows enough for `/notifications` to be slow in practice.
+
+Phase 11 is complete — the roadmap `~/.claude/plans/swirling-singing-book.md` set out is fully
+built. All of `docs/phase-11-plan.md` §10's definition of done is demonstrated either by an
+API-level test or by the manual browser verification above.

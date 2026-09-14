@@ -31,6 +31,9 @@ export default async function PropertiesPage({
   return (
     <>
       <PageHead title="Properties" description="Sites and buildings, each belonging to a client.">
+        <a href="/export/properties" className="button button--secondary">
+          Export CSV
+        </a>
         {session.can('property:create') ? (
           <Link href="/properties/new" className="button">
             New property

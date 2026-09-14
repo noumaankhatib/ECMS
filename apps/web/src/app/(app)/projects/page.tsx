@@ -47,6 +47,9 @@ export default async function ProjectsPage({
   return (
     <>
       <PageHead title="Projects" description="The work you have access to.">
+        <a href="/export/projects" className="button button--secondary">
+          Export CSV
+        </a>
         {session.can('project:create') ? (
           <Link href="/projects/new" className="button">
             New project
