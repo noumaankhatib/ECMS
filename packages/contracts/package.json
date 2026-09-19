@@ -10,7 +10,13 @@
       "default": "./dist/index.js"
     }
   },
+  "scripts": {
+    "build": "tsc --project tsconfig.json"
+  },
   "dependencies": {
     "zod": "^4.5.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
   }
 }
