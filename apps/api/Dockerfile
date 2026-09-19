@@ -18,8 +18,7 @@ COPY tsconfig.base.json ./
 COPY packages/contracts ./packages/contracts
 COPY apps/api ./apps/api
 
-# Build contracts then API
-RUN pnpm --filter @ecms/contracts run build
+# Build API
 RUN pnpm --filter @ecms/api run build
 
 # Generate Prisma client

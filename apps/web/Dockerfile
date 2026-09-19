@@ -17,7 +17,6 @@ COPY apps/web ./apps/web
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN pnpm --filter @ecms/contracts run build
 RUN pnpm --filter @ecms/web run build
 
 # ── Stage 2: runtime ─────────────────────────────────────────────────────────
