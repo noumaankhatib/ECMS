@@ -50,7 +50,7 @@ export async function signIn(_state: FormState, form: FormData): Promise<FormSta
   store.set(SESSION_COOKIE, parsedCookie.value, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env['COOKIE_SECURE'] !== 'false' && process.env.NODE_ENV === 'production',
     path: '/',
     ...(parsedCookie.expires ? { expires: parsedCookie.expires } : {}),
   });
