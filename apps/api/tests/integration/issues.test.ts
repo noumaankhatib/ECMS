@@ -93,6 +93,7 @@ describe('issues', () => {
   async function userWithRole(roleCode: string): Promise<string> {
     const user = await prisma.user.create({
       data: {
+        username: `issue-${crypto.randomUUID()}`,
         email: `issue-${crypto.randomUUID()}@example.com`,
         displayName: `Test ${roleCode}`,
         passwordHash: 'not-used-in-this-test',
@@ -241,6 +242,62 @@ describe('issues', () => {
         ),
       ),
     ).rejects.toMatchObject({ code: 'CONFLICT' });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Workstream — required only when a project runs both at once.
+  // ---------------------------------------------------------------------------
+
+  it('requires a workstream on a BOTH project, and stores it', async () => {
+    const bothProject = await inContext(() =>
+      projects.create(
+        {
+          clientId,
+          propertyId,
+          code: `ISS-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+          name: 'Both Workstreams Project',
+          type: 'BOTH',
+        },
+        owningSupervisor,
+      ),
+    );
+
+    await expect(
+      inContext(() =>
+        issues.create(
+          bothProject.id,
+          { ...issueDefaults, title: 'Missing workstream' },
+          owningSupervisor,
+        ),
+      ),
+    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+
+    const issue = await inContext(() =>
+      issues.create(
+        bothProject.id,
+        { ...issueDefaults, title: 'Planning-side issue', workstreamType: 'PLANNING' },
+        owningSupervisor,
+      ),
+    );
+    expect(issue.workstreamType).toBe('PLANNING');
+
+    const filtered = await issues.list(bothProject.id, {
+      page: 1,
+      pageSize: 25,
+      workstreamType: 'PLANNING',
+    });
+    expect(filtered.items.map((i) => i.id)).toContain(issue.id);
+  });
+
+  it('always stores null on a single-workstream project, whatever is sent', async () => {
+    const issue = await inContext(() =>
+      issues.create(
+        projectId,
+        { ...issueDefaults, title: 'Over-specified issue', workstreamType: 'SUPERVISION' },
+        owningSupervisor,
+      ),
+    );
+    expect(issue.workstreamType).toBeNull();
   });
 
   it('refuses a stale edit to an issue', async () => {

@@ -86,6 +86,7 @@ describe('projects', () => {
   async function userWithRole(roleCode: string): Promise<string> {
     const user = await prisma.user.create({
       data: {
+        username: `projects-${crypto.randomUUID()}`,
         email: `projects-${crypto.randomUUID()}@example.com`,
         displayName: `Test ${roleCode}`,
         passwordHash: 'not-used-in-this-test',
@@ -215,6 +216,141 @@ describe('projects', () => {
     // Membership widened WHERE they may work, not WHAT they may do: Planning
     // holds no project:edit at any scope.
     expect(await authorization.can(planner, 'project:edit', theirs)).toBe(false);
+  });
+
+  it('filters the list by workstream type, where BOTH counts on both sides', async () => {
+    const marker = `wf-${crypto.randomUUID().slice(0, 8)}`;
+    const planningOnly = await inContext(() =>
+      projects.create(
+        { clientId, propertyId, code: uniqueCode(), name: `${marker} planning`, type: 'PLANNING' },
+        admin,
+      ),
+    );
+    const supervisionOnly = await inContext(() =>
+      projects.create(
+        {
+          clientId,
+          propertyId,
+          code: uniqueCode(),
+          name: `${marker} supervision`,
+          type: 'SUPERVISION',
+        },
+        admin,
+      ),
+    );
+    const both = await inContext(() =>
+      projects.create(
+        { clientId, propertyId, code: uniqueCode(), name: `${marker} both`, type: 'BOTH' },
+        admin,
+      ),
+    );
+
+    const planningPage = await projects.list(
+      { page: 1, pageSize: 100, search: marker, type: 'PLANNING' },
+      admin,
+    );
+    const planningIds = planningPage.items.map((p) => p.id);
+    expect(planningIds).toContain(planningOnly.id);
+    expect(planningIds).toContain(both.id);
+    expect(planningIds).not.toContain(supervisionOnly.id);
+
+    const supervisionPage = await projects.list(
+      { page: 1, pageSize: 100, search: marker, type: 'SUPERVISION' },
+      admin,
+    );
+    const supervisionIds = supervisionPage.items.map((p) => p.id);
+    expect(supervisionIds).toContain(supervisionOnly.id);
+    expect(supervisionIds).toContain(both.id);
+    expect(supervisionIds).not.toContain(planningOnly.id);
+
+    const bothPage = await projects.list(
+      { page: 1, pageSize: 100, search: marker, type: 'BOTH' },
+      admin,
+    );
+    const bothIds = bothPage.items.map((p) => p.id);
+    expect(bothIds).toEqual([both.id]);
+  });
+
+  // -------------------------------------------------------------------------
+  // Upgrading a planning project to supervision
+  // -------------------------------------------------------------------------
+
+  it('upgrades a planning project to BOTH in place, opening its supervision workstream', async () => {
+    const projectId = await newProject('PLANNING');
+
+    const upgraded = await inContext(() =>
+      projects.upgradeToSupervision(projectId, { version: 1 }, admin),
+    );
+    expect(upgraded.type).toBe('BOTH');
+    expect(upgraded.id).toBe(projectId);
+    expect(upgraded.version).toBe(2);
+
+    const list = await workstreams.listForProject(projectId);
+    expect(list.map((w) => w.type).sort()).toEqual(['PLANNING', 'SUPERVISION']);
+  });
+
+  it('is safe to call again if a supervision workstream already exists somehow', async () => {
+    const projectId = await newProject('PLANNING');
+    await inContext(() =>
+      workstreams.create(projectId, { type: 'SUPERVISION', name: 'Supervision' }),
+    );
+
+    await inContext(() => projects.upgradeToSupervision(projectId, { version: 1 }, admin));
+
+    const list = await workstreams.listForProject(projectId);
+    expect(list.filter((w) => w.type === 'SUPERVISION')).toHaveLength(1);
+  });
+
+  it('refuses to upgrade a project that is not planning-only', async () => {
+    const supervisionId = await newProject('SUPERVISION');
+    await expect(
+      inContext(() => projects.upgradeToSupervision(supervisionId, { version: 1 }, admin)),
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+    const bothId = await newProject('BOTH');
+    await expect(
+      inContext(() => projects.upgradeToSupervision(bothId, { version: 1 }, admin)),
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+  });
+
+  it('refuses to upgrade a closed project', async () => {
+    const projectId = await newProject('PLANNING');
+    let project = await inContext(() =>
+      projects.transition(projectId, 'activate', { version: 1 }, admin),
+    );
+    project = await inContext(() =>
+      projects.transition(projectId, 'complete', { version: project.version }, admin),
+    );
+    await completeHandover(projectId);
+    project = await inContext(() =>
+      projects.transition(projectId, 'close', { version: project.version }, admin),
+    );
+
+    await expect(
+      inContext(() =>
+        projects.upgradeToSupervision(projectId, { version: project.version }, admin),
+      ),
+    ).rejects.toMatchObject({ code: 'ILLEGAL_TRANSITION' });
+  });
+
+  it('refuses a stale upgrade', async () => {
+    const projectId = await newProject('PLANNING');
+    await inContext(() => projects.update(projectId, { name: 'Renamed', version: 1 }, admin));
+
+    await expect(
+      inContext(() => projects.upgradeToSupervision(projectId, { version: 1 }, admin)),
+    ).rejects.toMatchObject({ code: 'STALE_RECORD' });
+  });
+
+  it('blocks the old PATCH path from taking a planning project to BOTH', async () => {
+    const projectId = await newProject('PLANNING');
+
+    await expect(
+      inContext(() => projects.update(projectId, { type: 'BOTH', version: 1 }, admin)),
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+    // The project is untouched — no type change, no orphaned workstream.
+    expect((await projects.byId(projectId, admin)).type).toBe('PLANNING');
   });
 
   // -------------------------------------------------------------------------

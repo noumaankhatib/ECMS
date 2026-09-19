@@ -20,18 +20,27 @@ export class AuthService {
   /**
    * Signs a user in.
    *
+   * `identifier` is whatever the person typed — their username, or their
+   * email if their account has one. Both are matched in one query rather
+   * than two, so there is no observable difference in shape or timing
+   * between "that's a username" and "that's an email" on the way in.
+   *
    * Every failure path returns the same error and takes comparable time.
-   * A wrong password, an unknown email, and a disabled account are
+   * A wrong password, an unknown identifier, and a disabled account are
    * indistinguishable from the outside — otherwise the sign-in form becomes a
    * way to discover who works here.
    */
-  async login(email: string, password: string): Promise<LoginResult> {
-    const normalisedEmail = email.trim().toLowerCase();
+  async login(identifier: string, password: string): Promise<LoginResult> {
+    const normalisedIdentifier = identifier.trim().toLowerCase();
 
     const user = await this.prisma.user.findFirst({
-      where: { email: normalisedEmail, deletedAt: null },
+      where: {
+        OR: [{ username: normalisedIdentifier }, { email: normalisedIdentifier }],
+        deletedAt: null,
+      },
       select: {
         id: true,
+        username: true,
         email: true,
         displayName: true,
         passwordHash: true,
@@ -40,7 +49,7 @@ export class AuthService {
     });
 
     // Runs against a decoy hash when there is no user, so the timing does not
-    // reveal whether the address exists.
+    // reveal whether the identifier exists.
     const passwordMatches = await this.passwords.verify(password, user?.passwordHash ?? null);
     const permitted = user !== null && user.status === 'ACTIVE' && passwordMatches;
 
@@ -48,7 +57,7 @@ export class AuthService {
       await this.recordFailedAttempt(user?.id ?? null);
       throw appError('INVALID_CREDENTIALS', {
         // Logged, never returned. The caller learns nothing beyond "no".
-        context: { email_attempted: normalisedEmail, user_found: user !== null },
+        context: { identifier_attempted: normalisedIdentifier, user_found: user !== null },
       });
     }
 
@@ -62,7 +71,12 @@ export class AuthService {
       });
 
       return {
-        user: { id: user.id, email: user.email, displayName: user.displayName },
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          displayName: user.displayName,
+        },
         token: issued.token,
         expiresAt: issued.expiresAt,
       };
@@ -83,7 +97,7 @@ export class AuthService {
   async findActiveUser(userId: string): Promise<AuthenticatedUser | null> {
     const user = await this.prisma.user.findFirst({
       where: { id: userId, deletedAt: null, status: 'ACTIVE' },
-      select: { id: true, email: true, displayName: true },
+      select: { id: true, username: true, email: true, displayName: true },
     });
     return user;
   }

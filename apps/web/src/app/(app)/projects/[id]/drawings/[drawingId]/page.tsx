@@ -4,7 +4,7 @@ import {
   type DrawingRevisionAction,
 } from '@ecms/contracts';
 
-import { ActionButton, ActionForm, Field, TextArea } from '@/components/form';
+import { ActionButton, ActionForm, Field, FileField, TextArea } from '@/components/form';
 import {
   Badge,
   Breadcrumb,
@@ -31,6 +31,11 @@ const STATUS_LABEL: Record<ApprovalStatus, string> = {
   APPROVED: 'Approved',
   REJECTED: 'Rejected',
   RETURNED_FOR_REVISION: 'Returned for revision',
+};
+
+const FILE_STATUS_LABEL: Record<string, string> = {
+  PENDING: 'No file yet',
+  FAILED: 'Upload failed',
 };
 
 /**
@@ -116,6 +121,7 @@ export default async function DrawingPage({
                     <th>Code</th>
                     <th>Status</th>
                     <th>Current</th>
+                    <th>File</th>
                     <th>Created</th>
                     <th />
                   </tr>
@@ -138,6 +144,22 @@ export default async function DrawingPage({
                             <span className="faint">Superseded</span>
                           ) : (
                             <Badge>Current</Badge>
+                          )}
+                        </td>
+                        <td>
+                          {revision.uploadStatus === 'ACTIVE' ? (
+                            <a
+                              href={`/projects/${id}/drawings/${drawingId}/revisions/${revision.id}/content`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="button button--small button--secondary"
+                            >
+                              View
+                            </a>
+                          ) : (
+                            <span className="faint">
+                              {FILE_STATUS_LABEL[revision.uploadStatus] ?? 'No file'}
+                            </span>
                           )}
                         </td>
                         <td className="nowrap">
@@ -180,10 +202,10 @@ export default async function DrawingPage({
                       required
                       hint="P1, C1, Rev A…"
                     />
-                    <Field
-                      label="File reference"
-                      name="fileId"
-                      hint="No Google Drive account is connected yet — leave blank unless you already have one."
+                    <FileField
+                      label="File"
+                      name="file"
+                      hint="Upload the drawing file from your computer, or leave blank to register the revision now and upload it later."
                     />
                   </div>
                   <TextArea label="Notes" name="notes" />

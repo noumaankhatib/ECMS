@@ -23,8 +23,19 @@ export default async function NewUserPage() {
         <CardBody>
           <ActionForm action={createUser} submitLabel="Create user" cancelHref="/users">
             <div className="form-grid">
+              <Field
+                label="Username"
+                name="username"
+                required
+                hint="What they sign in with. Lowercase letters, numbers, dots, underscores or hyphens."
+              />
               <Field label="Full name" name="displayName" required />
-              <Field label="Email address" name="email" type="email" required />
+              <Field
+                label="Email address"
+                name="email"
+                type="email"
+                hint="Optional — this system sends no mail, so it's only an alternate way to sign in."
+              />
               <Field
                 label="Password"
                 name="password"

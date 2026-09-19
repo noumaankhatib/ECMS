@@ -1,6 +1,6 @@
-import { ISSUE_PRIORITIES, ISSUE_SEVERITIES } from '@ecms/contracts';
+import { ISSUE_PRIORITIES, ISSUE_SEVERITIES, WORKSTREAM_TYPES } from '@ecms/contracts';
 
-import { ActionForm, Field, Select, TextArea } from '@/components/form';
+import { ActionForm, DateField, Field, Select, TextArea } from '@/components/form';
 import { Breadcrumb, Card, CardBody, PageHead } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
@@ -60,6 +60,18 @@ export default async function NewIssuePage({
             <Field label="Title" name="title" required />
             <TextArea label="Description" name="description" />
             <div className="form-grid">
+              {project.type === 'BOTH' ? (
+                <Select
+                  label="Workstream"
+                  name="workstreamType"
+                  required
+                  hint="This project runs both — say which one this issue belongs to."
+                  options={WORKSTREAM_TYPES.map((w) => ({
+                    value: w,
+                    label: w === 'PLANNING' ? 'Planning' : 'Supervision',
+                  }))}
+                />
+              ) : null}
               <Select
                 label="Severity"
                 name="severity"
@@ -82,7 +94,7 @@ export default async function NewIssuePage({
                   label: userName.get(m.userId) ?? m.userId,
                 }))}
               />
-              <Field label="Due date" name="dueDate" type="date" />
+              <DateField label="Due date" name="dueDate" />
             </div>
           </ActionForm>
         </CardBody>

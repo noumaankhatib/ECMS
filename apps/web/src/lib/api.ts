@@ -165,13 +165,13 @@ export async function stream(path: string): Promise<Response> {
  * the response is the Set-Cookie header rather than the body.
  */
 export async function login(
-  email: string,
+  identifier: string,
   password: string,
 ): Promise<{ setCookie: string | null }> {
   const response = await fetch(`${API_URL}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ identifier, password }),
     cache: 'no-store',
   });
 

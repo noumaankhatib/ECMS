@@ -88,6 +88,9 @@
   --radius: 10px;
   --radius-sm: 6px;
   --shadow: 0 1px 2px rgb(15 23 42 / 6%), 0 2px 6px rgb(15 23 42 / 5%);
+  /* The hover/raised state — one step deeper and softer, not just a bigger
+     version of --shadow, so a card reads as "lifted" rather than "bigger". */
+  --shadow-raised: 0 4px 10px rgb(15 23 42 / 9%), 0 8px 20px rgb(15 23 42 / 8%);
 
   --space-1: 4px;
   --space-2: 8px;
@@ -223,6 +226,10 @@ a:hover {
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
+  /* The subtitle's `white-space: nowrap` (below) keeps it on one line but
+     does not stop it rendering past its own box — without this, a narrow
+     window clips it straight over the collapse button instead of under it. */
+  overflow: hidden;
 }
 .sidebar__brand-mark {
   flex: 0 0 auto;
@@ -245,6 +252,8 @@ a:hover {
   color: var(--white);
   letter-spacing: -0.005em;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .sidebar__brand-full span {
   display: block;
@@ -254,6 +263,8 @@ a:hover {
   color: var(--nav-text);
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .sidebar--collapsed .sidebar__brand-full {
   display: none;
@@ -312,9 +323,22 @@ a:hover {
   text-decoration: none;
 }
 .nav__item[aria-current='page'] {
-  background: var(--nav-active);
+  background: linear-gradient(90deg, rgb(255 255 255 / 12%), rgb(255 255 255 / 4%));
   color: var(--white);
   font-weight: 600;
+}
+.nav__item[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--white);
+}
+.sidebar--collapsed .nav__item[aria-current='page']::before {
+  left: 2px;
 }
 .sidebar--collapsed .nav__item {
   justify-content: center;
@@ -433,6 +457,243 @@ a:hover {
 .header__search input:focus-visible {
   background: var(--surface);
 }
+.header__search-kbd {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text-faint);
+  font-size: 11px;
+  font-family: inherit;
+  pointer-events: none;
+}
+
+/* Reports page ----------------------------------------------------------------- */
+
+.period-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.period-toggle__button {
+  border: none;
+  background: var(--surface);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+  border-right: 1px solid var(--border);
+}
+.period-toggle__button:last-child {
+  border-right: none;
+}
+.period-toggle__button:hover {
+  background: var(--slate-100);
+}
+.period-toggle__button--active {
+  background: var(--brand-700);
+  color: var(--white);
+}
+.period-toggle__button--active:hover {
+  background: var(--brand-800);
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+.report-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--space-4);
+  color: var(--text);
+  transition:
+    box-shadow 150ms ease,
+    transform 150ms ease,
+    border-color 150ms ease;
+}
+.report-card:hover {
+  box-shadow: var(--shadow-raised);
+  border-color: var(--brand-700);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+.report-card__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--info-bg);
+  color: var(--info-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.report-card__title {
+  font-weight: 600;
+  font-size: 15px;
+}
+.report-card__description {
+  font-size: 13px;
+  color: var(--text-muted);
+  flex: 1 1 auto;
+}
+.report-card__cta {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brand-text);
+}
+
+/* Quick create (header) ------------------------------------------------------ */
+
+.header__quick-create {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.header__menu-panel--wide {
+  min-width: 220px;
+}
+.header__quick-create-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.header__quick-create-item svg {
+  color: var(--brand-700);
+  flex: 0 0 auto;
+}
+
+/* Command palette -------------------------------------------------------------- */
+
+.command-palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgb(15 23 42 / 45%);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh var(--space-4) var(--space-4);
+}
+.command-palette {
+  width: 100%;
+  max-width: 560px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 60px rgb(15 23 42 / 30%);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.command-palette__input-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+.command-palette__icon {
+  color: var(--text-faint);
+  flex: 0 0 auto;
+}
+.command-palette__input-row input {
+  flex: 1 1 auto;
+  border: none;
+  padding: var(--space-1) 0;
+  font-size: 15px;
+}
+.command-palette__input-row input:focus-visible {
+  outline: none;
+}
+.command-palette__close {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  padding: 2px;
+}
+.command-palette__body {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.command-palette__hint {
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.command-palette__hint kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 11px;
+}
+.command-palette__results {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+}
+.command-palette__results a {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+}
+.command-palette__results a:hover {
+  background: var(--slate-100);
+  text-decoration: none;
+}
+.command-palette__result-type {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--brand-text);
+  background: var(--brand-50);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.command-palette__result-label {
+  flex: 1 1 auto;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.command-palette__result-sub {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.command-palette__footer {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.command-palette__footer a {
+  color: var(--brand-text);
+  font-weight: 500;
+}
 
 .header__actions {
   display: flex;
@@ -510,7 +771,7 @@ a:hover {
   flex-direction: column;
   z-index: 40;
 }
-.header__menu-email {
+.header__menu-identifier {
   padding: var(--space-2) var(--space-3);
   font-size: 12px;
   color: var(--text-muted);
@@ -575,6 +836,13 @@ a:hover {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+  transition:
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+.card:hover {
+  box-shadow: var(--shadow-raised);
+  transform: translateY(-1px);
 }
 .card__head {
   padding: var(--space-4);
@@ -593,6 +861,22 @@ a:hover {
   grid-template-columns: 2fr 1fr;
   gap: var(--space-5);
   align-items: start;
+}
+
+.doc-preview {
+  width: 100%;
+  height: 70vh;
+  min-height: 420px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--neutral-bg);
+}
+.doc-preview-image {
+  width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  background: var(--neutral-bg);
 }
 
 .stat-grid {
@@ -660,6 +944,16 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  transition:
+    box-shadow 150ms ease,
+    transform 150ms ease,
+    border-color 150ms ease;
+}
+.kpi-card:hover {
+  box-shadow: var(--shadow-raised);
+  border-color: var(--brand-700);
+  transform: translateY(-1px);
+  text-decoration: none;
 }
 .kpi-card__head {
   display: flex;
@@ -747,11 +1041,7 @@ a:hover {
   inset: 0;
   pointer-events: none;
   background-image:
-    repeating-linear-gradient(
-      115deg,
-      rgb(255 255 255 / 5%) 0 1px,
-      transparent 1px 64px
-    ),
+    repeating-linear-gradient(115deg, rgb(255 255 255 / 5%) 0 1px, transparent 1px 64px),
     radial-gradient(circle at 88% 15%, rgb(255 255 255 / 10%), transparent 55%);
 }
 .hero-banner > * {
@@ -889,14 +1179,21 @@ a:hover {
   padding: 0;
   display: flex;
   flex-direction: column;
+  /* Scrolls within its own card once it grows past ~7 rows, so a busy day
+     of activity does not push the rest of the dashboard down the page. */
+  max-height: 420px;
+  overflow-y: auto;
 }
 .activity-list li {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-3);
   padding: var(--space-3) 0;
   border-bottom: 1px solid var(--border);
   font-size: 14px;
+}
+.activity-list .activity-icon {
+  margin-top: 2px;
 }
 .activity-list li:last-child {
   border-bottom: none;
@@ -931,12 +1228,75 @@ a:hover {
 }
 .activity-list__text {
   flex: 1 1 auto;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 .activity-list__time {
   flex: 0 0 auto;
   font-size: 12px;
   color: var(--text-muted);
   white-space: nowrap;
+  margin-top: 2px;
+}
+.activity-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--space-4);
+}
+.activity-column__head {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-2);
+}
+.activity-column .activity-list {
+  max-height: 260px;
+}
+
+.notification-mini-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.notification-mini-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: 13px;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+.notification-mini-list li:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.notification-mini-list__dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  margin-top: 5px;
+}
+.notification-mini-list__dot--info {
+  background: var(--info);
+}
+.notification-mini-list__dot--warning {
+  background: var(--warning);
+}
+.notification-mini-list__dot--critical {
+  background: var(--danger);
+}
+
+.activity-list__client {
+  color: var(--text-muted);
 }
 
 /* Upcoming deadlines ------------------------------------------------------------ */
@@ -947,6 +1307,8 @@ a:hover {
   padding: 0;
   display: flex;
   flex-direction: column;
+  max-height: 420px;
+  overflow-y: auto;
 }
 .deadline-list li {
   display: flex;
@@ -974,6 +1336,91 @@ a:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Mini calendar (dashboard utility rail) ---------------------------------------- */
+
+.mini-calendar__head {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: var(--space-3);
+}
+.mini-calendar__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  text-align: center;
+}
+.mini-calendar__grid--labels {
+  margin-bottom: var(--space-1);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.mini-calendar__cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  position: relative;
+}
+.mini-calendar__cell--today {
+  background: var(--slate-100);
+  font-weight: 700;
+}
+.mini-calendar__cell--overdue,
+.mini-calendar__cell--pending,
+.mini-calendar__cell--upcoming {
+  font-weight: 600;
+}
+.mini-calendar__cell--overdue::after,
+.mini-calendar__cell--pending::after,
+.mini-calendar__cell--upcoming::after {
+  content: '';
+  position: absolute;
+  bottom: 1px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+}
+.mini-calendar__cell--overdue::after {
+  background: var(--danger);
+}
+.mini-calendar__cell--pending::after {
+  background: var(--warning);
+}
+.mini-calendar__cell--upcoming::after {
+  background: var(--info);
+}
+.mini-calendar__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.mini-calendar__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.mini-calendar__legend i {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+/* Long, unpaginated lists (notifications, search results) ----------------------- */
+
+.scroll-list {
+  max-height: 480px;
+  overflow-y: auto;
 }
 
 /* Quick actions ------------------------------------------------------------------ */
@@ -1034,6 +1481,42 @@ thead th {
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border);
   background: var(--slate-50);
+}
+
+/* Table scroll container ---------------------------------------------------------
+   Caps a register table at a fixed viewport height instead of letting a long
+   page (hundreds of rows within one paginated page, or an unpaginated list)
+   push the pagination controls and page footer far below the fold. The
+   header row stays pinned via `position: sticky` so column labels remain
+   visible while the body scrolls underneath it. */
+.table-scroll {
+  max-height: 60vh;
+  overflow-y: auto;
+  overflow-x: auto;
+  border-radius: var(--radius);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong, var(--border)) transparent;
+}
+.table-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.table-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.table-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--border-strong, var(--border));
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.table-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-muted);
 }
 tbody td {
   padding: var(--space-3) var(--space-4);
@@ -1293,6 +1776,69 @@ select:disabled {
   color: var(--text-muted);
 }
 
+/* Date field — three typed boxes (day/month/year, always in that order,
+   regardless of the browser's own locale) plus a button that opens the
+   browser's real calendar picker. See DateField in components/form.tsx. */
+.date-field {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 0 4px 0 10px;
+}
+.date-field:focus-within {
+  outline: 2px solid var(--brand-700);
+  outline-offset: 1px;
+}
+.date-field__part {
+  border: none;
+  padding: 7px 0;
+  width: 2ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+.date-field__part--year {
+  width: 4ch;
+}
+.date-field__part:focus {
+  outline: none;
+}
+.date-field__sep {
+  color: var(--text-faint);
+}
+.date-field__calendar {
+  margin-left: auto;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.date-field__calendar:hover {
+  background: var(--slate-100);
+  color: var(--text);
+}
+/* Exists only so `showPicker()` has a real date input to call it on — never
+   seen or reached by tab order, never sized. */
+.date-field__native {
+  position: absolute;
+  width: 0;
+  height: 0;
+  padding: 0;
+  border: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1404,6 +1950,24 @@ select:disabled {
 .badge--purple {
   background: var(--purple-bg);
   color: var(--purple-text);
+}
+/* Text-only status — no fill, no dot, just the word itself in colour. Used
+   where a whole coloured pill per item would be too heavy (e.g. a full grid
+   of completeness checklist items). */
+.badge--success-text,
+.badge--critical-text {
+  background: transparent;
+  padding: 3px 0;
+}
+.badge--success-text {
+  color: var(--success-text);
+}
+.badge--critical-text {
+  color: var(--danger-text);
+}
+.badge--success-text::before,
+.badge--critical-text::before {
+  display: none;
 }
 
 .muted {

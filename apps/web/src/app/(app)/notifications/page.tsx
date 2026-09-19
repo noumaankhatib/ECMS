@@ -38,7 +38,7 @@ export default async function NotificationsPage() {
               Every overdue item, missing document and pending response is clear.
             </Empty>
           ) : (
-            <ul className="stack">
+            <ul className="stack scroll-list">
               {items.map((item, index) => (
                 <li key={index} className="row" style={{ justifyContent: 'space-between' }}>
                   <div>

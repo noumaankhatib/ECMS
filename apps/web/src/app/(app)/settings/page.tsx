@@ -47,8 +47,14 @@ export default async function SettingsPage() {
             <dl className="definition">
               <dt>Name</dt>
               <dd>{session.user.displayName}</dd>
-              <dt>Email</dt>
-              <dd>{session.user.email}</dd>
+              <dt>Username</dt>
+              <dd>{session.user.username}</dd>
+              {session.user.email ? (
+                <>
+                  <dt>Email</dt>
+                  <dd>{session.user.email}</dd>
+                </>
+              ) : null}
             </dl>
           </CardBody>
         </Card>

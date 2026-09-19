@@ -24,6 +24,7 @@ type UserWithRoles = Prisma.UserGetPayload<{ include: { roles: true } }>;
 
 const toSummary = (user: UserWithRoles): UserSummary => ({
   id: user.id,
+  username: user.username,
   email: user.email,
   displayName: user.displayName,
   status: user.status as UserStatus,
@@ -61,6 +62,7 @@ export class UserService {
         ? {
             OR: [
               { displayName: { contains: query.search, mode: 'insensitive' } },
+              { username: { contains: query.search, mode: 'insensitive' } },
               { email: { contains: query.search, mode: 'insensitive' } },
             ],
           }
@@ -95,16 +97,26 @@ export class UserService {
     const passwordHash = await this.passwords.hash(input.password);
 
     return this.prisma.$transaction(async (tx) => {
-      const existing = await tx.user.findUnique({ where: { email: input.email } });
-      if (existing) {
+      const existingUsername = await tx.user.findUnique({ where: { username: input.username } });
+      if (existingUsername) {
         throw appError('CONFLICT', {
-          fields: [{ field: 'email', reason: 'An account already uses that address.' }],
+          fields: [{ field: 'username', reason: 'An account already uses that username.' }],
         });
+      }
+
+      if (input.email) {
+        const existingEmail = await tx.user.findUnique({ where: { email: input.email } });
+        if (existingEmail) {
+          throw appError('CONFLICT', {
+            fields: [{ field: 'email', reason: 'An account already uses that address.' }],
+          });
+        }
       }
 
       const user = await tx.user.create({
         data: {
-          email: input.email,
+          username: input.username,
+          email: input.email ?? null,
           displayName: input.displayName,
           passwordHash,
           roles: { create: { roleCode: input.roleCode, grantedBy: actorId } },
@@ -117,7 +129,12 @@ export class UserService {
         entityType: 'User',
         entityId: user.id,
         // Note what is absent. The password does not appear here in any form.
-        after: { email: user.email, displayName: user.displayName, role: input.roleCode },
+        after: {
+          username: user.username,
+          email: user.email,
+          displayName: user.displayName,
+          role: input.roleCode,
+        },
       });
 
       return toSummary(user);

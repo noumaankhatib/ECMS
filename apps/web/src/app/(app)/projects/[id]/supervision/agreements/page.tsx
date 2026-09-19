@@ -1,4 +1,4 @@
-import { ActionForm, Field, Select, TextArea } from '@/components/form';
+import { ActionForm, DateRangeFields, Field, Select, TextArea } from '@/components/form';
 import {
   Badge,
   Breadcrumb,
@@ -123,8 +123,13 @@ export default async function SupervisionAgreementsPage({
                   />
                   <Field label="Visits allowed" name="visitsAllowed" required />
                   <Field label="Amount" name="amount" required />
-                  <Field label="Start date" name="startDate" type="date" required />
-                  <Field label="End date" name="endDate" type="date" />
+                  <DateRangeFields
+                    startLabel="Start date"
+                    startName="startDate"
+                    startRequired
+                    endLabel="End date"
+                    endName="endDate"
+                  />
                 </div>
                 <TextArea label="Notes" name="notes" />
               </ActionForm>
@@ -145,13 +150,13 @@ export default async function SupervisionAgreementsPage({
                 <input type="hidden" name="id" value={renewable.id} />
                 <input type="hidden" name="version" value={renewable.version} />
                 <div className="form-grid">
-                  <Field
-                    label="New start date"
-                    name="startDate"
-                    type="date"
-                    hint="Defaults to the day after this agreement's end date."
+                  <DateRangeFields
+                    startLabel="New start date"
+                    startName="startDate"
+                    startHint="Defaults to the day after this agreement's end date."
+                    endLabel="New end date"
+                    endName="endDate"
                   />
-                  <Field label="New end date" name="endDate" type="date" />
                   <Field
                     label="Visits allowed"
                     name="visitsAllowed"

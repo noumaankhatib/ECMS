@@ -56,6 +56,7 @@ describe('required documents', () => {
   async function userWithRole(roleCode: string): Promise<string> {
     const user = await prisma.user.create({
       data: {
+        username: `required-doc-${crypto.randomUUID()}`,
         email: `required-document-${crypto.randomUUID()}@example.com`,
         displayName: `Test ${roleCode}`,
         passwordHash: 'not-used-in-this-test',
@@ -87,7 +88,27 @@ describe('required documents', () => {
     propertyId = property.id;
   });
 
+  /** Every category this file creates uses one of these prefixes, followed
+   *  by a random suffix (to avoid colliding with a concurrent run) — never a
+   *  fixed name. `RequiredDocument` is the one genuinely global catalogue
+   *  this suite touches (docs/phase-9-plan.md §5): unlike a test's own
+   *  client/project/document rows, which sit inertly under their own
+   *  disposable ids, a leftover requirement here shows up in every real
+   *  project's completeness checklist the next time anyone opens it. */
+  const TEST_CATEGORY_PREFIXES = [
+    'Custom-',
+    'Editable-',
+    'Retiring-',
+    'Design-Match-',
+    'Scoped-',
+    'Archived-Doc-',
+    'Archived-',
+  ];
+
   afterAll(async () => {
+    await prisma.requiredDocument.deleteMany({
+      where: { OR: TEST_CATEGORY_PREFIXES.map((prefix) => ({ category: { startsWith: prefix } })) },
+    });
     await prisma.$disconnect();
   });
 

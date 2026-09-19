@@ -66,10 +66,19 @@ model AuditEntry {
 model User {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  /// Stored lower-cased. The unique index is therefore genuinely
-  /// case-insensitive without needing a citext extension.
-  email       String @unique @db.VarChar(320)
-  displayName String @map("display_name") @db.VarChar(200)
+  /// The login identity. Stored lower-cased, same reasoning as `email` below —
+  /// a genuinely case-insensitive unique index without a citext extension.
+  /// Mandatory: every account has one, unlike email.
+  username String @unique @db.VarChar(50)
+
+  /// Optional — this system sends no mail of any kind (no welcome mail, no
+  /// password reset), so email here is only ever an alternate login identity
+  /// or a contact detail, never a required mailbox. Nullable and unique:
+  /// Postgres allows any number of NULLs in a unique index, so two accounts
+  /// with no email never collide, but two accounts can never claim the same
+  /// one. Stored lower-cased, same reasoning as `username`.
+  email       String? @unique @db.VarChar(320)
+  displayName String  @map("display_name") @db.VarChar(200)
 
   /// Argon2id. The plaintext password is never stored, never logged, and never
   /// leaves the request that carried it.
@@ -612,11 +621,18 @@ model Issue {
 
   version Int @default(1)
 
+  /// PLANNING or SUPERVISION — which workstream raised this issue. Null for
+  /// every issue on a single-workstream project (there is only one workstream
+  /// to belong to, so asking the person to pick would be pointless); required
+  /// only when the project is BOTH, enforced in IssueService.create, not here.
+  workstreamType String? @map("workstream_type") @db.VarChar(20)
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdBy String?  @map("created_by") @db.Uuid
 
   @@index([projectId, status])
+  @@index([projectId, workstreamType])
   @@index([observationId])
   @@map("issue")
 }
@@ -681,10 +697,18 @@ model DrawingRevision {
   /// RETURNED_FOR_REVISION.
   status String @default("DRAFT") @db.VarChar(30)
 
-  /// The Drive file id, once uploaded (docs/phase-3-plan.md §7). Null while
-  /// this environment has no real Drive account — see the LocalDriveAdapter.
-  fileId String? @map("file_id")
-  notes  String? @db.Text
+  /// PENDING while bytes are being written to Drive, ACTIVE once the file id
+  /// is confirmed, FAILED if the upload never completed. Stays PENDING
+  /// forever for a revision created with no file at all (`fileId` typed by
+  /// hand, or genuinely none yet) — the same three states `Document` uses.
+  uploadStatus String @default("PENDING") @map("upload_status") @db.VarChar(20)
+  /// The Drive file id, set the instant uploadStatus becomes ACTIVE. Null
+  /// otherwise — see the LocalDriveAdapter (docs/phase-3-plan.md §7).
+  fileId           String? @map("file_id")
+  originalFilename String? @map("original_filename") @db.VarChar(255)
+  mimeType         String? @map("mime_type") @db.VarChar(150)
+  sizeBytes        Int?    @map("size_bytes")
+  notes            String? @db.Text
 
   /// Set the instant a LATER revision is created for this drawing, never
   /// earlier and never by any other path. Together with the partial unique
@@ -913,6 +937,14 @@ model Project {
   /// Set when the project is completed, cleared by nothing.
   actualEndDate DateTime? @map("actual_end_date") @db.Date
 
+  /// A human-readable note, not a link — the code of planning work that
+  /// predates this system, entered when a Supervision-only project is
+  /// created against planning done before anyone tracked it here. Never
+  /// resolved against a real Project row; if the planning project does exist
+  /// in the system, the correct path is upgrading it in place
+  /// (ProjectService.upgradeToSupervision), not this field.
+  externalPlanningReference String? @map("external_planning_reference") @db.VarChar(50)
+
   version Int @default(1)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -1101,4 +1133,25 @@ model Proposal {
   @@index([sketchNumber])
   @@index([clientId])
   @@map("proposal")
+}
+
+/// The bytes behind a `PostgresDriveAdapter` fileId — an alternative
+/// `DriveAdapter` backend for an environment with nowhere else to put files
+/// yet (a free-tier deploy with only a database provisioned). Deliberately
+/// its own table, never referenced by a foreign key from `Document` or
+/// `DrawingRevision` — those only ever hold a `fileId` string, the same
+/// opaque reference they'd hold for `LocalDriveAdapter` or a real
+/// `S3DriveAdapter`; nothing above the `DriveAdapter` interface may know
+/// which backend is active.
+model DriveFile {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// The full bytes. Postgres, not a document-shaped table — see
+  /// `PostgresDriveAdapter`'s own comment for why this is an initial-stage
+  /// choice, not a target architecture.
+  content Bytes
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("drive_file")
 }

@@ -26,6 +26,7 @@ describe('authentication', () => {
   const auth = new AuthService(prisma, passwords, sessions, new AuditService());
 
   const requestId = '99999999-8888-4777-8666-555555555555';
+  const username = `test-${crypto.randomUUID()}`;
   const email = `test-${crypto.randomUUID()}@example.com`;
   const password = 'a-sufficiently-long-password';
   let userId: string;
@@ -34,7 +35,12 @@ describe('authentication', () => {
 
   beforeAll(async () => {
     const user = await prisma.user.create({
-      data: { email, displayName: 'Test User', passwordHash: await passwords.hash(password) },
+      data: {
+        username,
+        email,
+        displayName: 'Test User',
+        passwordHash: await passwords.hash(password),
+      },
     });
     userId = user.id;
   });
@@ -56,6 +62,12 @@ describe('authentication', () => {
   it('accepts an email with different casing and surrounding whitespace', async () => {
     const result = await inContext(() => auth.login(`  ${email.toUpperCase()}  `, password));
     expect(result.user.id).toBe(userId);
+  });
+
+  it('also signs in with the username, since either identifies the same account', async () => {
+    const result = await inContext(() => auth.login(username.toUpperCase(), password));
+    expect(result.user.id).toBe(userId);
+    expect(result.user.username).toBe(username);
   });
 
   it('refuses a wrong password', async () => {

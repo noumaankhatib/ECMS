@@ -6,7 +6,16 @@ import {
 } from '@ecms/contracts';
 
 import { ActionButton, ActionForm, Field, Select, TextArea } from '@/components/form';
-import { Badge, Breadcrumb, Card, CardBody, Empty, PageHead, Value } from '@/components/ui';
+import {
+  Badge,
+  Breadcrumb,
+  Card,
+  CardBody,
+  Empty,
+  PageHead,
+  Pagination,
+  Value,
+} from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
 import type { Modification, Page as ApiPage, Project } from '@/lib/types';
@@ -14,6 +23,8 @@ import type { Modification, Page as ApiPage, Project } from '@/lib/types';
 import { createModification, transitionModification } from './actions';
 
 export const metadata = { title: 'Modifications — ECMS' };
+
+const PAGE_SIZE = 25;
 
 const STATUS_LABEL: Record<ApprovalStatus, string> = {
   DRAFT: 'Draft',
@@ -63,13 +74,23 @@ const ACTIONS: {
  * way a Submission's reviews/meetings do (docs/PROGRESS.md's Phase 2 note on
  * "no dedicated edit page" applies here for the same reason).
  */
-export default async function ModificationsPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ModificationsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ page?: string }>;
+}) {
   const session = await requireSession();
   const { id } = await params;
+  const query = await searchParams;
+  const pageNumber = Math.max(1, Number(query.page) || 1);
 
   const [project, modifications] = await Promise.all([
     api.get<Project>(`/projects/${id}`),
-    api.get<ApiPage<Modification>>(`/projects/${id}/modifications?pageSize=100`),
+    api.get<ApiPage<Modification>>(
+      `/projects/${id}/modifications?page=${pageNumber}&pageSize=${PAGE_SIZE}`,
+    ),
   ]);
 
   const closed = project.status === 'CLOSED';
@@ -80,6 +101,10 @@ export default async function ModificationsPage({ params }: { params: Promise<{ 
   const ordered = [...modifications.items].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
+
+  function buildHref(targetPage: number): string {
+    return `/projects/${id}/modifications?page=${targetPage}`;
+  }
 
   return (
     <>
@@ -97,63 +122,75 @@ export default async function ModificationsPage({ params }: { params: Promise<{ 
           {ordered.length === 0 ? (
             <Empty title="No modifications recorded yet" />
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Request</th>
-                  <th>Area</th>
-                  <th>Cost impact</th>
-                  <th>Time impact</th>
-                  <th>Status</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {ordered.map((modification) => {
-                  const available = ACTIONS.filter(
-                    (candidate) =>
-                      canTransitionApproval(modification.status, candidate.to) &&
-                      (candidate.decision ? mayApprove : mayEdit),
-                  );
-                  return (
-                    <tr key={modification.id}>
-                      <td>{modification.requestText}</td>
-                      <td>
-                        <Badge>{IMPACT_AREA_LABEL[modification.impactArea]}</Badge>
-                      </td>
-                      <td>
-                        <Value>{modification.costImpact}</Value>
-                      </td>
-                      <td>
-                        <Value>{modification.timeImpact}</Value>
-                      </td>
-                      <td>
-                        <Badge>{STATUS_LABEL[modification.status]}</Badge>
-                      </td>
-                      <td className="right">
-                        <div className="row" style={{ justifyContent: 'flex-end' }}>
-                          {available.map((candidate) => (
-                            <ActionButton
-                              key={candidate.action}
-                              action={transitionModification.bind(
-                                null,
-                                id,
-                                modification.id,
-                                candidate.action,
-                                modification.version,
-                              )}
-                              label={candidate.label}
-                              variant={candidate.variant ?? 'secondary'}
-                            />
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Request</th>
+                    <th>Area</th>
+                    <th>Cost impact</th>
+                    <th>Time impact</th>
+                    <th>Status</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {ordered.map((modification) => {
+                    const available = ACTIONS.filter(
+                      (candidate) =>
+                        canTransitionApproval(modification.status, candidate.to) &&
+                        (candidate.decision ? mayApprove : mayEdit),
+                    );
+                    return (
+                      <tr key={modification.id}>
+                        <td>{modification.requestText}</td>
+                        <td>
+                          <Badge>{IMPACT_AREA_LABEL[modification.impactArea]}</Badge>
+                        </td>
+                        <td>
+                          <Value>{modification.costImpact}</Value>
+                        </td>
+                        <td>
+                          <Value>{modification.timeImpact}</Value>
+                        </td>
+                        <td>
+                          <Badge>{STATUS_LABEL[modification.status]}</Badge>
+                        </td>
+                        <td className="right">
+                          <div className="row" style={{ justifyContent: 'flex-end' }}>
+                            {available.map((candidate) => (
+                              <ActionButton
+                                key={candidate.action}
+                                action={transitionModification.bind(
+                                  null,
+                                  id,
+                                  modification.id,
+                                  candidate.action,
+                                  modification.version,
+                                )}
+                                label={candidate.label}
+                                variant={candidate.variant ?? 'secondary'}
+                              />
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
+          {ordered.length > 0 ? (
+            <CardBody>
+              <Pagination
+                page={pageNumber}
+                pageSize={PAGE_SIZE}
+                total={modifications.total}
+                buildHref={buildHref}
+              />
+            </CardBody>
+          ) : null}
           {mayCreate ? (
             <CardBody>
               <ActionForm action={createModification} submitLabel="Record modification">

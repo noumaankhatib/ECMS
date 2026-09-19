@@ -1,21 +1,31 @@
 import {
+  WORKSTREAM_TYPES,
   searchQuerySchema,
+  type ApprovalInboxItem,
   type DashboardSummary,
   type NotificationItem,
   type SearchQuery,
   type SearchResult,
+  type WorkstreamStats,
+  type WorkstreamType,
 } from '@ecms/contracts';
 import { Controller, Get, Query, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { z } from 'zod';
 
 import { appError } from '../../shared/errors/app-error';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import { RequirePermissionAnywhere } from '../access';
 
+import { ApprovalsInboxService } from './approvals-inbox.service';
 import { DashboardService } from './dashboard.service';
 import { ExportService } from './export.service';
 import { NotificationsService } from './notifications.service';
 import { SearchService } from './search.service';
+import { WorkstreamStatsService } from './workstream-stats.service';
+
+const workstreamStatsQuerySchema = z.object({ type: z.enum(WORKSTREAM_TYPES) }).strict();
+type WorkstreamStatsQuery = z.infer<typeof workstreamStatsQuerySchema>;
 
 /** The signed-in user. The guard guarantees it; this keeps the assertion in one place. */
 function actorOf(req: Request): string {
@@ -40,6 +50,8 @@ export class InsightsController {
     private readonly dashboard: DashboardService,
     private readonly notifications: NotificationsService,
     private readonly search: SearchService,
+    private readonly workstreamStats: WorkstreamStatsService,
+    private readonly approvalsInbox: ApprovalsInboxService,
   ) {}
 
   @Get('dashboard')
@@ -47,9 +59,29 @@ export class InsightsController {
     return this.dashboard.summary(actorOf(req));
   }
 
+  /** The "Total projects" / "Open issues" cards on the top-level Planning
+   *  and Supervision list pages — see WorkstreamStatsService for the
+   *  BOTH-counts-toward-both rule. */
+  @Get('insights/workstream-stats')
+  @RequirePermissionAnywhere('project:view')
+  getWorkstreamStats(
+    @Query(new ZodValidationPipe(workstreamStatsQuerySchema)) query: WorkstreamStatsQuery,
+    @Req() req: Request,
+  ): Promise<WorkstreamStats> {
+    return this.workstreamStats.forType(query.type as WorkstreamType, actorOf(req));
+  }
+
   @Get('notifications')
   getNotifications(@Req() req: Request): Promise<NotificationItem[]> {
     return this.notifications.list(actorOf(req));
+  }
+
+  /** Cross-module list of items pending the caller's own approval — like
+   *  `getNotifications` above, self-gated inside the service against each
+   *  source's own permission, not a single route-level guard. */
+  @Get('insights/approvals')
+  getApprovalsInbox(@Req() req: Request): Promise<ApprovalInboxItem[]> {
+    return this.approvalsInbox.list(actorOf(req));
   }
 
   @Get('search')

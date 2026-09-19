@@ -52,14 +52,15 @@ const API = join(ROOT, 'apps/api');
 const HELP = `
 Usage: node scripts/setup.mjs [options]
 
-  --env=<target>     local (default), staging or production
-  --production       Required before anything may touch a production target
-  --dry-run          Report what would change; change nothing
-  --skip-database    Do not manage the container; the database is someone else's
-  --no-build         Skip the compile step
-  --no-admin         Do not create a first administrator
-  --admin-email=...  Address for the first administrator (local only)
-  -h, --help         This message
+  --env=<target>        local (default), staging or production
+  --production          Required before anything may touch a production target
+  --dry-run             Report what would change; change nothing
+  --skip-database       Do not manage the container; the database is someone else's
+  --no-build            Skip the compile step
+  --no-admin            Do not create a first administrator
+  --admin-username=...  Username for the first administrator (local only)
+  --admin-email=...     Optional email for the first administrator (local only)
+  -h, --help            This message
 
 Exit codes: 0 success, 1 a step failed, 2 refused on safety grounds.
 `;
@@ -72,7 +73,8 @@ function parseOptions(argv) {
     skipDatabase: false,
     build: true,
     admin: true,
-    adminEmail: 'admin@ecms.local',
+    adminUsername: 'admin',
+    adminEmail: null,
   };
 
   for (const arg of argv) {
@@ -85,6 +87,7 @@ function parseOptions(argv) {
     else if (arg === '--skip-database') options.skipDatabase = true;
     else if (arg === '--no-build') options.build = false;
     else if (arg === '--no-admin') options.admin = false;
+    else if (arg.startsWith('--admin-username=')) options.adminUsername = arg.slice(18);
     else if (arg.startsWith('--admin-email=')) options.adminEmail = arg.slice(14);
     else {
       process.stdout.write(`Unrecognised option: ${arg}\n${HELP}`);
@@ -452,7 +455,9 @@ function firstAdministrator(context) {
   }
 
   if (context.target !== 'local') {
-    note('no users exist. Create the first one with: pnpm user:create <email> <name> <password>');
+    note(
+      'no users exist. Create the first one with: pnpm user:create <username> <name> <password>',
+    );
     return;
   }
 
@@ -461,15 +466,16 @@ function firstAdministrator(context) {
     'node',
     [
       join(ROOT, 'apps/api/dist/tools/create-user.js'),
-      OPTIONS.adminEmail,
+      OPTIONS.adminUsername,
       'Local Administrator',
       password,
       'SYSTEM_ADMINISTRATOR',
+      ...(OPTIONS.adminEmail ? [OPTIONS.adminEmail] : []),
     ],
     { env: context.env, quiet: true },
   );
 
-  done(`created ${OPTIONS.adminEmail}`);
+  done(`created ${OPTIONS.adminUsername}`);
   process.stdout.write(
     `\n  ${bold('Password (shown once):')} ${password}\n` +
       `  ${grey('Local development only. Change it, or delete the account, before this machine is shared.')}\n`,

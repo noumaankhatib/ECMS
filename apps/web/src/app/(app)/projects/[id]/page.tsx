@@ -446,7 +446,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                       required
                       options={addable.map((u) => ({
                         value: u.id,
-                        label: `${u.displayName} (${u.email})`,
+                        label: `${u.displayName} (${u.username})`,
                       }))}
                     />
                     <Select

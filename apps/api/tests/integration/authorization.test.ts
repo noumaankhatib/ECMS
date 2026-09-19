@@ -22,6 +22,7 @@ describe('authorization', () => {
   async function userWithRole(roleCode: string): Promise<string> {
     const user = await prisma.user.create({
       data: {
+        username: `authz-${crypto.randomUUID()}`,
         email: `authz-${crypto.randomUUID()}@example.com`,
         displayName: 'Authz Test',
         passwordHash: 'not-used-in-this-test',
@@ -46,6 +47,7 @@ describe('authorization', () => {
 
     const bare = await prisma.user.create({
       data: {
+        username: `authz-${crypto.randomUUID()}`,
         email: `authz-${crypto.randomUUID()}@example.com`,
         displayName: 'No Roles',
         passwordHash: 'not-used-in-this-test',

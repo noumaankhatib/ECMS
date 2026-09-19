@@ -27,7 +27,7 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
   return (
     <>
       <Breadcrumb items={[{ href: '/users', label: 'Users' }, { label: user.displayName }]} />
-      <PageHead title={user.displayName} description={user.email}>
+      <PageHead title={user.displayName} description={user.username}>
         {user.status === 'DISABLED' ? <span className="badge">Disabled</span> : null}
         {mayAdminUser && !isSelf ? (
           user.status === 'ACTIVE' ? (
@@ -132,8 +132,10 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
           <CardHead title="Account" />
           <CardBody>
             <dl className="definition">
+              <dt>Username</dt>
+              <dd>{user.username}</dd>
               <dt>Email</dt>
-              <dd>{user.email}</dd>
+              <dd>{user.email ?? <span className="faint">—</span>}</dd>
               <dt>Status</dt>
               <dd>{user.status === 'ACTIVE' ? 'Active' : 'Disabled'}</dd>
               <dt>Added</dt>

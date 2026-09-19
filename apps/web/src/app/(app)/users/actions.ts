@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 
-import { attempt, refresh, runAction, text } from '@/lib/actions';
+import { attempt, nullableText, refresh, runAction, text } from '@/lib/actions';
 import { api } from '@/lib/api';
 import type { FormState } from '@/lib/form-state';
 import type { UserRow } from '@/lib/types';
@@ -10,7 +10,8 @@ import type { UserRow } from '@/lib/types';
 export async function createUser(_state: FormState, form: FormData): Promise<FormState> {
   const result = await attempt(async () =>
     api.post<UserRow>('/users', {
-      email: form.get('email'),
+      username: form.get('username'),
+      email: await nullableText(form, 'email'),
       displayName: await text(form, 'displayName'),
       password: form.get('password'),
       roleCode: form.get('roleCode'),

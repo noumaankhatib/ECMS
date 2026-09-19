@@ -63,7 +63,11 @@ export default async function ClientsPage({
           <span className="summary-banner__value">{result.total}</span>
           <span className="summary-banner__label"> Total clients</span>
         </div>
-        <p>Build strong relationships. Deliver greater impact.</p>
+        <p>
+          {params.archived === 'true'
+            ? 'Includes archived clients.'
+            : 'Archived clients are hidden — check "Include archived" to see them.'}
+        </p>
       </div>
 
       <form className="row" style={{ marginBottom: 'var(--space-4)' }}>
@@ -96,56 +100,58 @@ export default async function ClientsPage({
             {params.search ? 'Try a different search term.' : 'Create the first one to begin.'}
           </Empty>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Reference</th>
-                <th>Added</th>
-                <th>Status</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {result.items.map((client) => (
-                <tr key={client.id}>
-                  <td>
-                    <div className="entity-cell">
-                      <span className="entity-cell__icon">{initialsOf(client.name)}</span>
-                      <Link href={`/clients/${client.id}`}>{client.name}</Link>
-                    </div>
-                  </td>
-                  <td className="mono">{client.reference ?? <span className="faint">—</span>}</td>
-                  <td className="nowrap">
-                    <DateText value={client.createdAt} />
-                  </td>
-                  <td>
-                    {client.archivedAt ? (
-                      <span className="badge">Archived</span>
-                    ) : (
-                      <span className="badge badge--active">Active</span>
-                    )}
-                  </td>
-                  <td className="right">
-                    <RowMenu>
-                      <Link href={`/clients/${client.id}`}>View</Link>
-                      {session.can('client:edit') ? (
-                        <Link href={`/clients/${client.id}/edit`}>Edit</Link>
-                      ) : null}
-                      {session.can('client:archive') && !client.archivedAt ? (
-                        <ActionButton
-                          action={archiveClient.bind(null, client.id)}
-                          label="Archive"
-                          variant="danger"
-                          confirm={`Archive ${client.name}? Properties and projects linked to it are unaffected, but it will no longer appear in new-record pickers.`}
-                        />
-                      ) : null}
-                    </RowMenu>
-                  </td>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Reference</th>
+                  <th>Added</th>
+                  <th>Status</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {result.items.map((client) => (
+                  <tr key={client.id}>
+                    <td>
+                      <div className="entity-cell">
+                        <span className="entity-cell__icon">{initialsOf(client.name)}</span>
+                        <Link href={`/clients/${client.id}`}>{client.name}</Link>
+                      </div>
+                    </td>
+                    <td className="mono">{client.reference ?? <span className="faint">—</span>}</td>
+                    <td className="nowrap">
+                      <DateText value={client.createdAt} />
+                    </td>
+                    <td>
+                      {client.archivedAt ? (
+                        <span className="badge">Archived</span>
+                      ) : (
+                        <span className="badge badge--active">Active</span>
+                      )}
+                    </td>
+                    <td className="right">
+                      <RowMenu>
+                        <Link href={`/clients/${client.id}`}>View</Link>
+                        {session.can('client:edit') ? (
+                          <Link href={`/clients/${client.id}/edit`}>Edit</Link>
+                        ) : null}
+                        {session.can('client:archive') && !client.archivedAt ? (
+                          <ActionButton
+                            action={archiveClient.bind(null, client.id)}
+                            label="Archive"
+                            variant="danger"
+                            confirm={`Archive ${client.name}? Properties and projects linked to it are unaffected, but it will no longer appear in new-record pickers.`}
+                          />
+                        ) : null}
+                      </RowMenu>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
 

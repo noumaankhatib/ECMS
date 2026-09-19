@@ -10,7 +10,9 @@ export type AuditAction =
   | 'LOGGED_IN'
   | 'LOGGED_OUT'
   | 'LOGIN_FAILED'
-  | 'PERMISSION_DENIED';
+  | 'PERMISSION_DENIED'
+  | 'ADMIN_ARCHIVE'
+  | 'ADMIN_HARD_DELETE';
 
 export type AuditOutcome = 'SUCCEEDED' | 'REJECTED';
 

@@ -1,11 +1,15 @@
 /**
  * Creates or updates a user from the command line.
  *
- *   node dist/tools/create-user.js <email> <displayName> <password> [roleCode]
+ *   node dist/tools/create-user.js <username> <displayName> <password> [roleCode] [email]
  *
  * Exists so the very first administrator can be created without a chicken-and-egg
  * problem, and so a locked-out account can be recovered. Safe to run twice: an
- * existing address has its name and password updated rather than erroring.
+ * existing username has its name and password updated rather than erroring.
+ *
+ * Email is optional here, same as everywhere else — this system sends no mail
+ * of any kind, so it is never a required mailbox, only an optional extra
+ * identity.
  *
  * Interim measure. Once user administration exists in the interface (step 4)
  * this stays only as a break-glass recovery tool.
@@ -14,10 +18,11 @@ import { hash } from '@node-rs/argon2';
 import { PrismaClient } from '@prisma/client';
 
 async function main(): Promise<void> {
-  const [email, displayName, password, roleCode = 'SYSTEM_ADMINISTRATOR'] = process.argv.slice(2);
+  const [username, displayName, password, roleCode = 'SYSTEM_ADMINISTRATOR', email] =
+    process.argv.slice(2);
 
-  if (!email || !displayName || !password) {
-    console.error('Usage: create-user <email> <displayName> <password> [roleCode]');
+  if (!username || !displayName || !password) {
+    console.error('Usage: create-user <username> <displayName> <password> [roleCode] [email]');
     process.exit(1);
   }
   if (password.length < 12) {
@@ -25,13 +30,25 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const prisma = new PrismaClient({ datasourceUrl: process.env['DATABASE_URL'] as string });
-  const normalised = email.trim().toLowerCase();
+  const dbHost = process.env['DB_HOST'] ?? 'localhost';
+  const dbPort = process.env['DB_PORT'] ?? '5432';
+  const dbName = process.env['DB_NAME'] ?? 'ecms';
+  const dbUser = process.env['DB_APP_USER'] ?? 'ecms_app';
+  const dbPassword = encodeURIComponent(process.env['DB_APP_PASSWORD'] ?? '');
+  const prisma = new PrismaClient({ datasourceUrl: `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}` });
+  const normalisedUsername = username.trim().toLowerCase();
+  const normalisedEmail = email ? email.trim().toLowerCase() : null;
   const passwordHash = await hash(password, { memoryCost: 19_456, timeCost: 2, parallelism: 1 });
 
   const user = await prisma.user.upsert({
-    where: { email: normalised },
-    create: { email: normalised, displayName, passwordHash, status: 'ACTIVE' },
+    where: { username: normalisedUsername },
+    create: {
+      username: normalisedUsername,
+      email: normalisedEmail,
+      displayName,
+      passwordHash,
+      status: 'ACTIVE',
+    },
     update: { displayName, passwordHash, status: 'ACTIVE', deletedAt: null },
   });
 
@@ -42,7 +59,7 @@ async function main(): Promise<void> {
   });
 
   // The password is never echoed, not even here.
-  console.log(`User ready: ${user.email} (${user.id}) with role ${roleCode}`);
+  console.log(`User ready: ${user.username} (${user.id}) with role ${roleCode}`);
   await prisma.$disconnect();
 }
 

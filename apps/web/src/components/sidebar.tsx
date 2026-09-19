@@ -5,16 +5,21 @@ import { usePathname } from 'next/navigation';
 import { type ReactNode, useState } from 'react';
 
 import {
+  AdminDataIcon,
+  ApprovalsIcon,
   ChevronLeftIcon,
   ClientsIcon,
   DashboardIcon,
   DocumentsIcon,
   HelpIcon,
+  PlanningIcon,
   ProjectsIcon,
   PropertiesIcon,
   ProposalsIcon,
+  ReportsIcon,
   SettingsIcon,
   SketchTypesIcon,
+  SupervisionIcon,
   UsersIcon,
 } from './icons';
 
@@ -26,14 +31,19 @@ const COOKIE_NAME = 'ecms_sidebar_collapsed';
 const ICONS = {
   dashboard: DashboardIcon,
   projects: ProjectsIcon,
+  planning: PlanningIcon,
+  supervision: SupervisionIcon,
   proposals: ProposalsIcon,
   clients: ClientsIcon,
   properties: PropertiesIcon,
   sketchTypes: SketchTypesIcon,
   documents: DocumentsIcon,
+  reports: ReportsIcon,
+  approvals: ApprovalsIcon,
   users: UsersIcon,
   settings: SettingsIcon,
   help: HelpIcon,
+  adminData: AdminDataIcon,
 } as const;
 
 export type SidebarIconKey = keyof typeof ICONS;

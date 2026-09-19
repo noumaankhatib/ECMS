@@ -1,12 +1,14 @@
 import { PROJECT_STATUSES } from '@ecms/contracts';
 import Link from 'next/link';
 
-import { Card, DateText, Empty, PageHead, StatusBadge, Value } from '@/components/ui';
+import { Card, DateText, Empty, PageHead, Pagination, StatusBadge, Value } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
 import type { Client, Page as ApiPage, Project } from '@/lib/types';
 
 export const metadata = { title: 'Projects — ECMS' };
+
+const PAGE_SIZE = 25;
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: 'Draft',
@@ -27,12 +29,13 @@ const STATUS_LABEL: Record<string, string> = {
 export default async function ProjectsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; status?: string }>;
+  searchParams: Promise<{ search?: string; status?: string; page?: string }>;
 }) {
   const session = await requireSession();
   const params = await searchParams;
+  const pageNumber = Math.max(1, Number(params.page) || 1);
 
-  const query = new URLSearchParams({ pageSize: '100' });
+  const query = new URLSearchParams({ page: String(pageNumber), pageSize: String(PAGE_SIZE) });
   if (params.search) query.set('search', params.search);
   if (params.status) query.set('status', params.status);
 
@@ -43,6 +46,14 @@ export default async function ProjectsPage({
     ? await api.get<ApiPage<Client>>('/clients?pageSize=100&includeArchived=true')
     : { items: [] as Client[] };
   const clientName = new Map(clients.items.map((c) => [c.id, c.name]));
+
+  function buildHref(targetPage: number): string {
+    const q = new URLSearchParams();
+    if (params.search) q.set('search', params.search);
+    if (params.status) q.set('status', params.status);
+    q.set('page', String(targetPage));
+    return `/projects?${q.toString()}`;
+  }
 
   return (
     <>
@@ -92,44 +103,44 @@ export default async function ProjectsPage({
               : 'You are not a member of any project yet. Ask an administrator or the project manager to add you.'}
           </Empty>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Code</th>
-                <th>Name</th>
-                {session.can('client:view') ? <th>Client</th> : null}
-                <th>Status</th>
-                <th>Target end</th>
-              </tr>
-            </thead>
-            <tbody>
-              {page.items.map((project) => (
-                <tr key={project.id}>
-                  <td className="mono">
-                    <Link href={`/projects/${project.id}`}>{project.code}</Link>
-                  </td>
-                  <td>{project.name}</td>
-                  {session.can('client:view') ? (
-                    <td>
-                      <Value>{clientName.get(project.clientId)}</Value>
-                    </td>
-                  ) : null}
-                  <td>
-                    <StatusBadge status={project.status} />
-                  </td>
-                  <td className="nowrap">
-                    <DateText value={project.targetEndDate} />
-                  </td>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Name</th>
+                  {session.can('client:view') ? <th>Client</th> : null}
+                  <th>Status</th>
+                  <th>Target end</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {page.items.map((project) => (
+                  <tr key={project.id}>
+                    <td className="mono">
+                      <Link href={`/projects/${project.id}`}>{project.code}</Link>
+                    </td>
+                    <td>{project.name}</td>
+                    {session.can('client:view') ? (
+                      <td>
+                        <Value>{clientName.get(project.clientId)}</Value>
+                      </td>
+                    ) : null}
+                    <td>
+                      <StatusBadge status={project.status} />
+                    </td>
+                    <td className="nowrap">
+                      <DateText value={project.targetEndDate} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
 
-      <p className="muted" style={{ fontSize: 13, marginTop: 'var(--space-3)' }}>
-        {page.total} {page.total === 1 ? 'project' : 'projects'}
-      </p>
+      <Pagination page={pageNumber} pageSize={PAGE_SIZE} total={page.total} buildHref={buildHref} />
     </>
   );
 }

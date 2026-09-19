@@ -41,7 +41,10 @@ import { z } from 'zod';
 
 export const loginRequestSchema = z
   .object({
-    email: z.string().trim().toLowerCase().email('Must be a valid email address').max(320),
+    /** A username or an email — whichever this account actually has.
+     *  Deliberately not validated as an email shape, since a username never
+     *  is one; `AuthService.login` tries both against the same value. */
+    identifier: z.string().trim().toLowerCase().min(1, 'Enter your username or email').max(320),
     // Only a presence check on sign-in. Strength rules belong on the endpoints
     // that SET a password; applying them here would tell an attacker which
     // guesses were not even worth trying.
@@ -53,7 +56,8 @@ export type LoginRequest = z.infer<typeof loginRequestSchema>;
 
 export const currentUserSchema = z.object({
   id: z.string().uuid(),
-  email: z.string().email(),
+  username: z.string(),
+  email: z.string().nullable(),
   displayName: z.string(),
 });
 
@@ -160,6 +164,8 @@ export const PERMISSIONS = [
 
   'role:view',
   'role:admin',
+
+  'admin:data',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -447,6 +453,13 @@ export const createProjectSchema = z
     type: z.enum(PROJECT_TYPES),
     startDate: optionalDate,
     targetEndDate: optionalDate,
+    /**
+     * A human-readable note, not a link — the code of planning work that
+     * predates this system. Only meaningful on a SUPERVISION project created
+     * against planning the consultancy did before this app existed; never
+     * resolved against a real Project row.
+     */
+    externalPlanningReference: optionalText(50),
   })
   .strict()
   .superRefine((value, ctx) => {
@@ -491,6 +504,13 @@ export const projectListQuerySchema = z
     status: z.enum(PROJECT_STATUSES).optional(),
     clientId: z.string().uuid().optional(),
     propertyId: z.string().uuid().optional(),
+    /**
+     * Filters to projects that run this workstream. PLANNING and SUPERVISION
+     * each also match BOTH-type projects (a BOTH project runs both
+     * workstreams at once, the same rule RequiredDocument.scope already
+     * follows) — only `type=BOTH` itself means "BOTH-type projects only".
+     */
+    type: z.enum(PROJECT_TYPES).optional(),
   })
   .strict();
 
@@ -505,6 +525,21 @@ export const projectTransitionSchema = z
   .strict();
 
 export type ProjectTransition = z.infer<typeof projectTransitionSchema>;
+
+/**
+ * Upgrades a PLANNING project to BOTH in place — same project, same code —
+ * opening its Supervision workstream. The sanctioned way to add supervision
+ * to existing planning work; see ProjectService.upgradeToSupervision. Not a
+ * general type editor: it only ever moves PLANNING -> BOTH.
+ */
+export const upgradeProjectToBothSchema = z
+  .object({
+    version: z.number().int().min(1),
+    reason: optionalText(1000),
+  })
+  .strict();
+
+export type UpgradeProjectToBoth = z.infer<typeof upgradeProjectToBothSchema>;
 
 export const createWorkstreamSchema = z
   .object({
@@ -709,9 +744,30 @@ export const passwordSchema = z
   .min(12, 'Use at least 12 characters')
   .max(1024, 'That is longer than 1024 characters');
 
+/**
+ * The login identity. Mandatory, unlike email — this system sends no mail of
+ * any kind, so email is never a required mailbox, only an optional alternate
+ * identity or contact detail. Lower-cased for the same case-insensitive
+ * reasoning `email` already followed before this field existed.
+ */
+export const usernameSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(3, 'Use at least 3 characters')
+  .max(50, 'That is longer than 50 characters')
+  .regex(/^[a-z0-9._-]+$/, 'Use only lowercase letters, numbers, dots, underscores or hyphens');
+
 export const createUserSchema = z
   .object({
-    email: z.string().trim().toLowerCase().email('Must be a valid email address').max(320),
+    username: usernameSchema,
+    email: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .email('Must be a valid email address')
+      .max(320)
+      .nullish(),
     displayName: z.string().trim().min(1, 'A name is required').max(200),
     password: passwordSchema,
     roleCode: z.enum(ROLES),
@@ -721,9 +777,11 @@ export const createUserSchema = z
 export type CreateUser = z.infer<typeof createUserSchema>;
 
 /**
- * Editing a user never touches their password. Setting someone else's password
- * is a separate, deliberate act with its own endpoint, so it cannot happen as a
- * side effect of correcting a typo in a name.
+ * Editing a user never touches their password, and never touches their
+ * username or email — the login identity is set once at creation, same as
+ * before this field existed. Setting someone else's password is a separate,
+ * deliberate act with its own endpoint, so it cannot happen as a side effect
+ * of correcting a typo in a name.
  */
 export const updateUserSchema = z
   .object({
@@ -743,7 +801,8 @@ export type AssignRole = z.infer<typeof assignRoleSchema>;
 /** What the interface is told about a user. Never includes the password hash. */
 export interface UserSummary {
   readonly id: string;
-  readonly email: string;
+  readonly username: string;
+  readonly email: string | null;
   readonly displayName: string;
   readonly status: UserStatus;
   readonly roles: readonly Role[];
@@ -1186,6 +1245,7 @@ export const issueListQuerySchema = z
     status: z.enum(ISSUE_STATUSES).optional(),
     page: z.coerce.number().int().min(1).default(1),
     pageSize: z.coerce.number().int().min(1).max(100).default(25),
+    workstreamType: z.enum(WORKSTREAM_TYPES).optional(),
   })
   .strict();
 
@@ -1236,6 +1296,13 @@ export const createIssueSchema = z
     priority: z.enum(ISSUE_PRIORITIES).default('MEDIUM'),
     ownerId: z.string().uuid().nullish(),
     dueDate: optionalDate,
+    /**
+     * Which workstream raised this issue. Required only when the project
+     * runs both (IssueService.create checks this against the project's own
+     * type, since this schema has no way to see it) — on a single-workstream
+     * project it is ignored and always stored as null.
+     */
+    workstreamType: z.enum(WORKSTREAM_TYPES).nullish(),
   })
   .strict();
 
@@ -1299,9 +1366,6 @@ export type CreateDrawing = z.infer<typeof createDrawingSchema>;
 export const createDrawingRevisionSchema = z
   .object({
     revisionCode: z.string().trim().min(1, 'A revision code is required').max(50),
-    /** Set once a real Drive account exists to upload to
-     *  (docs/phase-3-plan.md §7) — null is the honest answer until then. */
-    fileId: optionalText(500),
     notes: optionalText(5000),
   })
   .strict();
@@ -1593,14 +1657,34 @@ export interface Trend {
 }
 
 export interface DashboardSummary {
-  projects?: Record<ProjectStatus, number> & { trend?: Trend };
+  projects?: Record<ProjectStatus, number> & {
+    trend?: Trend;
+    /** BOTH-type projects count toward both — same rule as everywhere else
+     *  a project's type is split by workstream. */
+    byType?: { planning: number; supervision: number };
+  };
   proposals?: Record<ProposalStatus, number> & { trend?: Trend };
   clients?: Trend;
-  issues?: { open: number; closed: number; overdue: number };
+  issues?: {
+    open: number;
+    closed: number;
+    overdue: number;
+    /** Untagged issues on a BOTH project count in neither bucket here —
+     *  ambiguous which workstream they belong to — only in `open` above. */
+    byWorkstream?: { planning: number; supervision: number };
+  };
   supervisionAgreements?: { active: number; nearingQuota: number };
   handover?: { completedNotClosed: number; ready: number };
   recentActivity?: ActivityItem[];
   upcomingDeadlines?: DeadlineItem[];
+}
+
+/** The two headline numbers shown on the top-level Planning/Supervision
+ *  list pages — a project-type-scoped sibling of `DashboardSummary`, not a
+ *  replacement for it. */
+export interface WorkstreamStats {
+  totalProjects: number;
+  openIssues: number;
 }
 
 export const DEADLINE_STATUSES = ['OVERDUE', 'PENDING', 'UPCOMING'] as const;
@@ -1635,12 +1719,21 @@ export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number];
 /** One line of the append-only audit trail (docs/PROGRESS.md's own audit
  *  design), reduced to the safe subset worth showing on a dashboard: never
  *  `before`/`after`, which may carry a document's content reference or other
- *  field-level detail a dashboard viewer may not be entitled to. */
+ *  field-level detail a dashboard viewer may not be entitled to.
+ *
+ *  `actorName`/`projectCode`/`projectName`/`clientName` are resolved
+ *  server-side (never a bare id for the viewer to decode) and are `null`
+ *  exactly when there is nothing to resolve — a system-initiated action has
+ *  no actor, and a portfolio-wide entity (Client, User) has no project. */
 export interface ActivityItem {
   action: ActivityAction;
   entityType: string;
   entityId: string | null;
   projectId: string | null;
+  projectCode: string | null;
+  projectName: string | null;
+  clientName: string | null;
+  actorName: string | null;
   occurredAt: string;
 }
 
@@ -1666,6 +1759,32 @@ export interface NotificationItem {
   link: string | null;
 }
 
+export const APPROVAL_INBOX_ENTITY_TYPES = [
+  'DrawingRevision',
+  'Modification',
+  'Submission',
+  'Proposal',
+] as const;
+export type ApprovalInboxEntityType = (typeof APPROVAL_INBOX_ENTITY_TYPES)[number];
+
+/** One item awaiting the current user's approval, unioned across every
+ *  module that shares the `ApprovalStatus` state machine (`DrawingRevision`,
+ *  `Modification`, `Submission`) plus `Proposal`'s own separate machine
+ *  (docs/phase-11-plan.md — Approvals inbox). Nothing here is stored or
+ *  dismissed; the same posture as `NotificationItem`, the list is
+ *  recomputed on every request. */
+export interface ApprovalInboxItem {
+  entityType: ApprovalInboxEntityType;
+  id: string;
+  title: string;
+  /** Null only for `Proposal`, which carries no `projectId` at all. */
+  projectId: string | null;
+  submittedBy: string | null;
+  submittedAt: string;
+  /** Where the web app should send the person to act on it. */
+  link: string;
+}
+
 export const SEARCH_RESULT_TYPES = ['CLIENT', 'PROPERTY', 'PROJECT', 'PROPOSAL'] as const;
 export type SearchResultType = (typeof SEARCH_RESULT_TYPES)[number];
 
@@ -1685,3 +1804,66 @@ export const searchQuerySchema = z
   .strict();
 
 export type SearchQuery = z.infer<typeof searchQuerySchema>;
+
+// ---------------------------------------------------------------------------
+// Admin — impact tree and selective delete (admin:data permission)
+// ---------------------------------------------------------------------------
+
+export const ADMIN_ENTITY_TYPES = [
+  'client',
+  'contact',
+  'property',
+  'proposal',
+  'project',
+  'member',
+  'workstream',
+  'planningActivity',
+  'milestone',
+  'submission',
+  'submissionReview',
+  'submissionMeeting',
+  'siteVisit',
+  'observation',
+  'instruction',
+  'issue',
+  'supervisionAgreement',
+  'drawing',
+  'drawingRevision',
+  'modification',
+  'document',
+  'handoverChecklist',
+] as const;
+
+export type AdminEntityType = (typeof ADMIN_ENTITY_TYPES)[number];
+
+export interface ImpactNode {
+  id: string;
+  type: AdminEntityType;
+  label: string;
+  archivedAt: string | null;
+  children: ImpactNode[];
+}
+
+export interface ImpactTree {
+  root: ImpactNode;
+  totalCount: number;
+}
+
+export const adminDeleteItemSchema = z.object({
+  type: z.enum(ADMIN_ENTITY_TYPES),
+  id: z.string().uuid(),
+});
+export type AdminDeleteItem = z.infer<typeof adminDeleteItemSchema>;
+
+export const adminArchiveSchema = z
+  .object({ items: z.array(adminDeleteItemSchema).min(1) })
+  .strict();
+export type AdminArchive = z.infer<typeof adminArchiveSchema>;
+
+export const adminHardDeleteSchema = z
+  .object({
+    items: z.array(adminDeleteItemSchema).min(1),
+    confirmName: z.string().min(1),
+  })
+  .strict();
+export type AdminHardDelete = z.infer<typeof adminHardDeleteSchema>;

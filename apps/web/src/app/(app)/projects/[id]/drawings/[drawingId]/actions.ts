@@ -2,7 +2,7 @@
 
 import type { DrawingRevisionAction } from '@ecms/contracts';
 
-import { nullableText, refresh, runAction, text } from '@/lib/actions';
+import { nullableText, refresh, runAction } from '@/lib/actions';
 import { api } from '@/lib/api';
 import type { FormState } from '@/lib/form-state';
 
@@ -10,13 +10,19 @@ export async function createRevision(_state: FormState, form: FormData): Promise
   const projectId = String(form.get('projectId'));
   const drawingId = String(form.get('drawingId'));
 
-  const result = await runAction(async () => {
-    await api.post(`/projects/${projectId}/drawings/${drawingId}/revisions`, {
-      revisionCode: await text(form, 'revisionCode'),
-      fileId: await nullableText(form, 'fileId'),
-      notes: await nullableText(form, 'notes'),
-    });
-  });
+  const body = new FormData();
+  body.set('revisionCode', String(form.get('revisionCode') ?? ''));
+  const notes = await nullableText(form, 'notes');
+  if (notes) body.set('notes', notes);
+
+  // Optional — a revision may be registered before the scanned file is
+  // ready, the same as before this form could upload one at all.
+  const file = form.get('file');
+  if (file instanceof File && file.size > 0) body.set('file', file);
+
+  const result = await runAction(() =>
+    api.postForm(`/projects/${projectId}/drawings/${drawingId}/revisions`, body),
+  );
 
   if (!result.error) await refresh(`/projects/${projectId}/drawings/${drawingId}`);
   return result;

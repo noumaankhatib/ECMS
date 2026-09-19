@@ -1,4 +1,10 @@
-import type { ActivityItem, DashboardSummary, DeadlineItem, Trend } from '@ecms/contracts';
+import type {
+  ActivityItem,
+  DashboardSummary,
+  DeadlineItem,
+  NotificationItem,
+  Trend,
+} from '@ecms/contracts';
 import Link from 'next/link';
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 
@@ -14,6 +20,7 @@ import {
   TrendUpIcon,
   UsersIcon,
 } from '@/components/icons';
+import { MiniCalendar } from '@/components/mini-calendar';
 import { Card, CardBody, CardHead, Empty, PageHead } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
@@ -89,7 +96,10 @@ const ACTIVITY_VERB: Record<ActivityItem['action'], string> = {
  *  status system use elsewhere — a client is always blue, a proposal
  *  always purple, wherever either appears. Anything outside this named set
  *  (Document, Milestone, ...) gets the neutral default rather than a guess. */
-const ACTIVITY_ACCENT: Record<string, { icon: ComponentType<SVGProps<SVGSVGElement>>; class: string }> = {
+const ACTIVITY_ACCENT: Record<
+  string,
+  { icon: ComponentType<SVGProps<SVGSVGElement>>; class: string }
+> = {
   Client: { icon: ClientsIcon, class: 'activity-icon--blue' },
   Proposal: { icon: ProposalsIcon, class: 'activity-icon--purple' },
   Project: { icon: ProjectsIcon, class: 'activity-icon--green' },
@@ -160,7 +170,24 @@ function KpiCard({
 function activityLabel(item: ActivityItem): ReactNode {
   return (
     <>
-      Someone {ACTIVITY_VERB[item.action]} a <strong>{item.entityType}</strong>
+      <strong>{item.actorName ?? 'Someone'}</strong> {ACTIVITY_VERB[item.action]} a{' '}
+      <strong>{item.entityType}</strong>
+      {item.projectCode ? (
+        <>
+          {' '}
+          on{' '}
+          <Link href={`/projects/${item.projectId}`}>
+            {item.projectCode}
+            {item.projectName ? ` — ${item.projectName}` : ''}
+          </Link>
+        </>
+      ) : null}
+      {item.clientName ? (
+        <>
+          {' '}
+          <span className="activity-list__client">({item.clientName})</span>
+        </>
+      ) : null}
     </>
   );
 }
@@ -217,6 +244,13 @@ export default async function DashboardPage() {
   const session = await requireSession();
   const summary = await api.get<DashboardSummary>('/dashboard');
 
+  // The same `/notifications` recompute the standalone page runs
+  // (docs/phase-11-plan.md §5) — nothing new fetched, just also surfaced
+  // here so the utility rail does not send someone away to see it.
+  const notifications = await api
+    .get<NotificationItem[]>('/notifications')
+    .catch(() => [] as NotificationItem[]);
+
   const hasAnything =
     summary.projects ||
     summary.proposals ||
@@ -243,6 +277,64 @@ export default async function DashboardPage() {
         .reduce((sum, [, count]) => sum + (typeof count === 'number' ? count : 0), 0)
     : 0;
 
+  const firstName = session.user.displayName.split(' ')[0];
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const overdueIssues = summary.issues?.overdue ?? 0;
+  const overdueDeadlines =
+    summary.upcomingDeadlines?.filter((item) => item.status === 'OVERDUE').length ?? 0;
+  const overdueTotal = overdueIssues + overdueDeadlines;
+  const heroMessage =
+    overdueTotal > 0
+      ? `${overdueTotal} item${overdueTotal === 1 ? '' : 's'} across the portfolio ${overdueTotal === 1 ? 'is' : 'are'} overdue and need attention.`
+      : 'Nothing overdue right now — the portfolio is on track.';
+
+  // Neither `DeadlineItem` nor `ActivityItem` alone carries everything a
+  // "project-wise" row wants (a deadline has no project name; an activity
+  // entry has no deadline) — this only joins the two the API already sent,
+  // it never asks for anything new. A project with no activity entry to
+  // borrow a name from still gets a row, just without one.
+  const projectNameById = new Map<string, string>();
+  for (const item of summary.recentActivity ?? []) {
+    if (item.projectId && item.projectCode) {
+      projectNameById.set(
+        item.projectId,
+        item.projectName ? `${item.projectCode} — ${item.projectName}` : item.projectCode,
+      );
+    }
+  }
+  const nextDeadlineByProject = new Map<string, DeadlineItem>();
+  for (const item of [...(summary.upcomingDeadlines ?? [])].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+  )) {
+    if (!nextDeadlineByProject.has(item.projectId)) {
+      nextDeadlineByProject.set(item.projectId, item);
+    }
+  }
+  const projectDeadlineRows = [...nextDeadlineByProject.entries()].map(([projectId, deadline]) => ({
+    projectId,
+    label: projectNameById.get(projectId) ?? `Project ${projectId.slice(0, 8)}`,
+    deadline,
+  }));
+
+  // A data-supported split, not an invented taxonomy: `entityType` already
+  // separates delivery work (Project/Issue) from client-facing/sales work
+  // (Client/Proposal) — the same two families `ACTIVITY_ACCENT` already
+  // colours differently above.
+  const DELIVERY_TYPES = new Set(['Project', 'Issue']);
+  const deliveryActivity = (summary.recentActivity ?? []).filter((item) =>
+    DELIVERY_TYPES.has(item.entityType),
+  );
+  const clientActivity = (summary.recentActivity ?? []).filter(
+    (item) => !DELIVERY_TYPES.has(item.entityType),
+  );
+
+  const NOTIFICATION_DOT_CLASS: Record<NotificationItem['severity'], string> = {
+    INFO: 'notification-mini-list__dot--info',
+    WARNING: 'notification-mini-list__dot--warning',
+    CRITICAL: 'notification-mini-list__dot--critical',
+  };
+
   return (
     <>
       <PageHead
@@ -262,11 +354,13 @@ export default async function DashboardPage() {
         <>
           <div className="hero-banner">
             <div>
-              <h2>Build. Manage. Grow.</h2>
-              <p>Turning complex projects into meaningful outcomes.</p>
+              <h2>
+                {greeting}, {firstName}.
+              </h2>
+              <p>{heroMessage}</p>
             </div>
             <div className="hero-banner__date">
-              <span>Signed in as {session.user.displayName}</span>
+              <span>Today</span>
               <strong>{today}</strong>
             </div>
           </div>
@@ -337,8 +431,8 @@ export default async function DashboardPage() {
             </CardBody>
           </Card>
 
-          <div className="grid-2" style={{ marginTop: 'var(--space-5)' }}>
-            <div className="stack">
+          {summary.projects || summary.proposals ? (
+            <div className="grid-2" style={{ marginTop: 'var(--space-5)' }}>
               {summary.projects ? (
                 <Card>
                   <CardHead title="Project status" />
@@ -350,6 +444,69 @@ export default async function DashboardPage() {
                         color: PROJECT_STATUS_COLOR[status] ?? 'var(--slate-400)',
                       }))}
                     />
+                  </CardBody>
+                </Card>
+              ) : null}
+
+              {summary.proposals ? (
+                <Card>
+                  <CardHead title="Proposal funnel">
+                    <Link href="/proposals" className="button button--secondary button--small">
+                      View all
+                    </Link>
+                  </CardHead>
+                  <CardBody>
+                    <Funnel
+                      stages={PROPOSAL_FUNNEL_ORDER.map((status) => ({
+                        label: PROPOSAL_STATUS_LABEL[status] ?? status,
+                        value: (summary.proposals as Record<string, number>)[status] ?? 0,
+                        color: PROPOSAL_STAGE_COLOR[status],
+                      }))}
+                    />
+                  </CardBody>
+                </Card>
+              ) : null}
+            </div>
+          ) : null}
+
+          {/* Two independent-height columns, left for delivery-status cards, right
+              for a shorter utility rail (calendar/notifications/deadlines) — kept
+              close in height on purpose so neither column trails off into a long
+              empty gap below the other. The two naturally tallest cards (the
+              chart pair above, and Recent activity below) are full-width instead
+              of forced into one of these columns. */}
+          <div className="grid-2" style={{ marginTop: 'var(--space-5)' }}>
+            <div className="stack">
+              {projectDeadlineRows.length > 0 ? (
+                <Card>
+                  <CardHead title="Projects with upcoming deadlines" />
+                  <CardBody>
+                    <div className="table-scroll">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Project</th>
+                            <th>Deadline status</th>
+                            <th>Next deadline</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {projectDeadlineRows.map((row) => (
+                            <tr key={row.projectId}>
+                              <td>
+                                <Link href={`/projects/${row.projectId}`}>{row.label}</Link>
+                              </td>
+                              <td>
+                                <span className={`badge ${DEADLINE_BADGE_CLASS[row.deadline.status]}`}>
+                                  {DEADLINE_LABEL[row.deadline.status]}
+                                </span>
+                              </td>
+                              <td>{formatDeadlineDate(row.deadline.date)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </CardBody>
                 </Card>
               ) : null}
@@ -430,6 +587,55 @@ export default async function DashboardPage() {
             <div className="stack">
               {summary.upcomingDeadlines && summary.upcomingDeadlines.length > 0 ? (
                 <Card>
+                  <CardHead title="This month" />
+                  <CardBody>
+                    <MiniCalendar dates={summary.upcomingDeadlines} />
+                    <div className="mini-calendar__legend">
+                      <span>
+                        <i style={{ background: 'var(--danger)' }} />
+                        Overdue
+                      </span>
+                      <span>
+                        <i style={{ background: 'var(--warning)' }} />
+                        Pending
+                      </span>
+                      <span>
+                        <i style={{ background: 'var(--info)' }} />
+                        Upcoming
+                      </span>
+                    </div>
+                  </CardBody>
+                </Card>
+              ) : null}
+
+              {notifications.length > 0 ? (
+                <Card>
+                  <CardHead title="Notifications">
+                    <Link href="/notifications" className="button button--secondary button--small">
+                      View all
+                    </Link>
+                  </CardHead>
+                  <CardBody>
+                    <ul className="notification-mini-list">
+                      {notifications.slice(0, 4).map((item, index) => (
+                        <li key={index}>
+                          <span
+                            className={`notification-mini-list__dot ${NOTIFICATION_DOT_CLASS[item.severity]}`}
+                          />
+                          {item.link ? (
+                            <Link href={item.link}>{item.message}</Link>
+                          ) : (
+                            <span>{item.message}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </CardBody>
+                </Card>
+              ) : null}
+
+              {summary.upcomingDeadlines && summary.upcomingDeadlines.length > 0 ? (
+                <Card>
                   <CardHead title="Upcoming deadlines" />
                   <CardBody>
                     <ul className="deadline-list">
@@ -451,43 +657,57 @@ export default async function DashboardPage() {
                 </Card>
               ) : null}
 
-              {summary.proposals ? (
-                <Card>
-                  <CardHead title="Proposal funnel">
-                    <Link href="/proposals" className="button button--secondary button--small">
-                      View all
-                    </Link>
-                  </CardHead>
-                  <CardBody>
-                    <Funnel
-                      stages={PROPOSAL_FUNNEL_ORDER.map((status) => ({
-                        label: PROPOSAL_STATUS_LABEL[status] ?? status,
-                        value: (summary.proposals as Record<string, number>)[status] ?? 0,
-                        color: PROPOSAL_STAGE_COLOR[status],
-                      }))}
-                    />
-                  </CardBody>
-                </Card>
-              ) : null}
-
-              {summary.recentActivity && summary.recentActivity.length > 0 ? (
-                <Card>
-                  <CardHead title="Recent activity" />
-                  <CardBody>
-                    <ul className="activity-list">
-                      {summary.recentActivity.map((item, index) => (
-                        <li key={index}>
-                          <ActivityIcon entityType={item.entityType} />
-                          <span className="activity-list__text">{activityLabel(item)}</span>
-                          <span className="activity-list__time">{timeAgo(item.occurredAt)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardBody>
-                </Card>
-              ) : null}
             </div>
           </div>
+
+          {summary.recentActivity && summary.recentActivity.length > 0 ? (
+            <div style={{ marginTop: 'var(--space-5)' }}>
+            <Card>
+              <CardHead title="Recent activity" />
+              <CardBody>
+                <div className="activity-columns">
+                  <div className="activity-column">
+                    <h3 className="activity-column__head">Delivery (projects &amp; issues)</h3>
+                    {deliveryActivity.length > 0 ? (
+                      <ul className="activity-list">
+                        {deliveryActivity.map((item, index) => (
+                          <li key={index}>
+                            <ActivityIcon entityType={item.entityType} />
+                            <span className="activity-list__text">{activityLabel(item)}</span>
+                            <span className="activity-list__time">{timeAgo(item.occurredAt)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="muted" style={{ fontSize: 13 }}>
+                        Nothing yet.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="activity-column">
+                    <h3 className="activity-column__head">Clients &amp; proposals</h3>
+                    {clientActivity.length > 0 ? (
+                      <ul className="activity-list">
+                        {clientActivity.map((item, index) => (
+                          <li key={index}>
+                            <ActivityIcon entityType={item.entityType} />
+                            <span className="activity-list__text">{activityLabel(item)}</span>
+                            <span className="activity-list__time">{timeAgo(item.occurredAt)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="muted" style={{ fontSize: 13 }}>
+                        Nothing yet.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
+            </div>
+          ) : null}
         </>
       )}
     </>

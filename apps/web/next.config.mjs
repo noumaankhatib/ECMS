@@ -12,6 +12,18 @@ const nextConfig = {
   transpilePackages: ['@ecms/contracts'],
   poweredByHeader: false,
   typedRoutes: false,
+  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
+  experimental: {
+    serverActions: {
+      // Document uploads (createDocument, apps/web/src/app/(app)/projects/[id]/documents/actions.ts)
+      // go through a Server Action, whose body is capped by Next at 1MB by
+      // default — well under the API's own 50MB limit
+      // (documents.controller.ts's MAX_UPLOAD_BYTES). A real scanned deed
+      // like MULKIA 25.S.101.pdf (1.05MB) silently fails at exactly this gap.
+      // Matched to the API's real cap, not raised arbitrarily.
+      bodySizeLimit: '50mb',
+    },
+  },
 };
 
 export default nextConfig;

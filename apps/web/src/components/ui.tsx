@@ -106,8 +106,19 @@ export function StatusBadge({ status }: { status: string }) {
   );
 }
 
-export function Badge({ children }: { children: ReactNode }) {
-  return <span className="badge badge--plain">{children}</span>;
+export function Badge({
+  children,
+  variant = 'plain',
+}: {
+  children: ReactNode;
+  /** Defaults to the neutral, dot-less treatment every existing caller
+   *  relies on. `success`/`critical` are filled pills for a status that
+   *  should read as "good"/"needs attention" at a glance. `success-text`/
+   *  `critical-text` are the same colours with no fill or dot — for a dense
+   *  list of items where a full pill per item would be too heavy. */
+  variant?: 'plain' | 'success' | 'critical' | 'success-text' | 'critical-text';
+}) {
+  return <span className={`badge badge--${variant}`}>{children}</span>;
 }
 
 /**

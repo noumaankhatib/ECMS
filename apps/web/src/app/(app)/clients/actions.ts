@@ -74,6 +74,27 @@ export async function addContact(_state: FormState, form: FormData): Promise<For
   redirect(`/clients/${clientId}`);
 }
 
+export async function updateContact(_state: FormState, form: FormData): Promise<FormState> {
+  const id = String(form.get('id'));
+  const clientId = String(form.get('clientId'));
+
+  const result = await runAction(async () => {
+    await api.patch<Contact>(`/contacts/${id}`, {
+      name: await text(form, 'name'),
+      position: await nullableText(form, 'position'),
+      email: await nullableText(form, 'email'),
+      phone: await nullableText(form, 'phone'),
+      isPrimary: form.get('isPrimary') === 'on',
+      version: Number(form.get('version')),
+    });
+  });
+
+  if (result.error) return result;
+
+  await refresh(`/clients/${clientId}`);
+  redirect(`/clients/${clientId}`);
+}
+
 export async function archiveContact(id: string, clientId: string): Promise<void> {
   await api.delete(`/contacts/${id}`);
   await refresh(`/clients/${clientId}`);

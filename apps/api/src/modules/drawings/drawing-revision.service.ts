@@ -8,14 +8,26 @@ import {
   type Page,
   type DrawingListQuery as RevisionListQuery,
 } from '@ecms/contracts';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { DrawingRevision, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../shared/database/prisma.service';
+import { DRIVE_ADAPTER, type DriveAdapter } from '../../shared/drive/drive-adapter';
 import { appError } from '../../shared/errors/app-error';
 import { AuditService } from '../audit';
 
 import { requireOpenProject } from './project-guard';
+
+/** What the controller hands the service — plain fields, not a framework
+ *  type, the same shape `DocumentService` takes (duplicated rather than
+ *  imported: a module may only reach into another module's `index`, and
+ *  this shape is not part of `DocumentsModule`'s public surface). */
+export interface UploadedFile {
+  readonly buffer: Buffer;
+  readonly originalname: string;
+  readonly mimetype: string;
+  readonly size: number;
+}
 
 /**
  * Append-only. A new revision is a new row, never an update to an existing
@@ -28,6 +40,7 @@ export class DrawingRevisionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Inject(DRIVE_ADAPTER) private readonly drive: DriveAdapter,
   ) {}
 
   async list(
@@ -65,14 +78,21 @@ export class DrawingRevisionService {
    * in the same transaction — three writes, the same shape
    * `Project.transition` uses for a conditional status move: supersede the
    * old current row, create the new one, point the drawing at it.
+   *
+   * `file` is optional — a revision may still be registered with no bytes
+   * yet, the same as before this had real upload support. When given, the
+   * bytes are written to Drive AFTER this transaction commits (external I/O
+   * has no place inside one) and the row is then marked ACTIVE or FAILED,
+   * the exact three-step write flow `DocumentService.create` uses.
    */
   async create(
     projectId: string,
     drawingId: string,
     input: CreateDrawingRevision,
     actorId: string,
+    file?: UploadedFile,
   ): Promise<DrawingRevision> {
-    return this.prisma.$transaction(async (tx) => {
+    const revision = await this.prisma.$transaction(async (tx) => {
       await requireOpenProject(tx, projectId);
       const drawing = await this.requireDrawing(tx, projectId, drawingId);
 
@@ -88,12 +108,11 @@ export class DrawingRevisionService {
         });
       }
 
-      const revision = await tx.drawingRevision
+      const created = await tx.drawingRevision
         .create({
           data: {
             drawingId,
             revisionCode: input.revisionCode,
-            fileId: input.fileId ?? null,
             notes: input.notes ?? null,
             createdBy: actorId,
           },
@@ -102,19 +121,89 @@ export class DrawingRevisionService {
 
       await tx.drawing.update({
         where: { id: drawingId },
-        data: { currentRevisionId: revision.id, version: { increment: 1 } },
+        data: { currentRevisionId: created.id, version: { increment: 1 } },
       });
 
       await this.audit.record(tx, {
         action: 'CREATED',
         entityType: 'DrawingRevision',
-        entityId: revision.id,
+        entityId: created.id,
         projectId,
-        after: { drawingId, revisionCode: revision.revisionCode },
+        after: { drawingId, revisionCode: created.revisionCode },
       });
 
-      return revision;
+      return created;
     });
+
+    if (!file) return revision;
+
+    try {
+      const { fileId } = await this.drive.upload(file.buffer, `${projectId}/drawings/${drawingId}`);
+
+      return await this.prisma.$transaction(async (tx) => {
+        const active = await tx.drawingRevision.update({
+          where: { id: revision.id },
+          data: {
+            uploadStatus: 'ACTIVE',
+            fileId,
+            originalFilename: file.originalname,
+            mimeType: file.mimetype,
+            sizeBytes: file.size,
+            version: { increment: 1 },
+          },
+        });
+
+        await this.audit.record(tx, {
+          action: 'STATUS_CHANGED',
+          entityType: 'DrawingRevision',
+          entityId: revision.id,
+          projectId,
+          before: { uploadStatus: 'PENDING' },
+          after: { uploadStatus: 'ACTIVE' },
+        });
+
+        return active;
+      });
+    } catch (error) {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.drawingRevision.update({
+          where: { id: revision.id },
+          data: { uploadStatus: 'FAILED', version: { increment: 1 } },
+        });
+
+        await this.audit.record(tx, {
+          action: 'STATUS_CHANGED',
+          entityType: 'DrawingRevision',
+          entityId: revision.id,
+          projectId,
+          outcome: 'REJECTED',
+          before: { uploadStatus: 'PENDING' },
+          after: { uploadStatus: 'FAILED' },
+        });
+      });
+
+      throw appError('INTERNAL', {
+        context: { drawing_revision_id: revision.id, error: String(error) },
+      });
+    }
+  }
+
+  /** The same shape `DocumentService.download` uses — the revision must have
+   *  an ACTIVE upload before there is anything to hand back. */
+  async download(
+    projectId: string,
+    drawingId: string,
+    id: string,
+  ): Promise<{ revision: DrawingRevision; content: Buffer }> {
+    const revision = await this.byId(projectId, drawingId, id);
+    if (revision.uploadStatus !== 'ACTIVE' || !revision.fileId) {
+      throw appError('CONFLICT', {
+        fields: [{ field: 'id', reason: 'This revision has no uploaded file to download.' }],
+      });
+    }
+
+    const content = await this.drive.download(revision.fileId);
+    return { revision, content };
   }
 
   /**

@@ -74,7 +74,10 @@ export class DashboardService {
     }
 
     if (await this.authorization.canAnywhere(userId, 'client:view')) {
-      summary.clients = await this.trendFor('client', {});
+      // Archived is excluded, matching the Clients list's own default
+      // (`ClientService.list`) — an archived client is not "on the books"
+      // and the dashboard should not disagree with the screen it links to.
+      summary.clients = await this.trendFor('client', { archivedAt: null });
     }
 
     const visibleForIssues = await this.authorization.visibleProjectIds(userId, 'issue:view');
@@ -98,7 +101,8 @@ export class DashboardService {
     // permissions `recentActivity` itself would ever draw from — the same
     // "absence, not a fake answer" rule every other section follows.
     const canSeeAnyActivity =
-      (visibleProjects === null || visibleProjects.length > 0) ||
+      visibleProjects === null ||
+      visibleProjects.length > 0 ||
       (await this.authorization.canAnywhere(userId, 'client:view')) ||
       (await this.authorization.canAnywhere(userId, 'proposal:view')) ||
       (await this.authorization.canAnywhere(userId, 'user:view'));
@@ -115,20 +119,37 @@ export class DashboardService {
     return summary;
   }
 
-  private async projectCounts(
-    visible: string[] | null,
-  ): Promise<Record<ProjectStatus, number> & { trend?: Trend }> {
+  private async projectCounts(visible: string[] | null): Promise<
+    Record<ProjectStatus, number> & {
+      trend?: Trend;
+      byType?: { planning: number; supervision: number };
+    }
+  > {
+    const scope = visible === null ? {} : { id: { in: visible } };
     const rows = await this.prisma.project.groupBy({
       by: ['status'],
-      where: visible === null ? {} : { id: { in: visible } },
+      where: scope,
       _count: { _all: true },
     });
     const counts = this.fillZeros(
       PROJECT_STATUSES,
       rows.map((r) => [r.status, r._count._all] as const),
     );
-    const trend = await this.trendFor('project', visible === null ? {} : { id: { in: visible } });
-    return { ...counts, trend };
+    const trend = await this.trendFor('project', scope);
+    const byType = await this.projectCountsByType(scope);
+    return { ...counts, trend, byType };
+  }
+
+  /** A BOTH project counts toward both sides — the same rule
+   *  RequiredDocument.scope already follows via WORKSTREAMS_FOR_TYPE. */
+  private async projectCountsByType(
+    scope: Record<string, unknown>,
+  ): Promise<{ planning: number; supervision: number }> {
+    const [planning, supervision] = await Promise.all([
+      this.prisma.project.count({ where: { ...scope, type: { in: ['PLANNING', 'BOTH'] } } }),
+      this.prisma.project.count({ where: { ...scope, type: { in: ['SUPERVISION', 'BOTH'] } } }),
+    ]);
+    return { planning, supervision };
   }
 
   private async proposalCounts(): Promise<Record<ProposalStatus, number> & { trend?: Trend }> {
@@ -174,11 +195,14 @@ export class DashboardService {
     return { total, changePercent };
   }
 
-  private async issueCounts(
-    visible: string[] | null,
-  ): Promise<{ open: number; closed: number; overdue: number }> {
+  private async issueCounts(visible: string[] | null): Promise<{
+    open: number;
+    closed: number;
+    overdue: number;
+    byWorkstream?: { planning: number; supervision: number };
+  }> {
     const where = visible === null ? {} : { projectId: { in: visible } };
-    const [open, closed, overdue] = await Promise.all([
+    const [open, closed, overdue, byWorkstream] = await Promise.all([
       this.prisma.issue.count({ where: { ...where, status: { in: ['OPEN', 'IN_PROGRESS'] } } }),
       this.prisma.issue.count({ where: { ...where, status: { in: ['RESOLVED', 'CLOSED'] } } }),
       this.prisma.issue.count({
@@ -188,8 +212,46 @@ export class DashboardService {
           dueDate: { lt: new Date() },
         },
       }),
+      this.openIssueCountsByWorkstream(where),
     ]);
-    return { open, closed, overdue };
+    return { open, closed, overdue, byWorkstream };
+  }
+
+  /**
+   * Open issues explicitly tagged for a workstream, plus untagged (legacy,
+   * pre-this-feature, or created on a single-workstream project) issues whose
+   * project's own type matches — the same "workstream field, or the
+   * project's sole type if there's no ambiguity" rule IssueService.create
+   * enforces at write time. An untagged issue on a BOTH project is genuinely
+   * ambiguous and is counted in neither bucket here, only in `open` above.
+   */
+  private async openIssueCountsByWorkstream(
+    where: Record<string, unknown>,
+  ): Promise<{ planning: number; supervision: number }> {
+    const openStatus = { status: { in: ['OPEN', 'IN_PROGRESS'] as string[] } };
+    const [planning, supervision] = await Promise.all([
+      this.prisma.issue.count({
+        where: {
+          ...where,
+          ...openStatus,
+          OR: [
+            { workstreamType: 'PLANNING' },
+            { workstreamType: null, project: { type: 'PLANNING' } },
+          ],
+        },
+      }),
+      this.prisma.issue.count({
+        where: {
+          ...where,
+          ...openStatus,
+          OR: [
+            { workstreamType: 'SUPERVISION' },
+            { workstreamType: null, project: { type: 'SUPERVISION' } },
+          ],
+        },
+      }),
+    ]);
+    return { planning, supervision };
   }
 
   private async supervisionCounts(
@@ -282,17 +344,71 @@ export class DashboardService {
         entityType: true,
         entityId: true,
         projectId: true,
+        actorUserId: true,
         occurredAt: true,
       },
     });
 
-    return entries.map((e) => ({
-      action: e.action as ActivityAction,
-      entityType: e.entityType,
-      entityId: e.entityId,
-      projectId: e.projectId,
-      occurredAt: e.occurredAt.toISOString(),
-    }));
+    // Resolved in two batched round trips rather than one per row — "who did
+    // this, on which project, for which client" is exactly what makes a
+    // dashboard feed useful, but a bare id is not something the viewer can
+    // act on, so this never ships one to the browser to decode itself.
+    const actorIds = [...new Set(entries.flatMap((e) => (e.actorUserId ? [e.actorUserId] : [])))];
+    const projectIds = [...new Set(entries.flatMap((e) => (e.projectId ? [e.projectId] : [])))];
+    // A Client entity's own id IS the client to name — there is no project to
+    // go through for those rows (client:* actions are portfolio-wide).
+    const directClientIds = [
+      ...new Set(
+        entries.flatMap((e) => (e.entityType === 'Client' && e.entityId ? [e.entityId] : [])),
+      ),
+    ];
+
+    const [actors, projects] = await Promise.all([
+      actorIds.length > 0
+        ? this.prisma.user.findMany({
+            where: { id: { in: actorIds } },
+            select: { id: true, displayName: true },
+          })
+        : [],
+      projectIds.length > 0
+        ? this.prisma.project.findMany({
+            where: { id: { in: projectIds } },
+            select: { id: true, code: true, name: true, clientId: true },
+          })
+        : [],
+    ]);
+
+    const clientIds = [...new Set([...projects.map((p) => p.clientId), ...directClientIds])];
+    const clients =
+      clientIds.length > 0
+        ? await this.prisma.client.findMany({
+            where: { id: { in: clientIds } },
+            select: { id: true, name: true },
+          })
+        : [];
+
+    const actorName = new Map(actors.map((a) => [a.id, a.displayName]));
+    const clientName = new Map(clients.map((c) => [c.id, c.name]));
+    const project = new Map(projects.map((p) => [p.id, p]));
+
+    return entries.map((e) => {
+      const p = e.projectId ? project.get(e.projectId) : undefined;
+      const resolvedClientName =
+        (p ? clientName.get(p.clientId) : undefined) ??
+        (e.entityType === 'Client' && e.entityId ? clientName.get(e.entityId) : undefined);
+
+      return {
+        action: e.action as ActivityAction,
+        entityType: e.entityType,
+        entityId: e.entityId,
+        projectId: e.projectId,
+        projectCode: p?.code ?? null,
+        projectName: p?.name ?? null,
+        clientName: resolvedClientName ?? null,
+        actorName: e.actorUserId ? (actorName.get(e.actorUserId) ?? null) : null,
+        occurredAt: e.occurredAt.toISOString(),
+      };
+    });
   }
 
   /**

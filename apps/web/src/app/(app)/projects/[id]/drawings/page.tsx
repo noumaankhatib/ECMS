@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 import { ActionForm, Field } from '@/components/form';
-import { Breadcrumb, Card, CardBody, Empty, PageHead, Value } from '@/components/ui';
+import { Breadcrumb, Card, CardBody, Empty, PageHead, Pagination, Value } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
 import type { Drawing, Page as ApiPage, Project } from '@/lib/types';
@@ -10,19 +10,33 @@ import { createDrawing } from './actions';
 
 export const metadata = { title: 'Drawings — ECMS' };
 
+const PAGE_SIZE = 25;
+
 /**
  * Drawings — a register of stable identities (docs/phase-3-plan.md §5).
  * Everything that changes over a drawing's life belongs to its revisions,
  * shown on the drawing's own detail page, not here.
  */
-export default async function DrawingsPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DrawingsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ page?: string }>;
+}) {
   const session = await requireSession();
   const { id } = await params;
+  const query = await searchParams;
+  const pageNumber = Math.max(1, Number(query.page) || 1);
 
   const [project, drawings] = await Promise.all([
     api.get<Project>(`/projects/${id}`),
-    api.get<ApiPage<Drawing>>(`/projects/${id}/drawings?pageSize=100`),
+    api.get<ApiPage<Drawing>>(`/projects/${id}/drawings?page=${pageNumber}&pageSize=${PAGE_SIZE}`),
   ]);
+
+  function buildHref(targetPage: number): string {
+    return `/projects/${id}/drawings?page=${targetPage}`;
+  }
 
   const closed = project.status === 'CLOSED';
   const mayCreate = session.can('drawing:create', id) && !closed;
@@ -43,29 +57,43 @@ export default async function DrawingsPage({ params }: { params: Promise<{ id: s
           {drawings.items.length === 0 ? (
             <Empty title="No drawings registered yet" />
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Number</th>
-                  <th>Title</th>
-                  <th>Current revision</th>
-                </tr>
-              </thead>
-              <tbody>
-                {drawings.items.map((drawing) => (
-                  <tr key={drawing.id}>
-                    <td className="mono">
-                      <Link href={`/projects/${id}/drawings/${drawing.id}`}>{drawing.number}</Link>
-                    </td>
-                    <td>{drawing.title}</td>
-                    <td>
-                      <Value>{drawing.currentRevisionId ? 'Yes' : null}</Value>
-                    </td>
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Number</th>
+                    <th>Title</th>
+                    <th>Current revision</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {drawings.items.map((drawing) => (
+                    <tr key={drawing.id}>
+                      <td className="mono">
+                        <Link href={`/projects/${id}/drawings/${drawing.id}`}>
+                          {drawing.number}
+                        </Link>
+                      </td>
+                      <td>{drawing.title}</td>
+                      <td>
+                        <Value>{drawing.currentRevisionId ? 'Yes' : null}</Value>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
+          {drawings.items.length > 0 ? (
+            <CardBody>
+              <Pagination
+                page={pageNumber}
+                pageSize={PAGE_SIZE}
+                total={drawings.total}
+                buildHref={buildHref}
+              />
+            </CardBody>
+          ) : null}
           {mayCreate ? (
             <CardBody>
               <ActionForm action={createDrawing} submitLabel="Register drawing">

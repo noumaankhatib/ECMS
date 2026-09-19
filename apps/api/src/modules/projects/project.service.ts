@@ -10,6 +10,7 @@ import {
   type ProjectStatus,
   type ProjectTransition,
   type UpdateProject,
+  type UpgradeProjectToBoth,
 } from '@ecms/contracts';
 import { Injectable } from '@nestjs/common';
 import type { Prisma, Project } from '@prisma/client';
@@ -66,6 +67,13 @@ export class ProjectService {
       ...(query.status ? { status: query.status } : {}),
       ...(query.clientId ? { clientId: query.clientId } : {}),
       ...(query.propertyId ? { propertyId: query.propertyId } : {}),
+      // A BOTH project runs both workstreams at once (WORKSTREAMS_FOR_TYPE's
+      // own rule), so filtering to PLANNING must also surface BOTH projects,
+      // and likewise for SUPERVISION — only `type=BOTH` itself means
+      // "BOTH-type projects only".
+      ...(query.type
+        ? { type: query.type === 'BOTH' ? 'BOTH' : { in: [query.type, 'BOTH'] } }
+        : {}),
       ...(query.search
         ? {
             OR: [
@@ -175,6 +183,7 @@ export class ProjectService {
             type: input.type,
             startDate: input.startDate ?? null,
             targetEndDate: input.targetEndDate ?? null,
+            externalPlanningReference: input.externalPlanningReference ?? null,
             createdBy: actorId,
             members: { create: { userId: actorId, roleCode: 'PROJECT_MANAGER' } },
             workstreams: {
@@ -216,6 +225,25 @@ export class ProjectService {
         });
       }
 
+      // PLANNING -> BOTH has its own sanctioned action (upgradeToSupervision)
+      // because it must also open the project's Supervision workstream in
+      // the same breath — a bare field PATCH here would leave Project.type
+      // and its Workstream rows out of sync, exactly the inconsistency this
+      // guard exists to stop from creeping back in through the general edit
+      // form. Every other type edit (a correction, SUPERVISION -> BOTH, or
+      // anything not touching type at all) is unaffected.
+      if (input.type === 'BOTH' && before.type === 'PLANNING') {
+        throw appError('CONFLICT', {
+          fields: [
+            {
+              field: 'type',
+              reason:
+                'Use "Add supervision" to upgrade a planning project to both — it opens the supervision workstream too.',
+            },
+          ],
+        });
+      }
+
       const { version: _version, ...fields } = input;
       const data: Prisma.ProjectUpdateManyMutationInput = { version: { increment: 1 } };
       for (const [key, value] of Object.entries(fields)) {
@@ -242,6 +270,69 @@ export class ProjectService {
       });
 
       return after;
+    });
+  }
+
+  /**
+   * Upgrades a PLANNING project to BOTH in place — same project, same code —
+   * and opens its Supervision workstream in the same transaction. This is
+   * the sanctioned way to add supervision to existing planning work (the
+   * client's own "link planning into supervision" flow): one project row,
+   * not two, so every feature that already keys off `projectId` (documents,
+   * drawings, issues, handover) keeps working on it unchanged.
+   *
+   * Rejects anything that isn't currently PLANNING — a project already BOTH
+   * or SUPERVISION has nothing to upgrade, and this action is not a general
+   * type editor (see the `update()` guard above, which sends callers here
+   * instead of letting a bare PATCH desynchronise type from workstreams).
+   */
+  async upgradeToSupervision(
+    id: string,
+    input: UpgradeProjectToBoth,
+    _actorId: string,
+  ): Promise<Project> {
+    return this.prisma.$transaction(async (tx) => {
+      const before = await tx.project.findUnique({ where: { id } });
+      if (!before) throw appError('NOT_FOUND');
+
+      if (before.type !== 'PLANNING') {
+        throw appError('CONFLICT', {
+          fields: [
+            { field: 'type', reason: 'Only a planning project can be upgraded to supervision.' },
+          ],
+        });
+      }
+      if (isProjectReadOnly(before.status as ProjectStatus)) {
+        throw appError('ILLEGAL_TRANSITION', {
+          context: { project_id: id, status: before.status },
+        });
+      }
+
+      const { count } = await tx.project.updateMany({
+        where: { id, version: input.version },
+        data: { type: 'BOTH', version: { increment: 1 } },
+      });
+      if (count === 0) throw appError('STALE_RECORD', { context: { project_id: id } });
+
+      // Upsert, not create: safe even if a Supervision workstream already
+      // exists on this project from some other path — the actual fix for
+      // the Project/Workstream inconsistency this action exists to prevent.
+      await tx.workstream.upsert({
+        where: { projectId_type: { projectId: id, type: 'SUPERVISION' } },
+        create: { projectId: id, type: 'SUPERVISION', name: 'Supervision' },
+        update: {},
+      });
+
+      await this.audit.record(tx, {
+        action: 'UPDATED',
+        entityType: 'Project',
+        entityId: id,
+        projectId: id,
+        before: { type: before.type },
+        after: { type: 'BOTH', reason: input.reason ?? null },
+      });
+
+      return tx.project.findUniqueOrThrow({ where: { id } });
     });
   }
 

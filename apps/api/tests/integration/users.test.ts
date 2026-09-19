@@ -29,6 +29,7 @@ describe('users', () => {
   const requestId = '99999999-8888-4777-8666-555555555555';
   const inContext = <T>(fn: () => Promise<T>): Promise<T> => runInRequestContext({ requestId }, fn);
 
+  const username = () => `users-${crypto.randomUUID()}`;
   const email = () => `users-${crypto.randomUUID()}@example.com`;
   const actor = crypto.randomUUID();
 
@@ -38,6 +39,7 @@ describe('users', () => {
     const created = await inContext(() =>
       users.create(
         {
+          username: username(),
           email: email(),
           displayName: 'Test Person',
           password: 'a-perfectly-fine-password',
@@ -77,14 +79,14 @@ describe('users', () => {
     expect(row.passwordHash.startsWith('$argon2id$')).toBe(true);
   });
 
-  it('refuses a second account on the same address', async () => {
+  it('refuses a second account with the same username', async () => {
     const existing = await users.byId(subject);
 
     await expect(
       inContext(() =>
         users.create(
           {
-            email: existing.email,
+            username: existing.username,
             displayName: 'Impostor',
             password: 'another-fine-password',
             roleCode: 'PLANNING',
@@ -93,6 +95,41 @@ describe('users', () => {
         ),
       ),
     ).rejects.toMatchObject({ code: 'CONFLICT' });
+  });
+
+  it('refuses a second account with the same email, when one is given', async () => {
+    const existing = await users.byId(subject);
+
+    await expect(
+      inContext(() =>
+        users.create(
+          {
+            username: username(),
+            email: existing.email ?? undefined,
+            displayName: 'Impostor',
+            password: 'another-fine-password',
+            roleCode: 'PLANNING',
+          },
+          actor,
+        ),
+      ),
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+  });
+
+  it('creates an account with no email at all', async () => {
+    const created = await inContext(() =>
+      users.create(
+        {
+          username: username(),
+          displayName: 'No Email Person',
+          password: 'a-perfectly-fine-password',
+          roleCode: 'PLANNING',
+        },
+        actor,
+      ),
+    );
+
+    expect(created.email).toBeNull();
   });
 
   it('ends every session the moment an account is disabled', async () => {

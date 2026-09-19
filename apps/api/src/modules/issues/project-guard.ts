@@ -11,10 +11,10 @@ import { appError } from '../../shared/errors/app-error';
 export async function requireOpenProject(
   tx: Prisma.TransactionClient,
   projectId: string,
-): Promise<void> {
+): Promise<{ status: string; type: string }> {
   const project = await tx.project.findUnique({
     where: { id: projectId },
-    select: { status: true },
+    select: { status: true, type: true },
   });
   if (!project) throw appError('NOT_FOUND');
   if (project.status === 'CLOSED') {
@@ -22,4 +22,5 @@ export async function requireOpenProject(
       fields: [{ field: 'projectId', reason: 'This project is closed.' }],
     });
   }
+  return project;
 }

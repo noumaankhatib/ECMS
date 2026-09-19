@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { ActionButton, ActionForm, Field, Select, TextArea } from '@/components/form';
+import { ActionButton, ActionForm, DateField, Field, Select, TextArea } from '@/components/form';
 import {
   Breadcrumb,
   Card,
@@ -185,7 +185,7 @@ export default async function SiteVisitPage({
                         label: nameFor(m.userId) ?? m.userId,
                       }))}
                     />
-                    <Field label="Due date" name="dueDate" type="date" />
+                    <DateField label="Due date" name="dueDate" />
                   </div>
                 </ActionForm>
               </CardBody>

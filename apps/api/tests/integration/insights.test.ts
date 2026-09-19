@@ -11,6 +11,8 @@ import { DashboardService } from '../../src/modules/insights/dashboard.service';
 import { ExportService } from '../../src/modules/insights/export.service';
 import { NotificationsService } from '../../src/modules/insights/notifications.service';
 import { SearchService } from '../../src/modules/insights/search.service';
+import { WorkstreamStatsService } from '../../src/modules/insights/workstream-stats.service';
+import { IssueService } from '../../src/modules/issues/issue.service';
 import { ProjectService } from '../../src/modules/projects/project.service';
 import { ProposalService } from '../../src/modules/proposals/proposal.service';
 import { SequenceService } from '../../src/modules/sequence';
@@ -57,7 +59,16 @@ describe('insights', () => {
     supervisionAgreements,
   );
   const search = new SearchService(authorization, clients, properties, projects, proposals);
-  const exportService = new ExportService(prisma, authorization, clients, properties, projects, proposals);
+  const exportService = new ExportService(
+    prisma,
+    authorization,
+    clients,
+    properties,
+    projects,
+    proposals,
+  );
+  const issues = new IssueService(prisma, audit);
+  const workstreamStats = new WorkstreamStatsService(prisma, authorization);
 
   const requestId = '88888888-2222-4111-8000-999999999999';
   const inContext = <T>(fn: () => Promise<T>): Promise<T> => runInRequestContext({ requestId }, fn);
@@ -65,6 +76,7 @@ describe('insights', () => {
   async function userWithRole(roleCode: string | null): Promise<string> {
     const user = await prisma.user.create({
       data: {
+        username: `insights-${crypto.randomUUID()}`,
         email: `insights-${crypto.randomUUID()}@example.com`,
         displayName: `Test ${roleCode ?? 'no-role'}`,
         passwordHash: 'not-used-in-this-test',
@@ -113,7 +125,13 @@ describe('insights', () => {
   it('dashboard counts a freshly created project under its own status', async () => {
     const project = await inContext(() =>
       projects.create(
-        { clientId, propertyId, code: `DASH-${codeSuffix}`, name: 'Dashboard project', type: 'SUPERVISION' },
+        {
+          clientId,
+          propertyId,
+          code: `DASH-${codeSuffix}`,
+          name: 'Dashboard project',
+          type: 'SUPERVISION',
+        },
         admin,
       ),
     );
@@ -127,7 +145,13 @@ describe('insights', () => {
   it('raises an overdue-milestone alert once its target date has passed, and clears once achieved', async () => {
     const project = await inContext(() =>
       projects.create(
-        { clientId, propertyId, code: `MILE-${codeSuffix}`, name: 'Milestone project', type: 'PLANNING' },
+        {
+          clientId,
+          propertyId,
+          code: `MILE-${codeSuffix}`,
+          name: 'Milestone project',
+          type: 'PLANNING',
+        },
         admin,
       ),
     );
@@ -159,7 +183,13 @@ describe('insights', () => {
   it('dashboard upcoming deadlines lists a real overdue milestone as OVERDUE, and drops it once achieved', async () => {
     const project = await inContext(() =>
       projects.create(
-        { clientId, propertyId, code: `DEAD-${codeSuffix}`, name: 'Deadline project', type: 'PLANNING' },
+        {
+          clientId,
+          propertyId,
+          code: `DEAD-${codeSuffix}`,
+          name: 'Deadline project',
+          type: 'PLANNING',
+        },
         admin,
       ),
     );
@@ -185,14 +215,22 @@ describe('insights', () => {
 
     const after = await dashboard.summary(admin);
     expect(
-      after.upcomingDeadlines?.some((d) => d.entityType === 'Milestone' && d.projectId === project.id),
+      after.upcomingDeadlines?.some(
+        (d) => d.entityType === 'Milestone' && d.projectId === project.id,
+      ),
     ).toBeFalsy();
   });
 
   it('search finds a project by its own code, and a client by name, but nothing for an unrelated term', async () => {
     const project = await inContext(() =>
       projects.create(
-        { clientId, propertyId, code: `SRCH-${codeSuffix}`, name: 'Search project', type: 'PLANNING' },
+        {
+          clientId,
+          propertyId,
+          code: `SRCH-${codeSuffix}`,
+          name: 'Search project',
+          type: 'PLANNING',
+        },
         admin,
       ),
     );
@@ -216,7 +254,13 @@ describe('insights', () => {
   it('issues export scopes by visibleProjectIds the same way the project list does', async () => {
     const project = await inContext(() =>
       projects.create(
-        { clientId, propertyId, code: `ISSU-${codeSuffix}`, name: 'Issue project', type: 'SUPERVISION' },
+        {
+          clientId,
+          propertyId,
+          code: `ISSU-${codeSuffix}`,
+          name: 'Issue project',
+          type: 'SUPERVISION',
+        },
         admin,
       ),
     );
@@ -229,5 +273,92 @@ describe('insights', () => {
 
     const emptyForNobody = await exportService.issuesCsv(nobody);
     expect(emptyForNobody).not.toContain(`Insights issue ${codeSuffix}`);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Workstream split — Planning/Supervision totals, additive to the dashboard.
+  // ---------------------------------------------------------------------------
+
+  it('dashboard project and issue counts break down by workstream, BOTH counting on both sides', async () => {
+    const marker = crypto.randomUUID().slice(0, 8).toUpperCase();
+
+    const planningOnly = await inContext(() =>
+      projects.create(
+        { clientId, propertyId, code: `WF-P-${marker}`, name: 'Planning-only', type: 'PLANNING' },
+        admin,
+      ),
+    );
+    const supervisionOnly = await inContext(() =>
+      projects.create(
+        {
+          clientId,
+          propertyId,
+          code: `WF-S-${marker}`,
+          name: 'Supervision-only',
+          type: 'SUPERVISION',
+        },
+        admin,
+      ),
+    );
+    const both = await inContext(() =>
+      projects.create(
+        { clientId, propertyId, code: `WF-B-${marker}`, name: 'Both', type: 'BOTH' },
+        admin,
+      ),
+    );
+
+    const issueDefaults = { severity: 'MEDIUM' as const, priority: 'MEDIUM' as const };
+
+    // Untagged issue on the single-workstream projects — always counted
+    // toward that project's sole workstream.
+    await inContext(() =>
+      issues.create(
+        planningOnly.id,
+        { ...issueDefaults, title: `${marker} planning issue` },
+        admin,
+      ),
+    );
+    await inContext(() =>
+      issues.create(
+        supervisionOnly.id,
+        { ...issueDefaults, title: `${marker} supervision issue` },
+        admin,
+      ),
+    );
+    // Explicitly tagged issue on the BOTH project.
+    await inContext(() =>
+      issues.create(
+        both.id,
+        { ...issueDefaults, title: `${marker} both-planning issue`, workstreamType: 'PLANNING' },
+        admin,
+      ),
+    );
+    // Untagged issue on the BOTH project — ambiguous, counted in neither
+    // workstream bucket, only in the overall `open` total.
+    const untaggedOnBoth = await prisma.issue.create({
+      data: { projectId: both.id, title: `${marker} untagged on both`, status: 'OPEN' },
+    });
+
+    const summary = await dashboard.summary(admin);
+    expect(summary.projects?.byType?.planning).toBeGreaterThanOrEqual(2); // planningOnly + both
+    expect(summary.projects?.byType?.supervision).toBeGreaterThanOrEqual(2); // supervisionOnly + both
+
+    const planningStats = await workstreamStats.forType('PLANNING', admin);
+    const supervisionStats = await workstreamStats.forType('SUPERVISION', admin);
+
+    expect(planningStats.totalProjects).toBeGreaterThanOrEqual(2);
+    expect(supervisionStats.totalProjects).toBeGreaterThanOrEqual(2);
+
+    // The untagged-on-BOTH issue must not have inflated either split bucket.
+    const beforeCount = {
+      planning: planningStats.openIssues,
+      supervision: supervisionStats.openIssues,
+    };
+    await prisma.issue.delete({ where: { id: untaggedOnBoth.id } });
+    const afterDelete = {
+      planning: (await workstreamStats.forType('PLANNING', admin)).openIssues,
+      supervision: (await workstreamStats.forType('SUPERVISION', admin)).openIssues,
+    };
+    expect(afterDelete).toEqual(beforeCount);
   });
 });

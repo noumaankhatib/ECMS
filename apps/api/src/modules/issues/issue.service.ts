@@ -1,12 +1,14 @@
 import {
   canTransitionIssue,
   ISSUE_ACTIONS,
+  WORKSTREAMS_FOR_TYPE,
   type CreateIssue,
   type IssueAction,
   type IssueListQuery,
   type IssueStatus,
   type IssueTransition,
   type Page,
+  type ProjectType,
   type UpdateIssue,
 } from '@ecms/contracts';
 import { Injectable } from '@nestjs/common';
@@ -37,6 +39,7 @@ export class IssueService {
       projectId,
       ...(query.status ? { status: query.status } : {}),
       ...(query.search ? { title: { contains: query.search, mode: 'insensitive' } } : {}),
+      ...(query.workstreamType ? { workstreamType: query.workstreamType } : {}),
     };
 
     const [items, total] = await this.prisma.$transaction([
@@ -60,10 +63,30 @@ export class IssueService {
 
   async create(projectId: string, input: CreateIssue, actorId: string): Promise<Issue> {
     return this.prisma.$transaction(async (tx) => {
-      await requireOpenProject(tx, projectId);
+      const project = await requireOpenProject(tx, projectId);
 
       if (input.observationId) {
         await this.requireObservationInProject(tx, projectId, input.observationId);
+      }
+
+      // A BOTH project runs two workstreams at once, so the person raising
+      // the issue must say which one it belongs to — the same "no guessing"
+      // rule RequiredDocument.scope already follows. A single-workstream
+      // project has nothing to choose between, so the field never appears in
+      // its UI and anything supplied is ignored: there is only ever one
+      // workstream it could mean.
+      const workstreams = WORKSTREAMS_FOR_TYPE[project.type as ProjectType];
+      let workstreamType: string | null = input.workstreamType ?? null;
+      if (workstreams.length > 1) {
+        if (!workstreamType) {
+          throw appError('VALIDATION_FAILED', {
+            fields: [
+              { field: 'workstreamType', reason: 'Choose which workstream this issue belongs to.' },
+            ],
+          });
+        }
+      } else {
+        workstreamType = null;
       }
 
       const issue = await tx.issue.create({
@@ -76,6 +99,7 @@ export class IssueService {
           priority: input.priority,
           ownerId: input.ownerId ?? null,
           dueDate: input.dueDate ?? null,
+          workstreamType,
           createdBy: actorId,
         },
       });

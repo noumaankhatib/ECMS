@@ -1,12 +1,14 @@
 import { PROPOSAL_STATUSES } from '@ecms/contracts';
 import Link from 'next/link';
 
-import { Card, CodeTag, DateText, Empty, PageHead, Value } from '@/components/ui';
+import { Card, CodeTag, DateText, Empty, PageHead, Pagination, Value } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requirePermission } from '@/lib/session';
 import type { Page as ApiPage, Proposal } from '@/lib/types';
 
 export const metadata = { title: 'Proposals — ECMS' };
+
+const PAGE_SIZE = 25;
 
 const STATUS_LABEL: Record<string, string> = {
   NEW: 'New',
@@ -22,16 +24,25 @@ const STATUS_LABEL: Record<string, string> = {
 export default async function ProposalsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; status?: string }>;
+  searchParams: Promise<{ search?: string; status?: string; page?: string }>;
 }) {
   const session = await requirePermission('proposal:view');
   const params = await searchParams;
+  const pageNumber = Math.max(1, Number(params.page) || 1);
 
-  const query = new URLSearchParams({ pageSize: '100' });
+  const query = new URLSearchParams({ page: String(pageNumber), pageSize: String(PAGE_SIZE) });
   if (params.search) query.set('search', params.search);
   if (params.status) query.set('status', params.status);
 
   const page = await api.get<ApiPage<Proposal>>(`/proposals?${query.toString()}`);
+
+  function buildHref(targetPage: number): string {
+    const q = new URLSearchParams();
+    if (params.search) q.set('search', params.search);
+    if (params.status) q.set('status', params.status);
+    q.set('page', String(targetPage));
+    return `/proposals?${q.toString()}`;
+  }
 
   return (
     <>
@@ -79,46 +90,46 @@ export default async function ProposalsPage({
               : 'Log the first inquiry to begin.'}
           </Empty>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Sketch no.</th>
-                <th>Contact</th>
-                <th>Status</th>
-                <th>Received</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {page.items.map((proposal) => (
-                <tr key={proposal.id}>
-                  <td className="mono">
-                    <Link href={`/proposals/${proposal.id}`}>
-                      <CodeTag>{proposal.sketchNumber}</CodeTag>
-                    </Link>
-                  </td>
-                  <td>{proposal.contactName}</td>
-                  <td>
-                    <span className="badge">
-                      {STATUS_LABEL[proposal.status] ?? proposal.status}
-                    </span>
-                  </td>
-                  <td className="nowrap">
-                    <DateText value={proposal.receivedAt} />
-                  </td>
-                  <td className="right">
-                    <Value>{proposal.contactPhone}</Value>
-                  </td>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sketch no.</th>
+                  <th>Contact</th>
+                  <th>Status</th>
+                  <th>Received</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {page.items.map((proposal) => (
+                  <tr key={proposal.id}>
+                    <td className="mono">
+                      <Link href={`/proposals/${proposal.id}`}>
+                        <CodeTag>{proposal.sketchNumber}</CodeTag>
+                      </Link>
+                    </td>
+                    <td>{proposal.contactName}</td>
+                    <td>
+                      <span className="badge">
+                        {STATUS_LABEL[proposal.status] ?? proposal.status}
+                      </span>
+                    </td>
+                    <td className="nowrap">
+                      <DateText value={proposal.receivedAt} />
+                    </td>
+                    <td className="right">
+                      <Value>{proposal.contactPhone}</Value>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
 
-      <p className="muted" style={{ fontSize: 13, marginTop: 'var(--space-3)' }}>
-        {page.total} {page.total === 1 ? 'proposal' : 'proposals'}
-      </p>
+      <Pagination page={pageNumber} pageSize={PAGE_SIZE} total={page.total} buildHref={buildHref} />
     </>
   );
 }

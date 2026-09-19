@@ -1,6 +1,7 @@
 import { Module, type MiddlewareConsumer, type NestModule } from '@nestjs/common';
 
 import { AccessModule } from './modules/access';
+import { AdminModule } from './modules/admin';
 import { AuditModule } from './modules/audit';
 import { DirectoryModule } from './modules/directory';
 import { DocumentsModule } from './modules/documents';
@@ -27,6 +28,7 @@ import { LOGGER } from './shared/logging/logger.token';
     DriveModule,
     AuditModule,
     AccessModule,
+    AdminModule,
     DirectoryModule,
     ProjectsModule,
     ProposalsModule,

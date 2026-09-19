@@ -23,13 +23,7 @@ export default async function LoginPage() {
         <Card>
           <CardBody>
             <ActionForm action={signIn} submitLabel="Sign in">
-              <Field
-                label="Email address"
-                name="email"
-                type="email"
-                required
-                autoComplete="username"
-              />
+              <Field label="Username or email" name="identifier" required autoComplete="username" />
               <Field
                 label="Password"
                 name="password"

@@ -83,6 +83,29 @@ export function SketchTypesIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** A drafting compass — planning work, before anything is built. */
+export function PlanningIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3v3" />
+      <path d="M9 21l3-9 3 9" />
+      <path d="M8 21h8" />
+      <circle cx="12" cy="3" r="1.4" fill="currentColor" stroke="none" />
+    </Icon>
+  );
+}
+
+/** A clipboard with a check — the site-visit inspection record. */
+export function SupervisionIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <rect x="5" y="4" width="14" height="17" rx="1.5" />
+      <path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" />
+      <path d="M9 12l2 2 4-4" />
+    </Icon>
+  );
+}
+
 export function DocumentsIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>
@@ -186,10 +209,68 @@ export function BellIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** The calendar-picker trigger on a DateField. */
+export function CalendarIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M8 3v4M16 3v4" />
+    </Icon>
+  );
+}
+
 export function ChevronDownIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props} strokeWidth="2">
       <path d="m6 9 6 6 6-6" />
+    </Icon>
+  );
+}
+
+/** Reports & analytics — a small bar chart, distinct from the dashboard's
+ *  quadrant glyph. */
+export function ReportsIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M4 20V10M12 20V4M20 20v-7" />
+    </Icon>
+  );
+}
+
+export function ApprovalsIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M9 12l2 2 4-4" />
+      <rect x="3" y="4" width="18" height="17" rx="2" />
+      <path d="M3 9h18" />
+    </Icon>
+  );
+}
+
+/** The Quick Create trigger, and any other "add new" affordance. */
+export function PlusIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props} strokeWidth="2">
+      <path d="M12 5v14M5 12h14" />
+    </Icon>
+  );
+}
+
+export function AdminDataIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props} strokeWidth="2">
+      <path d="M3 6h18M3 12h18M3 18h18" />
+      <path d="M8 3v3M12 3v3M16 3v3" />
+    </Icon>
+  );
+}
+
+/** Dismisses the command palette / a modal. */
+export function CloseIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props} strokeWidth="2">
+      <path d="m6 6 12 12M18 6 6 18" />
     </Icon>
   );
 }

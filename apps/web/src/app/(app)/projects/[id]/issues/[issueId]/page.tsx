@@ -6,7 +6,7 @@ import {
   type IssueStatus,
 } from '@ecms/contracts';
 
-import { ActionButton, ActionForm, Field, Select, TextArea } from '@/components/form';
+import { ActionButton, ActionForm, DateField, Select, TextArea } from '@/components/form';
 import {
   Badge,
   Breadcrumb,
@@ -156,10 +156,9 @@ export default async function IssuePage({
                         label: userName.get(m.userId) ?? m.userId,
                       }))}
                     />
-                    <Field
+                    <DateField
                       label="Due date"
                       name="dueDate"
-                      type="date"
                       defaultValue={issue.dueDate ? issue.dueDate.slice(0, 10) : undefined}
                     />
                   </div>

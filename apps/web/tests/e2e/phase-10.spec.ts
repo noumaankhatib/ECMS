@@ -24,7 +24,7 @@ const tag = Math.random().toString(36).slice(2, 8).toUpperCase();
 
 async function signIn(page: Page, email: string): Promise<void> {
   await page.goto('/login');
-  await page.getByLabel('Email address').fill(email);
+  await page.getByLabel('Username or email').fill(email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.waitForURL('**/projects');

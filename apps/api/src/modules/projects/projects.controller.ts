@@ -6,6 +6,7 @@ import {
   projectTransitionSchema,
   updateProjectSchema,
   updateWorkstreamSchema,
+  upgradeProjectToBothSchema,
   workstreamTransitionSchema,
   type AddProjectMember,
   type CreateProject,
@@ -15,6 +16,7 @@ import {
   type ProjectTransition,
   type UpdateProject,
   type UpdateWorkstream,
+  type UpgradeProjectToBoth,
   type WorkstreamTransition,
 } from '@ecms/contracts';
 import {
@@ -151,6 +153,23 @@ export class ProjectController {
     @Req() req: Request,
   ): Promise<Project> {
     return this.projects.transition(id, 'close', body, actorOf(req));
+  }
+
+  /**
+   * The client's "add supervision to an existing planning project" flow.
+   * Upgrades a PLANNING project to BOTH in place — same row, same code — and
+   * opens its Supervision workstream. Deliberately its own action rather than
+   * a `type` PATCH through `update()` (which now refuses this exact change):
+   * a bare field write can't also open the workstream atomically.
+   */
+  @Post(':id/upgrade-to-supervision')
+  @RequirePermission('project:edit')
+  upgradeToSupervision(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(upgradeProjectToBothSchema)) body: UpgradeProjectToBoth,
+    @Req() req: Request,
+  ): Promise<Project> {
+    return this.projects.upgradeToSupervision(id, body, actorOf(req));
   }
 
   // ---------------------------------------------------------------------------

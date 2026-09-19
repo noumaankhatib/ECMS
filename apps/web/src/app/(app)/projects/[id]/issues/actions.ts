@@ -20,6 +20,7 @@ export async function createIssue(_state: FormState, form: FormData): Promise<Fo
       priority: form.get('priority'),
       ownerId: form.get('ownerId') || undefined,
       dueDate: await nullableText(form, 'dueDate'),
+      workstreamType: form.get('workstreamType') || undefined,
     }),
   );
 

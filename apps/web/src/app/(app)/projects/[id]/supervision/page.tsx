@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { ActionForm, Field, TextArea } from '@/components/form';
+import { ActionForm, DateField, Field, TextArea } from '@/components/form';
 import { Breadcrumb, Card, CardBody, DateText, Empty, PageHead, Value } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
@@ -80,7 +80,7 @@ export default async function SupervisionPage({ params }: { params: Promise<{ id
               <ActionForm action={createSiteVisit} submitLabel="Record site visit">
                 <input type="hidden" name="projectId" value={id} />
                 <div className="form-grid">
-                  <Field label="Visit date" name="visitDate" type="date" required />
+                  <DateField label="Visit date" name="visitDate" required />
                   <Field label="Attendees" name="attendees" hint="Who was there." />
                 </div>
                 <TextArea label="Notes" name="notes" />

@@ -9,16 +9,42 @@ import {
   type DrawingRevisionTransition,
   type Page,
 } from '@ecms/contracts';
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  Req,
+  Res,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Drawing, DrawingRevision } from '@prisma/client';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 
 import { appError } from '../../shared/errors/app-error';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import { RequirePermission } from '../access';
 
-import { DrawingRevisionService } from './drawing-revision.service';
+import {
+  DrawingRevisionService,
+  type UploadedFile as UploadedFileShape,
+} from './drawing-revision.service';
 import { DrawingService } from './drawing.service';
+
+// The same ceiling `DocumentController` uses — drawing files are the same
+// kind of large engineering upload documents already are.
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+
+/** The same rule `DocumentController` uses for what a browser can render
+ *  inline versus what must download. */
+function isInlineViewable(mimeType: string | null): boolean {
+  return mimeType === 'application/pdf' || (mimeType?.startsWith('image/') ?? false);
+}
 
 /** The signed-in user. The guard guarantees it; this keeps the assertion in one place. */
 function actorOf(req: Request): string {
@@ -91,15 +117,36 @@ export class DrawingRevisionController {
     return this.revisions.byId(projectId, drawingId, id);
   }
 
+  @Get(':id/content')
+  @RequirePermission('drawing:view')
+  async content(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('drawingId', ParseUUIDPipe) drawingId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const { revision, content } = await this.revisions.download(projectId, drawingId, id);
+    const filename = revision.originalFilename ?? `${revision.revisionCode}`;
+    const disposition = isInlineViewable(revision.mimeType) ? 'inline' : 'attachment';
+    res.set({
+      'Content-Type': revision.mimeType ?? 'application/octet-stream',
+      'Content-Disposition': `${disposition}; filename="${encodeURIComponent(filename)}"`,
+      'Content-Length': String(content.length),
+    });
+    res.send(content);
+  }
+
   @Post()
   @RequirePermission('drawing:create')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_UPLOAD_BYTES } }))
   create(
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Param('drawingId', ParseUUIDPipe) drawingId: string,
     @Body(new ZodValidationPipe(createDrawingRevisionSchema)) body: CreateDrawingRevision,
+    @UploadedFile() file: UploadedFileShape | undefined,
     @Req() req: Request,
   ): Promise<DrawingRevision> {
-    return this.revisions.create(projectId, drawingId, body, actorOf(req));
+    return this.revisions.create(projectId, drawingId, body, actorOf(req), file);
   }
 
   // ---------------------------------------------------------------------------

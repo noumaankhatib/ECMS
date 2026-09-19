@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1135.0",
     "@ecms/contracts": "workspace:*",
     "@nestjs/common": "^11.2.3",
     "@nestjs/core": "^11.2.3",

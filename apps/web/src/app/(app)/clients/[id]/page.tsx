@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { ActionButton, ActionForm, Field } from '@/components/form';
+import { RowMenu } from '@/components/row-menu';
 import {
   Badge,
   Breadcrumb,
@@ -106,12 +107,15 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
                       </td>
                       <td className="right">
                         {session.can('client:edit') && !archived ? (
-                          <ActionButton
-                            action={archiveContact.bind(null, contact.id, id)}
-                            label="Remove"
-                            variant="danger"
-                            confirm={`Remove ${contact.name} from this client?`}
-                          />
+                          <RowMenu>
+                            <Link href={`/clients/${id}/contacts/${contact.id}/edit`}>Edit</Link>
+                            <ActionButton
+                              action={archiveContact.bind(null, contact.id, id)}
+                              label="Remove"
+                              variant="danger"
+                              confirm={`Remove ${contact.name} from this client?`}
+                            />
+                          </RowMenu>
                         ) : null}
                       </td>
                     </tr>

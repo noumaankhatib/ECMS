@@ -1,6 +1,6 @@
 import { PROJECT_TYPES } from '@ecms/contracts';
 
-import { ActionForm, Field, Select, TextArea } from '@/components/form';
+import { ActionForm, DateRangeFields, Field, Select, TextArea } from '@/components/form';
 import { Breadcrumb, Card, CardBody, PageHead } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requirePermission } from '@/lib/session';
@@ -77,8 +77,12 @@ export default async function NewProjectPage() {
                 }))}
               />
               <div />
-              <Field label="Start date" name="startDate" type="date" />
-              <Field label="Target end date" name="targetEndDate" type="date" />
+              <DateRangeFields
+                startLabel="Start date"
+                startName="startDate"
+                endLabel="Target end date"
+                endName="targetEndDate"
+              />
             </div>
             <TextArea label="Description" name="description" />
           </ActionForm>

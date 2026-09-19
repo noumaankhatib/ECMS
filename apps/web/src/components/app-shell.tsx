@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 
-import { Header } from './header';
+import { Header, type QuickCreateLink } from './header';
 import { Sidebar, type SidebarLink } from './sidebar';
 
 /**
@@ -18,9 +18,10 @@ export function AppShell({
   brand,
   footer,
   displayName,
-  email,
+  identifier,
   notificationCount,
   signOutAction,
+  quickCreateLinks,
   children,
 }: {
   links: SidebarLink[];
@@ -28,9 +29,10 @@ export function AppShell({
   brand: ReactNode;
   footer: ReactNode;
   displayName: string;
-  email: string;
+  identifier: string;
   notificationCount: number;
   signOutAction: () => Promise<void>;
+  quickCreateLinks: QuickCreateLink[];
   children: ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -49,10 +51,11 @@ export function AppShell({
       <div className="content-area">
         <Header
           displayName={displayName}
-          email={email}
+          identifier={identifier}
           notificationCount={notificationCount}
           signOutAction={signOutAction}
           onOpenMobileMenu={() => setMobileOpen(true)}
+          quickCreateLinks={quickCreateLinks}
         />
         <main className="main">{children}</main>
       </div>

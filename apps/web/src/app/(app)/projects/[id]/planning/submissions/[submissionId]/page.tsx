@@ -4,7 +4,7 @@ import {
   type SubmissionStatus,
 } from '@ecms/contracts';
 
-import { ActionButton, ActionForm, Field, TextArea } from '@/components/form';
+import { ActionButton, ActionForm, DateField, Field, TextArea } from '@/components/form';
 import {
   Badge,
   Breadcrumb,
@@ -283,9 +283,9 @@ export default async function SubmissionPage({
                   <input type="hidden" name="projectId" value={id} />
                   <input type="hidden" name="submissionId" value={submissionId} />
                   <div className="form-grid">
-                    <Field label="Review date" name="reviewDate" type="date" required />
+                    <DateField label="Review date" name="reviewDate" required />
                     <Field label="Reviewer" name="reviewerName" />
-                    <Field label="Response due" name="responseDueAt" type="date" />
+                    <DateField label="Response due" name="responseDueAt" />
                   </div>
                   <TextArea label="Comments" name="comments" />
                 </ActionForm>

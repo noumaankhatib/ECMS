@@ -8,6 +8,7 @@ config({ path: '../../.env' });
 
 export default defineConfig({
   test: {
+    setupFiles: ['tests/setup.ts'],
     include: ['tests/integration/**/*.test.ts', 'src/**/*.test.ts'],
     passWithNoTests: false,
     testTimeout: 30_000,

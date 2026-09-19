@@ -53,6 +53,13 @@ function actorOf(req: Request): string {
 // unbounded body is not (PRD §22's "starts permissive" still means bounded).
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
+/** Types a browser can render on its own — PDFs (every scanned deed, ID
+ *  card and survey plan in practice) and images. Everything else (Word,
+ *  Excel, ...) has no reliable in-browser viewer, so it still downloads. */
+function isInlineViewable(mimeType: string | null): boolean {
+  return mimeType === 'application/pdf' || (mimeType?.startsWith('image/') ?? false);
+}
+
 @Controller('projects/:projectId/documents')
 export class DocumentController {
   constructor(private readonly documents: DocumentService) {}
@@ -98,9 +105,10 @@ export class DocumentController {
   ): Promise<void> {
     const { document, content } = await this.documents.download(projectId, id);
     const filename = document.originalFilename ?? document.id;
+    const disposition = isInlineViewable(document.mimeType) ? 'inline' : 'attachment';
     res.set({
       'Content-Type': document.mimeType ?? 'application/octet-stream',
-      'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+      'Content-Disposition': `${disposition}; filename="${encodeURIComponent(filename)}"`,
       'Content-Length': String(content.length),
     });
     res.send(content);

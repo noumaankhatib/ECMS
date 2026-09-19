@@ -33,16 +33,16 @@ export class AuthController {
     // from many machines, and one machine cannot work through many accounts.
     // Ten attempts in fifteen minutes is generous for a person and hopeless for
     // a guessing attack (PRD §14).
-    const emailKey = `login:email:${body.email}`;
+    const identifierKey = `login:identifier:${body.identifier}`;
     const ipKey = `login:ip:${req.ip ?? 'unknown'}`;
-    this.rateLimiter.consume(emailKey, 10, 15 * 60_000);
+    this.rateLimiter.consume(identifierKey, 10, 15 * 60_000);
     this.rateLimiter.consume(ipKey, 30, 15 * 60_000);
 
-    const result = await this.auth.login(body.email, body.password);
+    const result = await this.auth.login(body.identifier, body.password);
 
     // Cleared on success: a person who mistyped their password twice should not
     // carry those attempts for the next quarter of an hour.
-    this.rateLimiter.reset(emailKey);
+    this.rateLimiter.reset(identifierKey);
 
     // The session travels in an httpOnly cookie, never in the response body.
     // Nothing in the browser's JavaScript can read it, so a scripting flaw

@@ -41,7 +41,8 @@ const PLANNER = `planner.${tag.toLowerCase()}@ecms.local`;
 async function createUser(page: Page, email: string, name: string, role: string): Promise<void> {
   await page.goto('/users/new');
   await page.getByLabel('Full name').fill(name);
-  await page.getByLabel('Email address').fill(email);
+  await page.getByLabel('Username').fill(email.split('@')[0] ?? email);
+  await page.getByLabel('Username or email').fill(email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByLabel('Role').selectOption(role);
   await page.getByRole('button', { name: 'Create user' }).click();
@@ -67,7 +68,7 @@ const statusBadge = (page: Page, status: string) => page.locator(`.badge--${stat
 
 async function signIn(page: Page, email: string): Promise<void> {
   await page.goto('/login');
-  await page.getByLabel('Email address').fill(email);
+  await page.getByLabel('Username or email').fill(email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.waitForURL('**/projects');
@@ -90,14 +91,14 @@ test.describe('Phase 1 through the browser', () => {
     page,
   }) => {
     await page.goto('/login');
-    await page.getByLabel('Email address').fill(ADMIN);
+    await page.getByLabel('Username or email').fill(ADMIN);
     await page.getByLabel('Password').fill('not-the-right-password');
     await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(banner(page)).toContainText('incorrect');
 
     // An address with no account behind it gets the identical message. Anything
     // else turns this form into a way of finding out who works here.
-    await page.getByLabel('Email address').fill('nobody@nowhere.test');
+    await page.getByLabel('Username or email').fill('nobody@nowhere.test');
     await page.getByLabel('Password').fill(PASSWORD);
     await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(banner(page)).toContainText('incorrect');

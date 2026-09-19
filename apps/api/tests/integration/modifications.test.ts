@@ -88,6 +88,7 @@ describe('modifications', () => {
   async function userWithRole(roleCode: string): Promise<string> {
     const user = await prisma.user.create({
       data: {
+        username: `modification-${crypto.randomUUID()}`,
         email: `modification-${crypto.randomUUID()}@example.com`,
         displayName: `Test ${roleCode}`,
         passwordHash: 'not-used-in-this-test',

@@ -1,7 +1,7 @@
 import type { SubmissionStatus } from '@ecms/contracts';
 import Link from 'next/link';
 
-import { ActionButton, ActionForm, Field, Select, TextArea } from '@/components/form';
+import { ActionButton, ActionForm, DateField, Field, Select, TextArea } from '@/components/form';
 import {
   Badge,
   Breadcrumb,
@@ -165,7 +165,7 @@ export default async function PlanningPage({ params }: { params: Promise<{ id: s
                       label: nameFor(m.userId) ?? m.userId,
                     }))}
                   />
-                  <Field label="Due date" name="dueDate" type="date" />
+                  <DateField label="Due date" name="dueDate" />
                 </div>
                 <TextArea label="Description" name="description" />
               </ActionForm>
@@ -238,7 +238,7 @@ export default async function PlanningPage({ params }: { params: Promise<{ id: s
                       both are on this page, and Field's id is derived from name,
                       so two fields called "name" would collide. */}
                   <Field label="Name" name="milestoneName" required />
-                  <Field label="Target date" name="targetDate" type="date" />
+                  <DateField label="Target date" name="targetDate" />
                 </div>
               </ActionForm>
             </CardBody>

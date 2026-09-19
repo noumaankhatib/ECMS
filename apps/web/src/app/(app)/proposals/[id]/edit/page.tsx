@@ -1,6 +1,6 @@
 import { PROJECT_TYPES } from '@ecms/contracts';
 
-import { ActionForm, Field, Select, TextArea } from '@/components/form';
+import { ActionForm, DateField, Field, Select, TextArea } from '@/components/form';
 import { Breadcrumb, Card, CardBody, PageHead } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requirePermission } from '@/lib/session';
@@ -121,13 +121,8 @@ export default async function EditProposalPage({ params }: { params: Promise<{ i
                   options={users.items.map((u) => ({ value: u.id, label: u.displayName }))}
                 />
               ) : null}
-              <Field
-                label="Received"
-                name="receivedAt"
-                type="date"
-                defaultValue={proposal.receivedAt}
-              />
-              <Field label="Due" name="dueAt" type="date" defaultValue={proposal.dueAt} />
+              <DateField label="Received" name="receivedAt" defaultValue={proposal.receivedAt} />
+              <DateField label="Due" name="dueAt" defaultValue={proposal.dueAt} />
             </div>
             <TextArea label="Notes" name="notes" defaultValue={proposal.notes} />
           </ActionForm>

@@ -15,30 +15,30 @@ import type { FormState } from '@/lib/form-state';
  * browser never has to talk to the API directly and the cookie stays httpOnly
  * throughout.
  *
- * Every failure says the same thing, deliberately. A wrong password, an unknown
- * address and a disabled account are indistinguishable here — as they are in
- * the API — because telling them apart turns this form into a way of finding
- * out who works here.
+ * Every failure says the same thing, deliberately. A wrong password, an
+ * unknown username or email, and a disabled account are indistinguishable
+ * here — as they are in the API — because telling them apart turns this form
+ * into a way of finding out who works here.
  */
 export async function signIn(_state: FormState, form: FormData): Promise<FormState> {
   const parsed = loginRequestSchema.safeParse({
-    email: form.get('email'),
+    identifier: form.get('identifier'),
     password: form.get('password'),
   });
 
   if (!parsed.success) {
-    return { error: 'Enter your email address and password.' };
+    return { error: 'Enter your username or email, and your password.' };
   }
 
   let setCookie: string | null;
   try {
-    ({ setCookie } = await login(parsed.data.email, parsed.data.password));
+    ({ setCookie } = await login(parsed.data.identifier, parsed.data.password));
   } catch (error) {
     if (error instanceof ApiError) {
       if (error.code === 'RATE_LIMITED') {
         return { error: 'Too many attempts. Wait a few minutes and try again.' };
       }
-      return { error: 'Email or password is incorrect.' };
+      return { error: 'Username, email or password is incorrect.' };
     }
     return { error: 'Could not reach the server. Try again shortly.' };
   }

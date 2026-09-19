@@ -21,6 +21,7 @@ import type {
   Role,
   SubmissionStatus,
   UserStatus,
+  WorkstreamType,
 } from '@ecms/contracts';
 
 export interface Page<T> {
@@ -86,6 +87,7 @@ export interface Project {
   startDate: string | null;
   targetEndDate: string | null;
   actualEndDate: string | null;
+  externalPlanningReference: string | null;
   version: number;
   createdAt: string;
 }
@@ -110,7 +112,8 @@ export interface Workstream {
 
 export interface UserRow {
   id: string;
-  email: string;
+  username: string;
+  email: string | null;
   displayName: string;
   status: UserStatus;
   roles: Role[];
@@ -246,6 +249,7 @@ export interface Issue {
   dueDate: string | null;
   status: IssueStatus;
   closureNotes: string | null;
+  workstreamType: WorkstreamType | null;
   version: number;
   createdAt: string;
 }
@@ -269,7 +273,11 @@ export interface DrawingRevision {
   drawingId: string;
   revisionCode: string;
   status: ApprovalStatus;
+  uploadStatus: 'PENDING' | 'ACTIVE' | 'FAILED';
   fileId: string | null;
+  originalFilename: string | null;
+  mimeType: string | null;
+  sizeBytes: number | null;
   notes: string | null;
   supersededAt: string | null;
   version: number;

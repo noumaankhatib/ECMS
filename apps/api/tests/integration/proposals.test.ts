@@ -33,6 +33,7 @@ describe('proposals', () => {
   async function userWithRole(roleCode: string): Promise<string> {
     const user = await prisma.user.create({
       data: {
+        username: `proposal-${crypto.randomUUID()}`,
         email: `proposal-${crypto.randomUUID()}@example.com`,
         displayName: `Test ${roleCode}`,
         passwordHash: 'not-used-in-this-test',
@@ -270,15 +271,13 @@ describe('proposals', () => {
     });
     const won = await proposals.transition(proposal.id, 'win', { version: approved.version });
 
-    await expect(
-      proposals.convert(won.id, { version: won.version }, admin),
-    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    await expect(proposals.convert(won.id, { version: won.version }, admin)).rejects.toMatchObject({
+      code: 'CONFLICT',
+    });
   });
 
   it('refuses to convert a proposal that is not WON', async () => {
-    const proposal = await inContext(() =>
-      proposals.create({ contactName: 'Still new' }, planner),
-    );
+    const proposal = await inContext(() => proposals.create({ contactName: 'Still new' }, planner));
 
     await expect(
       proposals.convert(proposal.id, { version: proposal.version }, admin),
@@ -297,15 +296,17 @@ describe('proposals', () => {
       admin,
     );
 
-    await expect(
-      proposals.convert(won.id, { version: won.version }, admin),
-    ).rejects.toMatchObject({ code: 'STALE_RECORD' });
+    await expect(proposals.convert(won.id, { version: won.version }, admin)).rejects.toMatchObject({
+      code: 'STALE_RECORD',
+    });
   });
 
   it('holds every seeded proposal permission in the shared catalogue', async () => {
     const rows = await prisma.rolePermission.findMany({
       where: {
-        permission: { in: ['proposal:view', 'proposal:create', 'proposal:edit', 'proposal:convert'] },
+        permission: {
+          in: ['proposal:view', 'proposal:create', 'proposal:edit', 'proposal:convert'],
+        },
       },
     });
     expect(rows.length).toBeGreaterThan(0);

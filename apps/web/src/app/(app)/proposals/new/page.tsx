@@ -1,6 +1,6 @@
 import { PROJECT_TYPES } from '@ecms/contracts';
 
-import { ActionForm, Field, Select, TextArea } from '@/components/form';
+import { ActionForm, DateField, Field, Select, TextArea } from '@/components/form';
 import { Breadcrumb, Card, CardBody, PageHead } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requirePermission } from '@/lib/session';
@@ -76,8 +76,8 @@ export default async function NewProposalPage() {
                   options={users.items.map((u) => ({ value: u.id, label: u.displayName }))}
                 />
               ) : null}
-              <Field label="Received" name="receivedAt" type="date" />
-              <Field label="Due" name="dueAt" type="date" />
+              <DateField label="Received" name="receivedAt" />
+              <DateField label="Due" name="dueAt" />
             </div>
             <TextArea label="Notes" name="notes" />
           </ActionForm>

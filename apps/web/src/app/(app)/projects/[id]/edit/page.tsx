@@ -1,6 +1,6 @@
 import { PROJECT_TYPES } from '@ecms/contracts';
 
-import { ActionForm, Field, Select, TextArea } from '@/components/form';
+import { ActionForm, DateRangeFields, Field, Select, TextArea } from '@/components/form';
 import { Breadcrumb, Card, CardBody, PageHead } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
@@ -66,17 +66,13 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
                 }))}
               />
               <div />
-              <Field
-                label="Start date"
-                name="startDate"
-                type="date"
-                defaultValue={forDateInput(project.startDate)}
-              />
-              <Field
-                label="Target end date"
-                name="targetEndDate"
-                type="date"
-                defaultValue={forDateInput(project.targetEndDate)}
+              <DateRangeFields
+                startLabel="Start date"
+                startName="startDate"
+                startDefaultValue={forDateInput(project.startDate)}
+                endLabel="Target end date"
+                endName="targetEndDate"
+                endDefaultValue={forDateInput(project.targetEndDate)}
               />
             </div>
             <TextArea label="Description" name="description" defaultValue={project.description} />

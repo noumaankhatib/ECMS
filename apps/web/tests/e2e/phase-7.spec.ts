@@ -20,6 +20,7 @@ const OUTSIDER = `outsider7.${tag.toLowerCase()}@ecms.local`;
 async function createUser(page: Page, email: string, name: string, role: string): Promise<void> {
   await page.goto('/users/new');
   await page.getByLabel('Full name').fill(name);
+  await page.getByLabel('Username').fill(email.split('@')[0] ?? email);
   await page.getByLabel('Email address').fill(email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByLabel('Role').selectOption(role);
@@ -29,7 +30,7 @@ async function createUser(page: Page, email: string, name: string, role: string)
 
 async function signIn(page: Page, email: string): Promise<void> {
   await page.goto('/login');
-  await page.getByLabel('Email address').fill(email);
+  await page.getByLabel('Username or email').fill(email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.waitForURL('**/projects');
