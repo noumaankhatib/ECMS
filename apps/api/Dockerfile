@@ -3,23 +3,19 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Install pnpm
 RUN corepack enable && corepack prepare pnpm@11.5.1 --activate
 
-# Copy workspace manifests first for layer caching
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/contracts/package.json ./packages/contracts/
 COPY apps/api/package.json ./apps/api/
 
 RUN pnpm install --frozen-lockfile
 
-# Copy source
 COPY tsconfig.base.json ./
 COPY packages/contracts ./packages/contracts
 COPY apps/api ./apps/api
 
-# Generate Prisma client FIRST — TypeScript needs the types during compilation
-# Run from WORKDIR (/app) using the full path, same as the root db:generate script
+# Generate Prisma client before TypeScript compilation
 RUN node_modules/.bin/prisma generate --schema=apps/api/prisma/schema.prisma
 
 # Build contracts then API
@@ -31,19 +27,12 @@ FROM node:22-alpine AS runner
 
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@11.5.1 --activate
-
-# Only production dependencies
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY packages/contracts/package.json ./packages/contracts/
-COPY apps/api/package.json ./apps/api/
-
-RUN pnpm install --frozen-lockfile --prod
-
-# Copy built output and Prisma files
+# Copy everything from builder — avoids node_modules path issues
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
-COPY --from=builder /app/apps/api/node_modules/.prisma ./apps/api/node_modules/.prisma
-COPY apps/api/prisma ./apps/api/prisma
+COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
+COPY --from=builder /app/packages ./packages
 
 ENV NODE_ENV=production
 EXPOSE 3001
