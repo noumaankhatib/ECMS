@@ -17,7 +17,7 @@ export function sessionCookieOptions(expiresAt: Date): CookieOptions {
   return {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env['NODE_ENV'] === 'production',
+    secure: process.env['COOKIE_SECURE'] !== 'false' && process.env['NODE_ENV'] === 'production',
     path: '/',
     expires: expiresAt,
   };
@@ -27,7 +27,7 @@ export function clearSessionCookie(res: Response): void {
   res.clearCookie(SESSION_COOKIE, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env['NODE_ENV'] === 'production',
+    secure: process.env['COOKIE_SECURE'] !== 'false' && process.env['NODE_ENV'] === 'production',
     path: '/',
   });
 }
