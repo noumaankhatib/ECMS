@@ -43,4 +43,4 @@ COPY package.json ./
 EXPOSE 3000
 
 WORKDIR /app/apps/web
-CMD ["/app/node_modules/.bin/next", "start", "-p", "3000"]
+CMD ["node", "/app/node_modules/next/dist/bin/next", "start", "-p", "3000"]
