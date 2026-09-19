@@ -18,12 +18,12 @@ COPY tsconfig.base.json ./
 COPY packages/contracts ./packages/contracts
 COPY apps/api ./apps/api
 
+# Generate Prisma client FIRST — TypeScript needs the types during compilation
+RUN pnpm --filter @ecms/api exec prisma generate --schema=apps/api/prisma/schema.prisma
+
 # Build contracts then API
 RUN pnpm --filter @ecms/contracts run build
 RUN pnpm --filter @ecms/api run build
-
-# Generate Prisma client
-RUN pnpm --filter @ecms/api exec prisma generate --schema=apps/api/prisma/schema.prisma
 
 # ── Stage 2: runtime ─────────────────────────────────────────────────────────
 FROM node:22-alpine AS runner
