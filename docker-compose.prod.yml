@@ -6,9 +6,11 @@ services:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_SUPER_USER}
       POSTGRES_PASSWORD: ${DB_SUPER_PASSWORD}
+      DB_OWNER_PASSWORD: ${DB_OWNER_PASSWORD}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./docker/postgres/init-prod.sh:/docker-entrypoint-initdb.d/init-prod.sh:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${DB_SUPER_USER} -d ${DB_NAME}']
       interval: 10s
@@ -37,11 +39,11 @@ services:
       DB_OWNER_PASSWORD: ${DB_OWNER_PASSWORD}
       CORS_ORIGINS: ${CORS_ORIGINS}
       SESSION_SECRET: ${SESSION_SECRET}
-      DRIVE_BACKEND: r2
-      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
-      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
-      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
-      R2_BUCKET: ${R2_BUCKET}
+      DRIVE_BACKEND: postgres
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET: ${R2_BUCKET:-ecms-files}
     networks:
       - internal
     expose:
