@@ -12,7 +12,6 @@ const nextConfig = {
   transpilePackages: ['@ecms/contracts'],
   poweredByHeader: false,
   typedRoutes: false,
-  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
   experimental: {
     serverActions: {
       // Document uploads (createDocument, apps/web/src/app/(app)/projects/[id]/documents/actions.ts)
