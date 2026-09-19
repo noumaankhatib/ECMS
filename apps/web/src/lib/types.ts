@@ -163,6 +163,7 @@ export interface Submission {
   status: SubmissionStatus;
   version: number;
   createdAt: string;
+  createdBy: string;
 }
 
 export interface SubmissionReview {

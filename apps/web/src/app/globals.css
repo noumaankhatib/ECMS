@@ -1780,6 +1780,7 @@ select:disabled {
    regardless of the browser's own locale) plus a button that opens the
    browser's real calendar picker. See DateField in components/form.tsx. */
 .date-field {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -1828,9 +1829,13 @@ select:disabled {
   color: var(--text);
 }
 /* Exists only so `showPicker()` has a real date input to call it on — never
-   seen or reached by tab order, never sized. */
+   seen or reached by tab order, never sized. Anchored to the bottom-right of
+   the field so the browser's calendar picker opens below the calendar button
+   rather than at the top-left corner of the viewport. */
 .date-field__native {
   position: absolute;
+  bottom: 0;
+  right: 0;
   width: 0;
   height: 0;
   padding: 0;

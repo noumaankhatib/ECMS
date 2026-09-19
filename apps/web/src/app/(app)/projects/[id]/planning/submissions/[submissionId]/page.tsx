@@ -110,7 +110,12 @@ export default async function SubmissionPage({
   const closed = project.status === 'CLOSED';
   const mayCreate = session.can('planning:create', id) && !closed;
   const mayEdit = session.can('planning:edit', id) && !closed;
-  const mayApprove = session.can('planning:approve', id) && !closed;
+  // Self-approval is refused by the server; exclude it here so the form is
+  // never shown to someone who created the submission.
+  const mayApprove =
+    session.can('planning:approve', id) &&
+    !closed &&
+    session.user.id !== submission.createdBy;
 
   const available = ACTIONS.filter(
     (candidate) =>
