@@ -10,7 +10,7 @@ services:
       DB_APP_PASSWORD: ${DB_APP_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./docker/postgres/init-prod.sh:/docker-entrypoint-initdb.d/init-prod.sh:ro
+      - ./docker/postgres/init-prod.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${DB_SUPER_USER} -d ${DB_NAME}']
       interval: 10s
@@ -58,6 +58,7 @@ services:
       - api
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      API_URL: http://api:3001
     networks:
       - internal
     expose:
