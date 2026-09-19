@@ -60,6 +60,7 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       API_URL: http://api:3001
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     networks:
       - internal
     expose:
