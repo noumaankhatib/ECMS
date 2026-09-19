@@ -19,7 +19,8 @@ COPY packages/contracts ./packages/contracts
 COPY apps/api ./apps/api
 
 # Generate Prisma client FIRST — TypeScript needs the types during compilation
-RUN pnpm --filter @ecms/api exec prisma generate --schema=apps/api/prisma/schema.prisma
+# Run from WORKDIR (/app) using the full path, same as the root db:generate script
+RUN node_modules/.bin/prisma generate --schema=apps/api/prisma/schema.prisma
 
 # Build contracts then API
 RUN pnpm --filter @ecms/contracts run build
