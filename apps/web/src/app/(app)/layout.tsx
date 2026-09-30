@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 
 import { AppShell } from '@/components/app-shell';
 import type { QuickCreateLink } from '@/components/header';
-import type { SidebarLink } from '@/components/sidebar';
+import type { SidebarGroup } from '@/components/sidebar';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
 
@@ -22,70 +22,103 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   // Only what this person can actually use. Each of these is enforced again by
   // the API; this only decides what is worth showing them.
-  const links: SidebarLink[] = (
+  // Groups follow the natural project lifecycle so the sidebar reads top-to-bottom
+  // as a workflow guide, with admin-only items isolated at the bottom.
+  const groups: SidebarGroup[] = (
     [
-      { href: '/dashboard', label: 'Dashboard', icon: 'dashboard', show: true },
-      { href: '/projects', label: 'Projects', icon: 'projects', show: true },
       {
-        href: '/planning',
-        label: 'Planning',
-        icon: 'planning',
-        show: session.can('planning:view'),
+        links: [{ href: '/dashboard', label: 'Dashboard', icon: 'dashboard', show: true }],
       },
       {
-        href: '/supervision',
-        label: 'Supervision',
-        icon: 'supervision',
-        show: session.can('supervision:view'),
+        label: 'Workflow',
+        links: [
+          {
+            href: '/proposals',
+            label: 'Proposals',
+            icon: 'proposals',
+            show: session.can('proposal:view'),
+          },
+          { href: '/projects', label: 'Projects', icon: 'projects', show: true },
+          {
+            href: '/planning',
+            label: 'Planning',
+            icon: 'planning',
+            show: session.can('planning:view'),
+          },
+          {
+            href: '/supervision',
+            label: 'Supervision',
+            icon: 'supervision',
+            show: session.can('supervision:view'),
+          },
+        ],
       },
       {
-        href: '/proposals',
-        label: 'Proposals',
-        icon: 'proposals',
-        show: session.can('proposal:view'),
-      },
-      { href: '/clients', label: 'Clients', icon: 'clients', show: session.can('client:view') },
-      {
-        href: '/properties',
-        label: 'Properties',
-        icon: 'properties',
-        show: session.can('property:view'),
-      },
-      {
-        href: '/sketch-types',
-        label: 'Sketch types',
-        icon: 'sketchTypes',
-        show: session.can('sketch_type:admin'),
+        label: 'Registry',
+        links: [
+          { href: '/clients', label: 'Clients', icon: 'clients', show: session.can('client:view') },
+          {
+            href: '/properties',
+            label: 'Properties',
+            icon: 'properties',
+            show: session.can('property:view'),
+          },
+        ],
       },
       {
-        href: '/required-documents',
-        label: 'Required documents',
-        icon: 'documents',
-        show: session.can('required_document:admin'),
+        label: 'Operations',
+        links: [
+          {
+            href: '/approvals',
+            label: 'Approvals',
+            icon: 'approvals',
+            show:
+              session.can('drawing:approve') ||
+              session.can('planning:approve') ||
+              session.can('proposal:edit'),
+          },
+          { href: '/reports', label: 'Reports', icon: 'reports', show: true },
+        ],
       },
-      { href: '/users', label: 'Users', icon: 'users', show: session.can('user:view') },
       {
-        href: '/admin/data',
-        label: 'Data management',
-        icon: 'adminData',
-        show: session.can('admin:data'),
+        label: 'Setup',
+        links: [
+          {
+            href: '/required-documents',
+            label: 'Required documents',
+            icon: 'documents',
+            show: session.can('required_document:admin'),
+          },
+          {
+            href: '/sketch-types',
+            label: 'Sketch types',
+            icon: 'sketchTypes',
+            show: session.can('sketch_type:admin'),
+          },
+          { href: '/users', label: 'Users', icon: 'users', show: session.can('user:view') },
+          {
+            href: '/admin/data',
+            label: 'Data management',
+            icon: 'adminData',
+            show: session.can('admin:data'),
+          },
+        ],
       },
       {
-        href: '/approvals',
-        label: 'Approvals',
-        icon: 'approvals',
-        show:
-          session.can('drawing:approve') ||
-          session.can('planning:approve') ||
-          session.can('proposal:edit'),
+        links: [
+          { href: '/settings', label: 'Settings', icon: 'settings', show: true },
+          { href: '/help', label: 'Help & Support', icon: 'help', show: true },
+        ],
       },
-      { href: '/reports', label: 'Reports', icon: 'reports', show: true },
-      { href: '/settings', label: 'Settings', icon: 'settings', show: true },
-      { href: '/help', label: 'Help & Support', icon: 'help', show: true },
     ] as const
   )
-    .filter((link) => link.show)
-    .map(({ href, label, icon }) => ({ href, label, icon }));
+    .map((group) => ({
+      ...group,
+      links: group.links
+        .filter((l) => l.show)
+        .map(({ href, label, icon }) => ({ href, label, icon })),
+    }))
+    .filter((group) => group.links.length > 0);
 
   // Recomputed on every navigation, never pushed — the same posture the
   // notifications page itself takes (docs/phase-11-plan.md §5).
@@ -103,10 +136,30 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   // untouched; this is a second entry point to the same four links.
   const quickCreateLinks: QuickCreateLink[] = (
     [
-      { href: '/projects/new', label: 'New project', icon: 'projects', show: session.can('project:create') },
-      { href: '/proposals/new', label: 'New proposal', icon: 'proposals', show: session.can('proposal:create') },
-      { href: '/clients/new', label: 'New client', icon: 'clients', show: session.can('client:create') },
-      { href: '/projects', label: 'Upload document', icon: 'documents', show: session.can('document:create') },
+      {
+        href: '/projects/new',
+        label: 'New project',
+        icon: 'projects',
+        show: session.can('project:create'),
+      },
+      {
+        href: '/proposals/new',
+        label: 'New proposal',
+        icon: 'proposals',
+        show: session.can('proposal:create'),
+      },
+      {
+        href: '/clients/new',
+        label: 'New client',
+        icon: 'clients',
+        show: session.can('client:create'),
+      },
+      {
+        href: '/projects',
+        label: 'Upload document',
+        icon: 'documents',
+        show: session.can('document:create'),
+      },
     ] as const
   )
     .filter((link) => link.show)
@@ -114,7 +167,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <AppShell
-      links={links}
+      groups={groups}
       defaultCollapsed={defaultCollapsed}
       quickCreateLinks={quickCreateLinks}
       brand={

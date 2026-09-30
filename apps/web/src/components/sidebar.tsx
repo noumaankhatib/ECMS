@@ -54,6 +54,11 @@ export interface SidebarLink {
   icon: SidebarIconKey;
 }
 
+export interface SidebarGroup {
+  label?: string;
+  links: SidebarLink[];
+}
+
 /**
  * The primary navigation rail — expanded (labels visible) or collapsed
  * (icons only, tooltipped). The preference is a plain, non-sensitive cookie
@@ -64,14 +69,14 @@ export interface SidebarLink {
  * both were decided before this component ever sees the link list.
  */
 export function Sidebar({
-  links,
+  groups,
   defaultCollapsed,
   brand,
   footer,
   mobileOpen,
   onCloseMobile,
 }: {
-  links: SidebarLink[];
+  groups: SidebarGroup[];
   defaultCollapsed: boolean;
   brand: ReactNode;
   footer: ReactNode;
@@ -117,23 +122,30 @@ export function Sidebar({
         </div>
 
         <nav className="nav" aria-label="Main">
-          {links.map((link) => {
-            const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
-            const Icon = ICONS[link.icon];
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="nav__item"
-                data-tooltip={link.label}
-                onClick={onCloseMobile}
-                {...(active ? { 'aria-current': 'page' } : {})}
-              >
-                <Icon className="nav__icon" />
-                <span className="nav__label">{link.label}</span>
-              </Link>
-            );
-          })}
+          {groups.map((group, i) => (
+            <div key={i} className="nav__group">
+              {group.label && !collapsed ? (
+                <span className="nav__group-label">{group.label}</span>
+              ) : null}
+              {group.links.map((link) => {
+                const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
+                const Icon = ICONS[link.icon];
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="nav__item"
+                    data-tooltip={link.label}
+                    onClick={onCloseMobile}
+                    {...(active ? { 'aria-current': 'page' } : {})}
+                  >
+                    <Icon className="nav__icon" />
+                    <span className="nav__label">{link.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         <div className="sidebar__footer">{footer}</div>

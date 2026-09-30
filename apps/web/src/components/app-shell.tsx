@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 
 import { Header, type QuickCreateLink } from './header';
-import { Sidebar, type SidebarLink } from './sidebar';
+import { Sidebar, type SidebarGroup } from './sidebar';
 
 /**
  * Owns the one piece of state `Sidebar` and `Header` both need to share but
@@ -13,7 +13,7 @@ import { Sidebar, type SidebarLink } from './sidebar';
  * collapse state stays local to `Sidebar` — nothing outside it needs to know.
  */
 export function AppShell({
-  links,
+  groups,
   defaultCollapsed,
   brand,
   footer,
@@ -24,7 +24,7 @@ export function AppShell({
   quickCreateLinks,
   children,
 }: {
-  links: SidebarLink[];
+  groups: SidebarGroup[];
   defaultCollapsed: boolean;
   brand: ReactNode;
   footer: ReactNode;
@@ -40,7 +40,7 @@ export function AppShell({
   return (
     <div className="shell">
       <Sidebar
-        links={links}
+        groups={groups}
         defaultCollapsed={defaultCollapsed}
         brand={brand}
         footer={footer}

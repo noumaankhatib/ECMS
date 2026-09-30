@@ -297,6 +297,21 @@ a:hover {
   gap: 2px;
   overflow-y: auto;
 }
+.nav__group + .nav__group {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+.nav__group-label {
+  display: block;
+  padding: 8px 12px 2px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+  user-select: none;
+}
 .nav__item {
   position: relative;
   display: flex;
