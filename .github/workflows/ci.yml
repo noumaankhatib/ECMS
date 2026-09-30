@@ -39,6 +39,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Every db:* script runs `node --env-file=.env`, and tests/setup.ts
+      # builds its connection strings from the DB_* variables, not from
+      # DATABASE_URL above — so without this file the first database step
+      # fails before any test runs. The passwords are the local-only defaults
+      # already committed in docker/postgres/init.sql and docker-compose.yml.
+      - name: Write .env for CI
+        run: |
+          sed -e 's/^DB_APP_PASSWORD=.*/DB_APP_PASSWORD=ecms_local_password/' \
+              -e 's/^DB_OWNER_PASSWORD=.*/DB_OWNER_PASSWORD=ecms_local_password/' \
+              -e 's/^DB_SUPER_PASSWORD=.*/DB_SUPER_PASSWORD=postgres/' \
+              .env.example > .env
+
       # Reads the pinned version from package.json's "packageManager" field,
       # so the runner uses the exact pnpm this repository was built against
       # rather than whatever "latest" happens to mean that day.

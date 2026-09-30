@@ -40,7 +40,7 @@ async function signIn(page: Page, email: string): Promise<void> {
   await page.getByLabel('Username or email').fill(email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL('**/projects');
+  await page.waitForURL('**/dashboard');
 }
 
 test.describe.configure({ mode: 'serial' });

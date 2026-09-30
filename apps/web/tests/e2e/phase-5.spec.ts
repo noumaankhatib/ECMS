@@ -28,7 +28,7 @@ async function signIn(page: Page): Promise<void> {
   await page.getByLabel('Username or email').fill(ADMIN);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL('**/projects');
+  await page.waitForURL('**/dashboard');
 }
 
 test.describe('Phase 5 through the browser', () => {
