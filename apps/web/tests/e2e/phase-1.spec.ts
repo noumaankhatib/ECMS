@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { submitCreate } from './duplicates';
+
 /**
  * Phase 1's definition of done, performed through the browser.
  *
@@ -71,7 +73,7 @@ async function signIn(page: Page, email: string): Promise<void> {
   await page.getByLabel('Username or email').fill(email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL('**/projects');
+  await page.waitForURL('**/dashboard');
 }
 
 async function signOut(page: Page): Promise<void> {
@@ -115,9 +117,7 @@ test.describe('Phase 1 through the browser', () => {
     await page.goto('/clients/new');
     await page.getByLabel('Name').fill(`Riverside Developments ${tag}`);
     await page.getByLabel('Reference').fill(`RIV-${tag}`);
-    await page.getByRole('button', { name: 'Create client' }).click();
-
-    await page.waitForURL(/\/clients\/[0-9a-f-]{36}$/);
+    await submitCreate(page, 'Create client', /\/clients\/[0-9a-f-]{36}$/);
     clientId = page.url().split('/').pop() ?? '';
     await expect(page.getByRole('heading', { level: 1 })).toContainText(tag);
 
@@ -126,9 +126,7 @@ test.describe('Phase 1 through the browser', () => {
     await page.getByLabel('Name', { exact: true }).fill(`Riverside House ${tag}`);
     await page.getByLabel('Town or city').fill('Leeds');
     await page.getByLabel('Postcode').fill('LS1 4AP');
-    await page.getByRole('button', { name: 'Create property' }).click();
-
-    await page.waitForURL(/\/properties\/[0-9a-f-]{36}$/);
+    await submitCreate(page, 'Create property', /\/properties\/[0-9a-f-]{36}$/);
     propertyId = page.url().split('/').pop() ?? '';
     await expect(page.getByRole('heading', { level: 1 })).toContainText(tag);
 

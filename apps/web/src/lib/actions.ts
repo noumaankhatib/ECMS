@@ -70,6 +70,8 @@ function messageFor(error: ApiError): string {
       return error.fields[0]?.reason ?? 'That is not allowed from the current status.';
     case 'DEPENDENCY_EXISTS':
       return 'This cannot be done while other records depend on it.';
+    case 'DUPLICATE_SUSPECTED':
+      return 'A record with the same official identity already exists. Review the match below before saving.';
     case 'VALIDATION_FAILED':
       return 'Please check the highlighted fields.';
     default:

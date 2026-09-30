@@ -1,3 +1,5 @@
+import type { DuplicateMatch } from '@ecms/contracts';
+
 import type { FieldIssue } from './api';
 
 /**
@@ -12,4 +14,9 @@ export interface FormState {
   readonly fields?: readonly FieldIssue[];
   /** Quoted by the person when asking for help, and searchable in the logs. */
   readonly requestId?: string;
+  /**
+   * Records that look like the one being saved. Nothing was written; the form
+   * shows them and asks the person what to do (lib/duplicate-check.ts).
+   */
+  readonly duplicates?: readonly DuplicateMatch[];
 }

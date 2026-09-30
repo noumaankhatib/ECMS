@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { submitCreate } from './duplicates';
+
 /**
  * Phase 4's definition of done, performed through the browser
  * (docs/phase-4-plan.md §9): a property records its Oman land-registry
@@ -31,7 +33,7 @@ async function signIn(page: Page): Promise<void> {
   await page.getByLabel('Username or email').fill(ADMIN);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL('**/projects');
+  await page.waitForURL('**/dashboard');
 }
 
 test.describe('Phase 4 through the browser', () => {
@@ -40,26 +42,26 @@ test.describe('Phase 4 through the browser', () => {
 
     await page.goto('/clients/new');
     await page.locator('#name').fill(`AAA Phase 4 Client ${tag}`);
-    await page.getByRole('button', { name: 'Create client' }).click();
-    await page.waitForURL(/\/clients\/[0-9a-f-]{36}$/);
+    await submitCreate(page, 'Create client', /\/clients\/[0-9a-f-]{36}$/);
     const clientId = page.url().split('/').pop() ?? '';
 
     await page.goto(`/properties/new?clientId=${clientId}`);
     await page.locator('#clientId').selectOption(clientId);
     await page.locator('#name').fill(`AAA Phase 4 Plot ${tag}`);
-    await page.locator('#plotNumber').fill('102/8');
+    // Unique per run: the same plot twice is refused as a duplicate, and
+    // this database keeps every earlier run's plots.
+    await page.locator('#plotNumber').fill(`102/${tag}`);
     await page.locator('#wilayat').fill('Al Seeb');
     await page.locator('#village').fill('Al Mawaleh South');
-    await page.locator('#surveyReference').fill('1-35-055-01-585');
+    await page.locator('#surveyReference').fill(`1-35-055-01-${tag}`);
     await page.locator('#titleDeedReference').fill('2015/19618');
     await page.locator('#ownerName').fill('Nasreen bint Abdul Rahim bin Sheikh');
     await page.locator('#ownerNationalId').fill('62898538');
-    await page.getByRole('button', { name: 'Create property' }).click();
-    await page.waitForURL(/\/properties\/[0-9a-f-]{36}$/);
+    await submitCreate(page, 'Create property', /\/properties\/[0-9a-f-]{36}$/);
 
-    await expect(page.getByText('102/8')).toBeVisible();
+    await expect(page.getByText(`102/${tag}`)).toBeVisible();
     await expect(page.getByText('Al Seeb / Al Mawaleh South')).toBeVisible();
-    await expect(page.getByText('1-35-055-01-585')).toBeVisible();
+    await expect(page.getByText(`1-35-055-01-${tag}`)).toBeVisible();
     await expect(page.getByText('2015/19618')).toBeVisible();
     await expect(page.getByText(/Nasreen bint Abdul Rahim bin Sheikh.*62898538/)).toBeVisible();
   });
@@ -69,15 +71,13 @@ test.describe('Phase 4 through the browser', () => {
 
     await page.goto('/clients/new');
     await page.locator('#name').fill(`AAA Phase 4 Numbering Client ${tag}`);
-    await page.getByRole('button', { name: 'Create client' }).click();
-    await page.waitForURL(/\/clients\/[0-9a-f-]{36}$/);
+    await submitCreate(page, 'Create client', /\/clients\/[0-9a-f-]{36}$/);
     const clientId = page.url().split('/').pop() ?? '';
 
     await page.goto(`/properties/new?clientId=${clientId}`);
     await page.locator('#clientId').selectOption(clientId);
     await page.locator('#name').fill(`AAA Phase 4 Numbering Plot ${tag}`);
-    await page.getByRole('button', { name: 'Create property' }).click();
-    await page.waitForURL(/\/properties\/[0-9a-f-]{36}$/);
+    await submitCreate(page, 'Create property', /\/properties\/[0-9a-f-]{36}$/);
     const propertyId = page.url().split('/').pop() ?? '';
 
     await page.goto('/projects/new');

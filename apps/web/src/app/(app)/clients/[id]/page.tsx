@@ -195,6 +195,24 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
                 <dd className="mono">
                   <Value>{client.reference}</Value>
                 </dd>
+                <dt>Type</dt>
+                <dd>
+                  <Value>
+                    {client.clientType === 'COMPANY'
+                      ? 'Company'
+                      : client.clientType === 'INDIVIDUAL'
+                        ? 'Individual'
+                        : null}
+                  </Value>
+                </dd>
+                <dt>CR number</dt>
+                <dd className="mono">
+                  <Value>{client.crNumber}</Value>
+                </dd>
+                <dt>Civil ID</dt>
+                <dd className="mono">
+                  <Value>{client.civilId}</Value>
+                </dd>
                 <dt>Added</dt>
                 <dd>
                   <DateText value={client.createdAt} />

@@ -1,13 +1,14 @@
-import { ActionForm, Field, TextArea } from '@/components/form';
+import { DuplicateAwareForm } from '@/components/duplicate-form';
 import { Breadcrumb, Card, CardBody, PageHead } from '@/components/ui';
 import { requirePermission } from '@/lib/session';
 
 import { createClient } from '../actions';
+import { CLIENT_PREFILL_FIELDS, ClientFields } from '../client-fields';
 
 export const metadata = { title: 'New client — ECMS' };
 
 export default async function NewClientPage() {
-  await requirePermission('client:create');
+  const session = await requirePermission('client:create');
 
   return (
     <>
@@ -16,17 +17,17 @@ export default async function NewClientPage() {
 
       <Card>
         <CardBody>
-          <ActionForm action={createClient} submitLabel="Create client" cancelHref="/clients">
-            <div className="form-grid">
-              <Field label="Name" name="name" required wide />
-              <Field
-                label="Reference"
-                name="reference"
-                hint="Your own reference for this client. Must be unique."
-              />
-            </div>
-            <TextArea label="Notes" name="notes" />
-          </ActionForm>
+          <DuplicateAwareForm
+            action={createClient}
+            submitLabel="Create client"
+            cancelHref="/clients"
+            basePath="/clients"
+            canEdit={session.can('client:edit')}
+            canOverride={session.can('directory:override_duplicate')}
+            prefillFields={CLIENT_PREFILL_FIELDS}
+          >
+            <ClientFields />
+          </DuplicateAwareForm>
         </CardBody>
       </Card>
     </>

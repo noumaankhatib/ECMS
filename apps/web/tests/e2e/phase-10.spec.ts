@@ -4,6 +4,8 @@ import { join } from 'node:path';
 
 import { expect, test, type Page } from '@playwright/test';
 
+import { submitCreate } from './duplicates';
+
 /**
  * Phase 10's definition of done, performed through the browser
  * (docs/phase-10-plan.md §8): closing is blocked with a reason while the
@@ -27,7 +29,7 @@ async function signIn(page: Page, email: string): Promise<void> {
   await page.getByLabel('Username or email').fill(email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL('**/projects');
+  await page.waitForURL('**/dashboard');
 }
 
 test.describe.configure({ mode: 'serial' });
@@ -43,15 +45,13 @@ test.describe('Phase 10 through the browser', () => {
 
     await page.goto('/clients/new');
     await page.locator('#name').fill(`AAA Phase 10 Client ${tag}`);
-    await page.getByRole('button', { name: 'Create client' }).click();
-    await page.waitForURL(/\/clients\/[0-9a-f-]{36}$/);
+    await submitCreate(page, 'Create client', /\/clients\/[0-9a-f-]{36}$/);
     const clientId = page.url().split('/').pop() ?? '';
 
     await page.goto(`/properties/new?clientId=${clientId}`);
     await page.locator('#clientId').selectOption(clientId);
     await page.locator('#name').fill(`AAA Phase 10 Plot ${tag}`);
-    await page.getByRole('button', { name: 'Create property' }).click();
-    await page.waitForURL(/\/properties\/[0-9a-f-]{36}$/);
+    await submitCreate(page, 'Create property', /\/properties\/[0-9a-f-]{36}$/);
     const propertyId = page.url().split('/').pop() ?? '';
 
     await page.goto('/projects/new');

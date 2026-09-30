@@ -1,9 +1,11 @@
 'use server';
 
+import type { DuplicateMatch } from '@ecms/contracts';
 import { redirect } from 'next/navigation';
 
-import { attempt, nullableText, refresh, runAction, text } from '@/lib/actions';
+import { nullableText, refresh, text } from '@/lib/actions';
 import { api } from '@/lib/api';
+import { changed, checkThenSave } from '@/lib/duplicate-check';
 import type { FormState } from '@/lib/form-state';
 import type { Property } from '@/lib/types';
 
@@ -29,11 +31,25 @@ async function addressFrom(form: FormData) {
 }
 
 export async function createProperty(_state: FormState, form: FormData): Promise<FormState> {
-  const result = await attempt(async () =>
-    api.post<Property>('/properties', {
-      clientId: form.get('clientId'),
-      ...(await addressFrom(form)),
-    }),
+  const clientId = String(form.get('clientId') ?? '');
+  const fields = await addressFrom(form);
+
+  const result = await checkThenSave(
+    form,
+    () =>
+      api.post<DuplicateMatch[]>('/properties/duplicates', {
+        ...(clientId ? { clientId } : {}),
+        ...(fields.name ? { name: fields.name } : {}),
+        ...(fields.plotNumber ? { plotNumber: fields.plotNumber } : {}),
+        ...(fields.wilayat ? { wilayat: fields.wilayat } : {}),
+        ...(fields.surveyReference ? { surveyReference: fields.surveyReference } : {}),
+      }),
+    (duplicateOverride) =>
+      api.post<Property>('/properties', {
+        clientId,
+        ...fields,
+        ...(duplicateOverride ? { duplicateOverride } : {}),
+      }),
   );
 
   if (!result.ok) return result.state;
@@ -44,15 +60,36 @@ export async function createProperty(_state: FormState, form: FormData): Promise
 
 export async function updateProperty(_state: FormState, form: FormData): Promise<FormState> {
   const id = String(form.get('id'));
+  const fields = await addressFrom(form);
 
-  const result = await runAction(async () => {
-    await api.patch<Property>(`/properties/${id}`, {
-      ...(await addressFrom(form)),
-      version: Number(form.get('version')),
-    });
-  });
+  // A plot's identity is its number AND wilayat, so a change to either is
+  // checked against the pair it will have afterwards.
+  const plotChanged = changed(form, 'plotNumber') ?? changed(form, 'wilayat');
+  const name = changed(form, 'name');
+  const surveyReference = changed(form, 'surveyReference');
 
-  if (result.error) return result;
+  const result = await checkThenSave(
+    form,
+    async () =>
+      plotChanged || name || surveyReference
+        ? api.post<DuplicateMatch[]>('/properties/duplicates', {
+            excludeId: id,
+            ...(name ? { name, clientId: String(form.get('checkClientId')) } : {}),
+            ...(plotChanged && fields.plotNumber && fields.wilayat
+              ? { plotNumber: fields.plotNumber, wilayat: fields.wilayat }
+              : {}),
+            ...(surveyReference ? { surveyReference } : {}),
+          })
+        : [],
+    (duplicateOverride) =>
+      api.patch<Property>(`/properties/${id}`, {
+        ...fields,
+        ...(duplicateOverride ? { duplicateOverride } : {}),
+        version: Number(form.get('version')),
+      }),
+  );
+
+  if (!result.ok) return result.state;
 
   await refresh(`/properties/${id}`);
   redirect(`/properties/${id}`);

@@ -2196,3 +2196,35 @@ unchanged by a test run.
 **Next:** Phase B — web warning panel (Cancel / Use existing / Update existing / Create anyway, by
 permission); Phase C — proposal conversion "link existing client?" and as-you-type hints;
 Phase D — admin merge tool.
+
+## Post-roadmap — Duplicate detection, Phase B (web) ✅
+
+**Built:** `components/duplicate-form.tsx` (`DuplicateAwareForm`, `PrefillFromDuplicate`) and
+`lib/duplicate-check.ts` (`checkThenSave`), used by client and property New/Edit. The first Save
+asks `POST /…/duplicates`; any match shows a panel instead of saving, with what was typed kept:
+
+- **Cancel**, **Use existing** — everyone.
+- **Update existing** — only with `client:edit`/`property:edit`. The new entry's values go to the
+  existing record's edit page through `sessionStorage`, not the URL (they include Civil IDs).
+- **Not a duplicate — create anyway** — a likely match only.
+- **Save anyway (override)** — an exact match, only with `directory:override_duplicate`, and only
+  once a reason of 5+ characters is typed. Without the permission the panel says who can.
+- **Check again** — re-checks after the person corrects a field.
+
+Edits only check what the edit changes (hidden `original_*` fields), so a record already let
+through with an override is not flagged on every save. Client pages gained Type, CR number, Civil
+ID.
+
+**Verification:** a Playwright script against the running app, 17/17 — exact and likely panels,
+input kept, override gated by reason and role (Project Manager sees neither override nor "Update
+existing", as it holds neither permission), prefill without the URL, plot + wilayat matched
+across spellings.
+
+**Also fixed:** e2e sign-in waited for `/projects`, but login has landed on `/dashboard` since
+`4a81829`; e2e client/property creation goes through `tests/e2e/duplicates.ts`, which dismisses
+a likeness left by earlier runs but fails on an exact collision; phase-4's plot is unique per run.
+CI now writes a `.env` (every `db:*` script uses `--env-file=.env`, which CI never had).
+
+**Known, not introduced here:** the property form's client dropdown loads only the first 100
+clients alphabetically; `phase-10` "closing is offered but disabled" needs a more specific
+`Handover` locator after the UI redesign.

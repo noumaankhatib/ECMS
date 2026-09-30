@@ -36,6 +36,10 @@ export interface Client {
   name: string;
   reference: string | null;
   notes: string | null;
+  clientType: 'COMPANY' | 'INDIVIDUAL' | null;
+  /** Commercial Registration number, stored normalised. */
+  crNumber: string | null;
+  civilId: string | null;
   version: number;
   createdAt: string;
   archivedAt: string | null;

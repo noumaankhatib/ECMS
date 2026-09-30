@@ -1,19 +1,42 @@
 'use server';
 
+import type { DuplicateMatch } from '@ecms/contracts';
 import { redirect } from 'next/navigation';
 
-import { attempt, nullableText, refresh, runAction, text } from '@/lib/actions';
+import { nullableText, refresh, runAction, text } from '@/lib/actions';
 import { api } from '@/lib/api';
+import { changed, checkThenSave } from '@/lib/duplicate-check';
 import type { FormState } from '@/lib/form-state';
 import type { Client, Contact } from '@/lib/types';
 
+/** The client's own fields, identical on create and edit. */
+async function clientFrom(form: FormData) {
+  return {
+    name: await text(form, 'name'),
+    reference: await nullableText(form, 'reference'),
+    notes: await nullableText(form, 'notes'),
+    clientType: await nullableText(form, 'clientType'),
+    crNumber: await nullableText(form, 'crNumber'),
+    civilId: await nullableText(form, 'civilId'),
+  };
+}
+
 export async function createClient(_state: FormState, form: FormData): Promise<FormState> {
-  const result = await attempt(() =>
-    api.post<Client>('/clients', {
-      name: form.get('name'),
-      reference: form.get('reference'),
-      notes: form.get('notes'),
-    }),
+  const fields = await clientFrom(form);
+
+  const result = await checkThenSave(
+    form,
+    () =>
+      api.post<DuplicateMatch[]>('/clients/duplicates', {
+        name: fields.name,
+        crNumber: fields.crNumber ?? undefined,
+        civilId: fields.civilId ?? undefined,
+      }),
+    (duplicateOverride) =>
+      api.post<Client>('/clients', {
+        ...fields,
+        ...(duplicateOverride ? { duplicateOverride } : {}),
+      }),
   );
 
   if (!result.ok) return result.state;
@@ -24,19 +47,35 @@ export async function createClient(_state: FormState, form: FormData): Promise<F
 
 export async function updateClient(_state: FormState, form: FormData): Promise<FormState> {
   const id = String(form.get('id'));
+  const fields = await clientFrom(form);
 
-  const result = await runAction(async () => {
-    await api.patch<Client>(`/clients/${id}`, {
-      name: await text(form, 'name'),
-      reference: await nullableText(form, 'reference'),
-      notes: await nullableText(form, 'notes'),
-      // The version the form was rendered with. If somebody else has saved in
-      // the meantime the API refuses, rather than quietly discarding their edit.
-      version: Number(form.get('version')),
-    });
-  });
+  // Only what this edit changes is checked — see `changed`.
+  const name = changed(form, 'name');
+  const crNumber = changed(form, 'crNumber');
+  const civilId = changed(form, 'civilId');
 
-  if (result.error) return result;
+  const result = await checkThenSave(
+    form,
+    async () =>
+      name || crNumber || civilId
+        ? api.post<DuplicateMatch[]>('/clients/duplicates', {
+            ...(name ? { name } : {}),
+            ...(crNumber ? { crNumber } : {}),
+            ...(civilId ? { civilId } : {}),
+            excludeId: id,
+          })
+        : [],
+    (duplicateOverride) =>
+      api.patch<Client>(`/clients/${id}`, {
+        ...fields,
+        ...(duplicateOverride ? { duplicateOverride } : {}),
+        // The version the form was rendered with. If somebody else has saved in
+        // the meantime the API refuses, rather than quietly discarding their edit.
+        version: Number(form.get('version')),
+      }),
+  );
+
+  if (!result.ok) return result.state;
 
   await refresh(`/clients/${id}`);
   redirect(`/clients/${id}`);

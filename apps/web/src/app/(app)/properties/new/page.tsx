@@ -1,10 +1,12 @@
-import { ActionForm, Field, Select, TextArea } from '@/components/form';
+import { DuplicateAwareForm } from '@/components/duplicate-form';
+import { Field, Select, TextArea } from '@/components/form';
 import { Breadcrumb, Card, CardBody, PageHead } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requirePermission } from '@/lib/session';
 import type { Client, Page as ApiPage } from '@/lib/types';
 
 import { createProperty } from '../actions';
+import { PROPERTY_PREFILL_FIELDS } from '../prefill-fields';
 
 export const metadata = { title: 'New property — ECMS' };
 
@@ -13,7 +15,7 @@ export default async function NewPropertyPage({
 }: {
   searchParams: Promise<{ clientId?: string }>;
 }) {
-  await requirePermission('property:create');
+  const session = await requirePermission('property:create');
   const params = await searchParams;
 
   // Archived clients are excluded: the API refuses a property on one, so
@@ -28,10 +30,14 @@ export default async function NewPropertyPage({
 
       <Card>
         <CardBody>
-          <ActionForm
+          <DuplicateAwareForm
             action={createProperty}
             submitLabel="Create property"
             cancelHref="/properties"
+            basePath="/properties"
+            canEdit={session.can('property:edit')}
+            canOverride={session.can('directory:override_duplicate')}
+            prefillFields={PROPERTY_PREFILL_FIELDS}
           >
             <div className="form-grid">
               <Select
@@ -66,7 +72,7 @@ export default async function NewPropertyPage({
               <Field label="Owner national ID" name="ownerNationalId" />
             </div>
             <TextArea label="Notes" name="notes" />
-          </ActionForm>
+          </DuplicateAwareForm>
         </CardBody>
       </Card>
     </>
