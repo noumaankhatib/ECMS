@@ -59,7 +59,9 @@ export default async function ApprovalsPage() {
             .filter((section) => section.items.length > 0)
             .map((section) => (
               <Card key={section.entityType}>
-                <CardHead title={`${SECTION_TITLE[section.entityType]} (${section.items.length})`} />
+                <CardHead
+                  title={`${SECTION_TITLE[section.entityType]} (${section.items.length})`}
+                />
                 <CardBody>
                   <ul className="stack scroll-list">
                     {section.items.map((item) => (

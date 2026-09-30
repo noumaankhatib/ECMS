@@ -34,8 +34,13 @@ const TYPE_LABELS: Record<AdminEntityType, string> = {
   handoverChecklist: 'Handover checklist',
 };
 
-const ARCHIVABLE_TYPES: Set<AdminEntityType> = new Set([
-  'client', 'contact', 'property', 'planningActivity', 'milestone', 'document',
+const ARCHIVABLE_TYPES = new Set<AdminEntityType>([
+  'client',
+  'contact',
+  'property',
+  'planningActivity',
+  'milestone',
+  'document',
 ]);
 
 interface TreeNodeProps {
@@ -71,7 +76,15 @@ function TreeNode({ node, selected, onToggle, depth }: TreeNodeProps) {
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 12, color: 'var(--color-muted, #6b7280)', width: 16 }}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+              fontSize: 12,
+              color: 'var(--color-muted, #6b7280)',
+              width: 16,
+            }}
             aria-label={open ? 'Collapse' : 'Expand'}
           >
             {open ? '▾' : '▸'}
@@ -95,7 +108,9 @@ function TreeNode({ node, selected, onToggle, depth }: TreeNodeProps) {
           {node.label}
         </span>
         {node.archivedAt ? (
-          <span className="badge" style={{ fontSize: 11 }}>Archived</span>
+          <span className="badge" style={{ fontSize: 11 }}>
+            Archived
+          </span>
         ) : null}
         {hasChildren ? (
           <span className="faint" style={{ fontSize: 12, flexShrink: 0 }}>
@@ -154,8 +169,11 @@ function ConfirmDialog({ count, rootLabel, onConfirm, onCancel, pending }: Confi
       >
         <h2 style={{ marginTop: 0, color: 'var(--color-danger, #c0392b)' }}>Permanent deletion</h2>
         <p>
-          This will <strong>permanently delete {count} record{count !== 1 ? 's' : ''}</strong>. This
-          cannot be undone.
+          This will{' '}
+          <strong>
+            permanently delete {count} record{count !== 1 ? 's' : ''}
+          </strong>
+          . This cannot be undone.
         </p>
         <p>
           Type <strong>{rootLabel}</strong> to confirm:
@@ -169,7 +187,12 @@ function ConfirmDialog({ count, rootLabel, onConfirm, onCancel, pending }: Confi
           style={{ width: '100%', marginBottom: 16 }}
         />
         <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
-          <button type="button" className="button button--secondary" onClick={onCancel} disabled={pending}>
+          <button
+            type="button"
+            className="button button--secondary"
+            onClick={onCancel}
+            disabled={pending}
+          >
             Cancel
           </button>
           <button
@@ -226,7 +249,10 @@ export function ImpactTreeClient({ tree }: { tree: ImpactTree; type: string }) {
     startTransition(async () => {
       const result = await archiveItems(selectedItems);
       if (result.error) setError(result.error);
-      else setSuccess(`${selectedItems.length} record${selectedItems.length !== 1 ? 's' : ''} archived.`);
+      else
+        setSuccess(
+          `${selectedItems.length} record${selectedItems.length !== 1 ? 's' : ''} archived.`,
+        );
     });
   }
 
@@ -254,10 +280,20 @@ export function ImpactTreeClient({ tree }: { tree: ImpactTree; type: string }) {
         }}
       >
         <div className="row" style={{ gap: 8 }}>
-          <button type="button" className="button button--secondary" onClick={selectAll} style={{ fontSize: 13 }}>
+          <button
+            type="button"
+            className="button button--secondary"
+            onClick={selectAll}
+            style={{ fontSize: 13 }}
+          >
             Select all
           </button>
-          <button type="button" className="button button--secondary" onClick={deselectAll} style={{ fontSize: 13 }}>
+          <button
+            type="button"
+            className="button button--secondary"
+            onClick={deselectAll}
+            style={{ fontSize: 13 }}
+          >
             Deselect all
           </button>
         </div>
@@ -323,7 +359,9 @@ export function ImpactTreeClient({ tree }: { tree: ImpactTree; type: string }) {
           className="button button--secondary"
           disabled={selectedItems.length === 0 || !allArchivable || isPending}
           onClick={handleArchive}
-          title={!allArchivable ? 'Some selected types cannot be archived — use hard delete' : undefined}
+          title={
+            !allArchivable ? 'Some selected types cannot be archived — use hard delete' : undefined
+          }
         >
           {isPending ? 'Working…' : `Archive selected (${selectedItems.length})`}
         </button>

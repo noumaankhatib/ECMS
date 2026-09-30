@@ -76,9 +76,7 @@ export default async function SearchPage({
                 {items.map((item) => (
                   <li key={item.id}>
                     <Link href={RESULT_HREF[type](item.id)}>{item.label}</Link>
-                    {item.sublabel ? (
-                      <span className="muted"> — {item.sublabel}</span>
-                    ) : null}
+                    {item.sublabel ? <span className="muted"> — {item.sublabel}</span> : null}
                   </li>
                 ))}
               </ul>

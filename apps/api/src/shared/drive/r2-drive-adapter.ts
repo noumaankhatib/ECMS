@@ -1,7 +1,12 @@
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { Injectable } from '@nestjs/common';
 
 import type { DriveAdapter } from './drive-adapter';
@@ -26,7 +31,9 @@ export class R2DriveAdapter implements DriveAdapter {
     this.bucket = process.env['R2_BUCKET'] ?? 'ecms-files';
 
     if (!accountId || !accessKeyId || !secretAccessKey) {
-      throw new Error('R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY must be set when DRIVE_BACKEND=r2');
+      throw new Error(
+        'R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY must be set when DRIVE_BACKEND=r2',
+      );
     }
 
     this.client = new S3Client({
@@ -61,8 +68,6 @@ export class R2DriveAdapter implements DriveAdapter {
   }
 
   async delete(fileId: string): Promise<void> {
-    await this.client.send(
-      new DeleteObjectCommand({ Bucket: this.bucket, Key: fileId }),
-    );
+    await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: fileId }));
   }
 }

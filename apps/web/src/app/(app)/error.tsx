@@ -36,8 +36,8 @@ export default function AppError({
         <CardBody>
           <div className="alert" role="alert">
             <p>
-              This page hit an error and could not finish loading. Nothing you did caused this —
-              it is safe to try again.
+              This page hit an error and could not finish loading. Nothing you did caused this — it
+              is safe to try again.
             </p>
             {error.digest ? (
               <p className="hint">

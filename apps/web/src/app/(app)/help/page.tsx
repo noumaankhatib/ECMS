@@ -38,9 +38,8 @@ export default async function HelpPage() {
               </dd>
               <dt>An action is refused</dt>
               <dd>
-                The message names what is missing — an unmet precondition (like open issues
-                blocking a project close) or a permission you don&apos;t hold. Both are shown, not
-                hidden.
+                The message names what is missing — an unmet precondition (like open issues blocking
+                a project close) or a permission you don&apos;t hold. Both are shown, not hidden.
               </dd>
               <dt>I need a register as a spreadsheet</dt>
               <dd>Use the &quot;Export CSV&quot; action on the relevant list page.</dd>

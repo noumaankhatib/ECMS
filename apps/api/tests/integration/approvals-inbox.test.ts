@@ -108,10 +108,7 @@ describe('approvals inbox', () => {
 
   async function createProject(code: string) {
     return inContext(() =>
-      projects.create(
-        { clientId, propertyId, code, name: code, type: 'PLANNING' },
-        admin,
-      ),
+      projects.create({ clientId, propertyId, code, name: code, type: 'PLANNING' }, admin),
     );
   }
 

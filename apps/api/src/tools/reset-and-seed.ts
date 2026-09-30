@@ -140,7 +140,9 @@ async function main(): Promise<void> {
   // comments on createdBy/assigneeId/ownerId throughout schema.prisma), so
   // nothing else needs touching here.
   await prisma.user.deleteMany({ where: { id: { not: keepUser.id } } });
-  await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${TRUNCATE_TABLES.map((t) => `"${t}"`).join(', ')} CASCADE;`);
+  await prisma.$executeRawUnsafe(
+    `TRUNCATE TABLE ${TRUNCATE_TABLES.map((t) => `"${t}"`).join(', ')} CASCADE;`,
+  );
   await rm(driveRoot, { recursive: true, force: true });
   await mkdir(driveRoot, { recursive: true });
 
@@ -258,7 +260,12 @@ async function main(): Promise<void> {
       data: { projectId: project.id, type: 'PLANNING', name: 'Planning', status: 'IN_PROGRESS' },
     }),
     prisma.workstream.create({
-      data: { projectId: project.id, type: 'SUPERVISION', name: 'Supervision', status: 'IN_PROGRESS' },
+      data: {
+        projectId: project.id,
+        type: 'SUPERVISION',
+        name: 'Supervision',
+        status: 'IN_PROGRESS',
+      },
     }),
   ]);
   step(
@@ -269,7 +276,12 @@ async function main(): Promise<void> {
   );
 
   const membership = await prisma.projectMember.create({
-    data: { projectId: project.id, userId: keepUser.id, roleCode: 'PROJECT_MANAGER', grantedBy: keepUser.id },
+    data: {
+      projectId: project.id,
+      userId: keepUser.id,
+      roleCode: 'PROJECT_MANAGER',
+      grantedBy: keepUser.id,
+    },
   });
   step(
     'Project membership',
@@ -482,7 +494,10 @@ async function main(): Promise<void> {
       createdBy: keepUser.id,
     },
   });
-  await prisma.drawing.update({ where: { id: drawing.id }, data: { currentRevisionId: drawingRevision.id } });
+  await prisma.drawing.update({
+    where: { id: drawing.id },
+    data: { currentRevisionId: drawingRevision.id },
+  });
   step(
     'Drawing revision — the PDF bytes are inserted HERE',
     `drawingId = ${drawing.id}. This is the append-only row that actually carries a file: fileId is ` +
@@ -517,7 +532,12 @@ async function main(): Promise<void> {
   );
 
   // --- 8. Documents (one per required-document category, so completeness has data) --
-  const documents: Array<{ category: string; label: string; doc: Awaited<ReturnType<typeof prisma.document.create>>; path: string }> = [];
+  const documents: {
+    category: string;
+    label: string;
+    doc: Awaited<ReturnType<typeof prisma.document.create>>;
+    path: string;
+  }[] = [];
   for (const req of requiredDocs) {
     const file = await uploadPdfFile(
       `projects/${project.code}/documents`,
@@ -545,12 +565,19 @@ async function main(): Promise<void> {
     'Documents — one real PDF per required-document category',
     `Each has projectId = ${project.id} and a category that matches a row from the admin-configured ` +
       'RequiredDocument catalogue below by VALUE, not a foreign key (document.category is free text ' +
-      'on purpose). This is what Step 14\'s completeness check reads. A real PDF was written to disk ' +
+      "on purpose). This is what Step 14's completeness check reads. A real PDF was written to disk " +
       'for every single one — file path is printed under each record.',
-    documents.map((d) => ({ category: d.category, label: d.label, record: d.doc, fileOnDisk: d.path })),
+    documents.map((d) => ({
+      category: d.category,
+      label: d.label,
+      record: d.doc,
+      fileOnDisk: d.path,
+    })),
   );
 
-  console.log(`\nRequired-documents catalogue matched above (admin-configured, unchanged by this reset):`);
+  console.log(
+    `\nRequired-documents catalogue matched above (admin-configured, unchanged by this reset):`,
+  );
   console.log(JSON.stringify(requiredDocs, null, 2));
 
   // --- 9. Handover checklist ----------------------------------------------------------
@@ -596,7 +623,7 @@ async function main(): Promise<void> {
   step(
     'Proposal (separate from the project above — this one is not yet converted)',
     `clientId = ${client.id}, propertyId = ${property.id}, sketchTypeId = ${proposal.sketchTypeId} ` +
-      "(from the ProposalSketchType catalogue). Its own inquiry-to-project lifecycle: NEW -> CONCEPT " +
+      '(from the ProposalSketchType catalogue). Its own inquiry-to-project lifecycle: NEW -> CONCEPT ' +
       '-> CLIENT_REVISION -> APPROVED -> WON -> CONVERTED. convertedProjectId is null until the convert action (below) ' +
       'convert action mints a brand-new Project from it — a second project alongside PRJ-DEMO-001.',
     proposal,
@@ -612,7 +639,7 @@ async function main(): Promise<void> {
   actionStep('A spare PDF for you to upload by hand', [
     'Every PDF so far (drawing + 6 documents) was already inserted into the database for you.',
     'This one is deliberately NOT registered anywhere — use it to watch a fresh upload happen,',
-    'either through the web UI\'s file picker or with curl -F (see the upload steps below):',
+    "either through the web UI's file picker or with curl -F (see the upload steps below):",
     `\n    ${sampleUploadPath}\n`,
   ]);
 

@@ -312,7 +312,10 @@ export class ProposalService {
       if (proposal.clientId && property.clientId !== proposal.clientId) {
         throw appError('CONFLICT', {
           fields: [
-            { field: 'propertyId', reason: 'That property does not belong to this proposal\'s client.' },
+            {
+              field: 'propertyId',
+              reason: "That property does not belong to this proposal's client.",
+            },
           ],
         });
       }
@@ -365,7 +368,11 @@ export class ProposalService {
         entityType: 'Proposal',
         entityId: id,
         before: { status: 'WON' },
-        after: { status: 'CONVERTED', convertedProjectId: project.id, reason: input.reason ?? null },
+        after: {
+          status: 'CONVERTED',
+          convertedProjectId: project.id,
+          reason: input.reason ?? null,
+        },
       });
 
       await this.audit.record(tx, {

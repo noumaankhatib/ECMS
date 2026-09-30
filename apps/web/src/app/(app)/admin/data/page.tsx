@@ -45,34 +45,81 @@ export default async function AdminDataPage({
     return `/admin/data?${q.toString()}`;
   }
 
-  const query = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE), includeArchived: 'true' });
+  const query = new URLSearchParams({
+    page: String(page),
+    pageSize: String(PAGE_SIZE),
+    includeArchived: 'true',
+  });
   if (search) query.set('search', search);
 
-  type ListItem = { id: string; label: string; sublabel: string | null; status: string | null; createdAt: string | null; archivedAt: string | null };
+  interface ListItem {
+    id: string;
+    label: string;
+    sublabel: string | null;
+    status: string | null;
+    createdAt: string | null;
+    archivedAt: string | null;
+  }
   let items: ListItem[] = [];
   let total = 0;
   let entityType: 'client' | 'property' | 'project' | 'proposal' = 'client';
 
   if (tab === 'clients') {
     entityType = 'client';
-    const result = await api.get<ApiPage<Client>>(`/clients?${query.toString()}`).catch(() => ({ items: [] as Client[], total: 0, page: 1, pageSize: PAGE_SIZE }));
+    const result = await api
+      .get<ApiPage<Client>>(`/clients?${query.toString()}`)
+      .catch(() => ({ items: [] as Client[], total: 0, page: 1, pageSize: PAGE_SIZE }));
     total = result.total;
-    items = result.items.map((c) => ({ id: c.id, label: c.name, sublabel: c.reference ?? null, status: null, createdAt: c.createdAt, archivedAt: c.archivedAt ?? null }));
+    items = result.items.map((c) => ({
+      id: c.id,
+      label: c.name,
+      sublabel: c.reference ?? null,
+      status: null,
+      createdAt: c.createdAt,
+      archivedAt: c.archivedAt ?? null,
+    }));
   } else if (tab === 'properties') {
     entityType = 'property';
-    const result = await api.get<ApiPage<Property>>(`/properties?${query.toString()}`).catch(() => ({ items: [] as Property[], total: 0, page: 1, pageSize: PAGE_SIZE }));
+    const result = await api
+      .get<ApiPage<Property>>(`/properties?${query.toString()}`)
+      .catch(() => ({ items: [] as Property[], total: 0, page: 1, pageSize: PAGE_SIZE }));
     total = result.total;
-    items = result.items.map((p) => ({ id: p.id, label: p.name, sublabel: p.reference ?? null, status: null, createdAt: null, archivedAt: p.archivedAt ?? null }));
+    items = result.items.map((p) => ({
+      id: p.id,
+      label: p.name,
+      sublabel: p.reference ?? null,
+      status: null,
+      createdAt: null,
+      archivedAt: p.archivedAt ?? null,
+    }));
   } else if (tab === 'projects') {
     entityType = 'project';
-    const result = await api.get<ApiPage<Project>>(`/projects?${query.toString()}`).catch(() => ({ items: [] as Project[], total: 0, page: 1, pageSize: PAGE_SIZE }));
+    const result = await api
+      .get<ApiPage<Project>>(`/projects?${query.toString()}`)
+      .catch(() => ({ items: [] as Project[], total: 0, page: 1, pageSize: PAGE_SIZE }));
     total = result.total;
-    items = result.items.map((p) => ({ id: p.id, label: p.name, sublabel: p.code, status: p.status, createdAt: p.createdAt, archivedAt: null }));
+    items = result.items.map((p) => ({
+      id: p.id,
+      label: p.name,
+      sublabel: p.code,
+      status: p.status,
+      createdAt: p.createdAt,
+      archivedAt: null,
+    }));
   } else if (tab === 'proposals') {
     entityType = 'proposal';
-    const result = await api.get<ApiPage<ProposalRow>>(`/proposals?${query.toString()}`).catch(() => ({ items: [] as ProposalRow[], total: 0, page: 1, pageSize: PAGE_SIZE }));
+    const result = await api
+      .get<ApiPage<ProposalRow>>(`/proposals?${query.toString()}`)
+      .catch(() => ({ items: [] as ProposalRow[], total: 0, page: 1, pageSize: PAGE_SIZE }));
     total = result.total;
-    items = result.items.map((p) => ({ id: p.id, label: p.contactName, sublabel: p.sketchNumber, status: p.status, createdAt: p.createdAt, archivedAt: null }));
+    items = result.items.map((p) => ({
+      id: p.id,
+      label: p.contactName,
+      sublabel: p.sketchNumber,
+      status: p.status,
+      createdAt: p.createdAt,
+      archivedAt: null,
+    }));
   }
 
   return (
@@ -85,7 +132,10 @@ export default async function AdminDataPage({
       <div className="summary-banner">
         <div>
           <span className="summary-banner__value">{total}</span>
-          <span className="summary-banner__label"> {TABS.find((t) => t.key === tab)?.label ?? ''}</span>
+          <span className="summary-banner__label">
+            {' '}
+            {TABS.find((t) => t.key === tab)?.label ?? ''}
+          </span>
         </div>
         <p style={{ color: 'var(--color-danger, #c0392b)', fontWeight: 500 }}>
           Hard delete is permanent and cannot be undone. Review the impact tree carefully.
@@ -160,7 +210,11 @@ export default async function AdminDataPage({
                       )}
                     </td>
                     <td className="nowrap">
-                      {item.createdAt ? <DateText value={item.createdAt} /> : <span className="faint">—</span>}
+                      {item.createdAt ? (
+                        <DateText value={item.createdAt} />
+                      ) : (
+                        <span className="faint">—</span>
+                      )}
                     </td>
                     <td>
                       {item.archivedAt ? (

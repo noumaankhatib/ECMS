@@ -52,10 +52,12 @@ export class AdminDeleteService {
     const nonArchivable = items.filter((i) => !ARCHIVABLE.has(i.type));
     if (nonArchivable.length > 0) {
       throw appError('CONFLICT', {
-        fields: [{
-          field: 'items',
-          reason: `These types cannot be archived (only hard-deleted): ${[...new Set(nonArchivable.map((i) => i.type))].join(', ')}`,
-        }],
+        fields: [
+          {
+            field: 'items',
+            reason: `These types cannot be archived (only hard-deleted): ${[...new Set(nonArchivable.map((i) => i.type))].join(', ')}`,
+          },
+        ],
       });
     }
 
@@ -64,22 +66,40 @@ export class AdminDeleteService {
       const byType = groupByType(items);
 
       if (byType.client?.length) {
-        await tx.client.updateMany({ where: { id: { in: byType.client } }, data: { archivedAt: now, archivedBy: actorId } });
+        await tx.client.updateMany({
+          where: { id: { in: byType.client } },
+          data: { archivedAt: now, archivedBy: actorId },
+        });
       }
       if (byType.contact?.length) {
-        await tx.contact.updateMany({ where: { id: { in: byType.contact } }, data: { archivedAt: now } });
+        await tx.contact.updateMany({
+          where: { id: { in: byType.contact } },
+          data: { archivedAt: now },
+        });
       }
       if (byType.property?.length) {
-        await tx.property.updateMany({ where: { id: { in: byType.property } }, data: { archivedAt: now, archivedBy: actorId } });
+        await tx.property.updateMany({
+          where: { id: { in: byType.property } },
+          data: { archivedAt: now, archivedBy: actorId },
+        });
       }
       if (byType.planningActivity?.length) {
-        await tx.planningActivity.updateMany({ where: { id: { in: byType.planningActivity } }, data: { archivedAt: now } });
+        await tx.planningActivity.updateMany({
+          where: { id: { in: byType.planningActivity } },
+          data: { archivedAt: now },
+        });
       }
       if (byType.milestone?.length) {
-        await tx.milestone.updateMany({ where: { id: { in: byType.milestone } }, data: { archivedAt: now } });
+        await tx.milestone.updateMany({
+          where: { id: { in: byType.milestone } },
+          data: { archivedAt: now },
+        });
       }
       if (byType.document?.length) {
-        await tx.document.updateMany({ where: { id: { in: byType.document } }, data: { archivedAt: now, archivedBy: actorId } });
+        await tx.document.updateMany({
+          where: { id: { in: byType.document } },
+          data: { archivedAt: now, archivedBy: actorId },
+        });
       }
 
       await this.audit.record(tx, {
@@ -171,7 +191,9 @@ export class AdminDeleteService {
         await tx.milestone.deleteMany({ where: { id: { in: byType.milestone } } });
       }
       if (byType.supervisionAgreement?.length) {
-        await tx.supervisionAgreement.deleteMany({ where: { id: { in: byType.supervisionAgreement } } });
+        await tx.supervisionAgreement.deleteMany({
+          where: { id: { in: byType.supervisionAgreement } },
+        });
       }
       if (byType.handoverChecklist?.length) {
         await tx.handoverChecklist.deleteMany({ where: { id: { in: byType.handoverChecklist } } });
@@ -221,9 +243,7 @@ export class AdminDeleteService {
   }
 }
 
-function groupByType(
-  items: AdminDeleteItem[],
-): Partial<Record<AdminDeleteItem['type'], string[]>> {
+function groupByType(items: AdminDeleteItem[]): Partial<Record<AdminDeleteItem['type'], string[]>> {
   const result: Partial<Record<AdminDeleteItem['type'], string[]>> = {};
   for (const item of items) {
     (result[item.type] ??= []).push(item.id);

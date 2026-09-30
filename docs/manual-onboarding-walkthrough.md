@@ -26,20 +26,20 @@ This is where a brand-new client normally starts: an inquiry, before a
 formal Client record even exists. `clientId`/`propertyId` are **both
 optional** here on purpose.
 
-| Field | Sample value |
-|---|---|
-| contactName *(required)* | `Ahmed Al Rawahi` |
-| contactPhone | `+968 9911 2233` |
-| clientId | *(leave blank — client doesn't exist yet)* |
-| propertyId | *(leave blank)* |
-| sketchTypeId | pick "Villa - G+1" from the dropdown (admin-configured list) |
-| projectType | `BOTH` |
-| approxAreaSqm | `380` |
-| source | `walk-in` |
-| assignedArchitectId | *(pick yourself from the user list)* |
-| receivedAt | `2026-09-18` |
-| dueAt | `2026-10-02` |
-| notes | `First-time client, wants villa + supervision.` |
+| Field                    | Sample value                                                 |
+| ------------------------ | ------------------------------------------------------------ |
+| contactName _(required)_ | `Ahmed Al Rawahi`                                            |
+| contactPhone             | `+968 9911 2233`                                             |
+| clientId                 | _(leave blank — client doesn't exist yet)_                   |
+| propertyId               | _(leave blank)_                                              |
+| sketchTypeId             | pick "Villa - G+1" from the dropdown (admin-configured list) |
+| projectType              | `BOTH`                                                       |
+| approxAreaSqm            | `380`                                                        |
+| source                   | `walk-in`                                                    |
+| assignedArchitectId      | _(pick yourself from the user list)_                         |
+| receivedAt               | `2026-09-18`                                                 |
+| dueAt                    | `2026-10-02`                                                 |
+| notes                    | `First-time client, wants villa + supervision.`              |
 
 `sketchNumber` is **not** a field you fill — the server auto-generates it
 (e.g. `26-SB-142`) the moment you save.
@@ -54,12 +54,12 @@ Screen: the proposal you just opened.
 
 Click each button in order — each is a real state change, not just a label:
 
-| Action | State change |
-|---|---|
-| Click **Start Concept** | `NEW → CONCEPT` |
-| Click **Send for Client Review** | `CONCEPT → CLIENT_REVISION` |
-| Click **Approve** | `CLIENT_REVISION → APPROVED` |
-| Click **Win** | `APPROVED → WON` |
+| Action                           | State change                 |
+| -------------------------------- | ---------------------------- |
+| Click **Start Concept**          | `NEW → CONCEPT`              |
+| Click **Send for Client Review** | `CONCEPT → CLIENT_REVISION`  |
+| Click **Approve**                | `CLIENT_REVISION → APPROVED` |
+| Click **Win**                    | `APPROVED → WON`             |
 
 At `WON`, before you can convert, the proposal needs a `propertyId` — which
 needs a Client and a Property to exist. That's Stage 3 below.
@@ -70,11 +70,11 @@ needs a Client and a Property to exist. That's Stage 3 below.
 
 Screen: **Clients → New**
 
-| Field | Sample value |
-|---|---|
-| name *(required)* | `Al Rawahi Family Trading LLC` |
-| reference | `CL-2026-014` |
-| notes | `Onboarded from proposal 26-SB-142.` |
+| Field             | Sample value                         |
+| ----------------- | ------------------------------------ |
+| name _(required)_ | `Al Rawahi Family Trading LLC`       |
+| reference         | `CL-2026-014`                        |
+| notes             | `Onboarded from proposal 26-SB-142.` |
 
 **State after save:** a new `client.id` exists — copy it, you'll need it
 below. Nothing points at it yet.
@@ -85,13 +85,13 @@ below. Nothing points at it yet.
 
 Screen: **Client detail → Contacts tab → New**
 
-| Field | Sample value |
-|---|---|
-| name | `Ahmed Al Rawahi` |
-| position | `Owner` |
-| email | `ahmed.alrawahi@example.com` |
-| phone | `+968 9911 2233` |
-| isPrimary | `true` |
+| Field     | Sample value                 |
+| --------- | ---------------------------- |
+| name      | `Ahmed Al Rawahi`            |
+| position  | `Owner`                      |
+| email     | `ahmed.alrawahi@example.com` |
+| phone     | `+968 9911 2233`             |
+| isPrimary | `true`                       |
 
 Links to the client automatically (you're inside the client's page). Only
 one contact per client may have `isPrimary = true` — the form enforces it.
@@ -102,22 +102,22 @@ one contact per client may have `isPrimary = true` — the form enforces it.
 
 Screen: **Client detail → Properties tab → New**
 
-| Field | Sample value |
-|---|---|
-| name | `Al Amerat Villa Plot` |
-| reference | `PR-2026-014` |
-| addressLine1 | `Way 4512, Al Amerat` |
-| addressLine2 | `Behind Al Amerat Park` |
-| city | `Muscat` |
-| postcode | `133` |
-| country | `Oman` |
-| plotNumber *(Krookie's own plot number)* | `1-20-041-02-233` |
-| wilayat | `Al Amerat` |
-| village | `Al Amerat` |
-| surveyReference *(Krookie's survey serial)* | `1-20-041-02-233` |
-| titleDeedReference *(Mulkia deed reference)* | `2020/08842` |
-| ownerName | `Ahmed Al Rawahi` |
-| ownerNationalId | `23456789` |
+| Field                                        | Sample value            |
+| -------------------------------------------- | ----------------------- |
+| name                                         | `Al Amerat Villa Plot`  |
+| reference                                    | `PR-2026-014`           |
+| addressLine1                                 | `Way 4512, Al Amerat`   |
+| addressLine2                                 | `Behind Al Amerat Park` |
+| city                                         | `Muscat`                |
+| postcode                                     | `133`                   |
+| country                                      | `Oman`                  |
+| plotNumber _(Krookie's own plot number)_     | `1-20-041-02-233`       |
+| wilayat                                      | `Al Amerat`             |
+| village                                      | `Al Amerat`             |
+| surveyReference _(Krookie's survey serial)_  | `1-20-041-02-233`       |
+| titleDeedReference _(Mulkia deed reference)_ | `2020/08842`            |
+| ownerName                                    | `Ahmed Al Rawahi`       |
+| ownerNationalId                              | `23456789`              |
 
 **State after save:** property belongs to the client from Stage 3. Now go
 back to the Stage 2 proposal and click **Convert** — pick this property when
@@ -135,13 +135,13 @@ Click **Convert**, select `propertyId = <the property from Stage 5>`.
 `proposal.convertedProjectId` is now set to a brand-new Project's id. That
 new project already carries:
 
-| Field | Value |
-|---|---|
-| clientId | Stage 3 client |
-| propertyId | Stage 5 property |
-| type | `BOTH` *(copied from proposal.projectType)* |
-| status | `DRAFT` |
-| code | auto-generated, e.g. `PRJ-2026-0037` |
+| Field      | Value                                       |
+| ---------- | ------------------------------------------- |
+| clientId   | Stage 3 client                              |
+| propertyId | Stage 5 property                            |
+| type       | `BOTH` _(copied from proposal.projectType)_ |
+| status     | `DRAFT`                                     |
+| code       | auto-generated, e.g. `PRJ-2026-0037`        |
 
 **Side effect (automatic, nothing to fill in):** a PLANNING workstream and a
 SUPERVISION workstream are both opened on this project immediately, because
@@ -166,9 +166,9 @@ life; DRAFT projects must be activated before most other actions unlock.)
 
 Screen: **Project → Members tab**
 
-| Field | Sample value |
-|---|---|
-| userId | your own user id |
+| Field    | Sample value      |
+| -------- | ----------------- |
+| userId   | your own user id  |
 | roleCode | `PROJECT_MANAGER` |
 
 Why this matters: your global role (e.g. `SYSTEM_ADMINISTRATOR`) says WHAT
@@ -183,68 +183,68 @@ Screen: **Project → Planning tab**
 
 ### 9a. Planning activity → New
 
-| Field | Sample value |
-|---|---|
-| name | `Prepare concept design` |
+| Field       | Sample value                                |
+| ----------- | ------------------------------------------- |
+| name        | `Prepare concept design`                    |
 | description | `Initial concept design for client review.` |
-| assigneeId | your user id |
-| dueDate | `2026-10-15` |
+| assigneeId  | your user id                                |
+| dueDate     | `2026-10-15`                                |
 
 No status field — this is a plain checkbox (`done`), ticked later by hand.
 
 ### 9b. Milestone → New
 
-| Field | Sample value |
-|---|---|
-| name | `Municipality submission` |
-| targetDate | `2026-11-01` |
+| Field      | Sample value              |
+| ---------- | ------------------------- |
+| name       | `Municipality submission` |
+| targetDate | `2026-11-01`              |
 
 `achievedDate` stays empty until you tick it off when actually reached.
 
 ### 9c. Submission → New (the actual authority application)
 
-| Field | Sample value |
-|---|---|
-| reference | `SUB-2026-014` |
-| authorityName | `Al Amerat Municipality` |
-| department | `PLANNING` |
-| pendingWith | `consultancy` |
-| notes | `Initial villa submission.` |
+| Field         | Sample value                |
+| ------------- | --------------------------- |
+| reference     | `SUB-2026-014`              |
+| authorityName | `Al Amerat Municipality`    |
+| department    | `PLANNING`                  |
+| pendingWith   | `consultancy`               |
+| notes         | `Initial villa submission.` |
 
 **State after save:** `submission.status = DRAFT`
 
 ### 9d. Move the submission forward, one button per state
 
-| Action | State change |
-|---|---|
-| Click **Submit** | `DRAFT → SUBMITTED` |
+| Action           | State change               |
+| ---------------- | -------------------------- |
+| Click **Submit** | `DRAFT → SUBMITTED`        |
 | Click **Review** | `SUBMITTED → UNDER_REVIEW` |
 
 ### 9e. Submission → Reviews tab → New (log what the authority came back with)
 
-| Field | Sample value |
-|---|---|
-| reviewDate | `2026-09-25` |
-| reviewerName | `Municipality Reviewer` |
-| comments | `Requested clarification on setback distances.` |
-| responseDueAt | `2026-10-05` |
+| Field         | Sample value                                    |
+| ------------- | ----------------------------------------------- |
+| reviewDate    | `2026-09-25`                                    |
+| reviewerName  | `Municipality Reviewer`                         |
+| comments      | `Requested clarification on setback distances.` |
+| responseDueAt | `2026-10-05`                                    |
 
 ### 9f. Submission → Meetings tab → New
 
-| Field | Sample value |
-|---|---|
-| required | `true` |
-| meetingAt | `2026-09-30T09:00` |
+| Field     | Sample value                             |
+| --------- | ---------------------------------------- |
+| required  | `true`                                   |
+| meetingAt | `2026-09-30T09:00`                       |
 | attendees | `Project Manager, Municipality Reviewer` |
-| purpose | `Discuss setback clarification` |
+| purpose   | `Discuss setback clarification`          |
 
 ### 9g. Back on the submission itself: resolve and approve
 
-| Action | Result |
-|---|---|
-| Click **Request Clarification** | `clarificationRequested = true` |
-| Click **Respond to Clarification**, response = `Setback corrected to 3m as required.` | response stored |
-| Click **Approve**, permitReference = `PERMIT-2026-014` *(required the first time you approve)* | `UNDER_REVIEW → APPROVED` |
+| Action                                                                                         | Result                          |
+| ---------------------------------------------------------------------------------------------- | ------------------------------- |
+| Click **Request Clarification**                                                                | `clarificationRequested = true` |
+| Click **Respond to Clarification**, response = `Setback corrected to 3m as required.`          | response stored                 |
+| Click **Approve**, permitReference = `PERMIT-2026-014` _(required the first time you approve)_ | `UNDER_REVIEW → APPROVED`       |
 
 ---
 
@@ -254,62 +254,62 @@ Screen: **Project → Supervision tab**
 
 ### 10a. Supervision agreement → New
 
-| Field | Sample value |
-|---|---|
-| type | `MONTHLY` |
-| visitsAllowed | `4` |
-| amount | `550.00` |
-| startDate | `2026-09-18` |
-| notes | `Standard monthly retainer.` |
+| Field         | Sample value                 |
+| ------------- | ---------------------------- |
+| type          | `MONTHLY`                    |
+| visitsAllowed | `4`                          |
+| amount        | `550.00`                     |
+| startDate     | `2026-09-18`                 |
+| notes         | `Standard monthly retainer.` |
 
 ### 10b. Site visit → New
 
-| Field | Sample value |
-|---|---|
-| visitDate | `2026-09-20` |
-| attendees | `Site Engineer, Contractor Foreman` |
-| notes | `First site walk before groundwork.` |
+| Field     | Sample value                         |
+| --------- | ------------------------------------ |
+| visitDate | `2026-09-20`                         |
+| attendees | `Site Engineer, Contractor Foreman`  |
+| notes     | `First site walk before groundwork.` |
 
 ### 10c. On that site visit → Observations tab → New
 
-| Field | Sample value |
-|---|---|
+| Field       | Sample value                                                  |
+| ----------- | ------------------------------------------------------------- |
 | description | `Rebar spacing on ground floor slab wider than drawing spec.` |
-| category | `Structural` |
+| category    | `Structural`                                                  |
 
 ### 10d. On the same site visit → Instructions tab → New
 
-| Field | Sample value |
-|---|---|
+| Field         | Sample value                                                      |
+| ------------- | ----------------------------------------------------------------- |
 | directiveText | `Correct rebar spacing to match approved drawing before pouring.` |
-| assigneeId | your user id |
-| dueDate | `2026-09-23` |
+| assigneeId    | your user id                                                      |
+| dueDate       | `2026-09-23`                                                      |
 
 ### 10e. Turn the observation into a tracked Issue
 
 Screen: **Project → Issues → New**
 
-| Field | Sample value |
-|---|---|
-| observationId | the observation from 10c (the form links it for you) |
-| title | `Incorrect rebar spacing on ground floor slab` |
-| description | `Spacing measured at 250mm against a 200mm spec.` |
-| severity | `HIGH` |
-| priority | `HIGH` |
-| ownerId | your user id |
-| dueDate | `2026-09-23` |
-| workstreamType | `SUPERVISION` |
+| Field          | Sample value                                         |
+| -------------- | ---------------------------------------------------- |
+| observationId  | the observation from 10c (the form links it for you) |
+| title          | `Incorrect rebar spacing on ground floor slab`       |
+| description    | `Spacing measured at 250mm against a 200mm spec.`    |
+| severity       | `HIGH`                                               |
+| priority       | `HIGH`                                               |
+| ownerId        | your user id                                         |
+| dueDate        | `2026-09-23`                                         |
+| workstreamType | `SUPERVISION`                                        |
 
 **State after save:** `issue.status = OPEN`
 
 ### 10f. Drive the issue to closure, one button at a time
 
-| Action | State change |
-|---|---|
-| Click **Start** | `OPEN → IN_PROGRESS` |
-| Click **Resolve** *(optionally add closureNotes via Edit first)* | `IN_PROGRESS → RESOLVED` |
-| Click **Close** | `RESOLVED → CLOSED` |
-| *(Reopen is also available if a closed issue needs to come back)* | `CLOSED → OPEN` |
+| Action                                                            | State change             |
+| ----------------------------------------------------------------- | ------------------------ |
+| Click **Start**                                                   | `OPEN → IN_PROGRESS`     |
+| Click **Resolve** _(optionally add closureNotes via Edit first)_  | `IN_PROGRESS → RESOLVED` |
+| Click **Close**                                                   | `RESOLVED → CLOSED`      |
+| _(Reopen is also available if a closed issue needs to come back)_ | `CLOSED → OPEN`          |
 
 ---
 
@@ -319,10 +319,10 @@ Screen: **Project → Drawings → New**
 
 ### 11a. Register the drawing (identity only, no file yet)
 
-| Field | Sample value |
-|---|---|
-| number | `DRW-001` |
-| title | `Ground Floor Plan` |
+| Field  | Sample value        |
+| ------ | ------------------- |
+| number | `DRW-001`           |
+| title  | `Ground Floor Plan` |
 
 **State after save:** drawing exists, `currentRevisionId = null`.
 
@@ -330,11 +330,11 @@ Screen: **Project → Drawings → New**
 
 Screen: that drawing → **Revisions → New**
 
-| Field | Sample value |
-|---|---|
-| revisionCode | `P1` |
-| notes | `First issue for authority submission.` |
-| file | **attach a PDF here** |
+| Field        | Sample value                            |
+| ------------ | --------------------------------------- |
+| revisionCode | `P1`                                    |
+| notes        | `First issue for authority submission.` |
+| file         | **attach a PDF here**                   |
 
 Use this ready-made real PDF (already on disk, nothing to generate):
 
@@ -351,11 +351,11 @@ this revision.
 
 ### 11c. Move the revision through approval
 
-| Action | State change |
-|---|---|
-| Click **Submit** | `DRAFT → SUBMITTED` |
-| Click **Review** | `SUBMITTED → UNDER_REVIEW` |
-| Click **Approve** | `UNDER_REVIEW → APPROVED` |
+| Action            | State change               |
+| ----------------- | -------------------------- |
+| Click **Submit**  | `DRAFT → SUBMITTED`        |
+| Click **Review**  | `SUBMITTED → UNDER_REVIEW` |
+| Click **Approve** | `UNDER_REVIEW → APPROVED`  |
 
 ⚠️ **Once APPROVED:** a database trigger makes this exact revision row
 permanently un-editable and un-deletable, forever. To change anything, you
@@ -371,14 +371,14 @@ Do this once per row of the (admin-configured) Required Documents
 catalogue, so the completeness screen has something to show. Example for
 one category:
 
-| Field | Sample value |
-|---|---|
-| category | `Design` *(must match a RequiredDocument category)* |
-| title | `Approved architectural, structural and MEP drawings` |
-| description | `Concept design set for client sign-off.` |
-| linkedType | *(leave blank, or e.g. `SITE_VISIT`)* |
-| linkedId | *(only if linkedType is set — must be given together)* |
-| file | attach the same `sample-upload.pdf`, or any real PDF |
+| Field       | Sample value                                           |
+| ----------- | ------------------------------------------------------ |
+| category    | `Design` _(must match a RequiredDocument category)_    |
+| title       | `Approved architectural, structural and MEP drawings`  |
+| description | `Concept design set for client sign-off.`              |
+| linkedType  | _(leave blank, or e.g. `SITE_VISIT`)_                  |
+| linkedId    | _(only if linkedType is set — must be given together)_ |
+| file        | attach the same `sample-upload.pdf`, or any real PDF   |
 
 Repeat for each catalogue category you want covered: Tests, Design,
 Authority, Contract, Construction, Completion (check **Admin → Required
@@ -397,22 +397,22 @@ required categories still have zero documents against them.
 
 Screen: **Project → Modifications → New**
 
-| Field | Sample value |
-|---|---|
-| requestText | `Client requests moving the kitchen window 500mm to the left.` |
-| impactArea | `ARCHITECTURE` *(or STRUCTURAL / MEP)* |
-| costImpact | `Negligible` |
-| timeImpact | `None` |
-| drawingRevisionId | the P1 revision from Stage 11 *(optional)* |
-| observationId | the observation from Stage 10c *(optional — both, one, or neither)* |
+| Field             | Sample value                                                        |
+| ----------------- | ------------------------------------------------------------------- |
+| requestText       | `Client requests moving the kitchen window 500mm to the left.`      |
+| impactArea        | `ARCHITECTURE` _(or STRUCTURAL / MEP)_                              |
+| costImpact        | `Negligible`                                                        |
+| timeImpact        | `None`                                                              |
+| drawingRevisionId | the P1 revision from Stage 11 _(optional)_                          |
+| observationId     | the observation from Stage 10c _(optional — both, one, or neither)_ |
 
 **State after save:** `modification.status = DRAFT`
 
-| Action | State change |
-|---|---|
-| Click **Submit** | `DRAFT → SUBMITTED` |
-| Click **Review** | `SUBMITTED → UNDER_REVIEW` |
-| Click **Approve** | `UNDER_REVIEW → APPROVED` *(same shared approval machine as drawings)* |
+| Action            | State change                                                           |
+| ----------------- | ---------------------------------------------------------------------- |
+| Click **Submit**  | `DRAFT → SUBMITTED`                                                    |
+| Click **Review**  | `SUBMITTED → UNDER_REVIEW`                                             |
+| Click **Approve** | `UNDER_REVIEW → APPROVED` _(same shared approval machine as drawings)_ |
 
 ---
 
@@ -433,10 +433,10 @@ it):
 
 Once satisfied, go back to the Project screen:
 
-| Action | State change |
-|---|---|
-| Click **Complete** | `project.status: ACTIVE → COMPLETED` |
-| Click **Close** | `project.status: COMPLETED → CLOSED` *(terminal, read-only)* |
+| Action             | State change                                                 |
+| ------------------ | ------------------------------------------------------------ |
+| Click **Complete** | `project.status: ACTIVE → COMPLETED`                         |
+| Click **Close**    | `project.status: COMPLETED → CLOSED` _(terminal, read-only)_ |
 
 ---
 
@@ -462,9 +462,9 @@ from — normally `apps/api/`, giving `apps/api/.local-drive/`).
 
 Inside that root, the path differs by upload type:
 
-| Upload type | Path pattern | Example |
-|---|---|---|
-| Document (Stage 12) | `<projectId>/<random-uuid>` | `.local-drive/41e43170-.../9c3e92b0-...` |
+| Upload type                  | Path pattern                                     | Example                                                      |
+| ---------------------------- | ------------------------------------------------ | ------------------------------------------------------------ |
+| Document (Stage 12)          | `<projectId>/<random-uuid>`                      | `.local-drive/41e43170-.../9c3e92b0-...`                     |
 | Drawing revision (Stage 11b) | `<projectId>/drawings/<drawingId>/<random-uuid>` | `.local-drive/41e43170.../drawings/0b806596.../3c40c4e9-...` |
 
 The database never stores the absolute path — `document.fileId` /
@@ -497,10 +497,10 @@ If you ever do need the disk path directly (e.g. to inspect the raw file):
 
 From `SUBMITTED` or `UNDER_REVIEW`:
 
-| Action | State change |
-|---|---|
-| Click **Reject** | `→ REJECTED` *(terminal for this revision)* |
-| Click **Return for Revision** | `→ RETURNED_FOR_REVISION` |
+| Action                        | State change                                |
+| ----------------------------- | ------------------------------------------- |
+| Click **Reject**              | `→ REJECTED` _(terminal for this revision)_ |
+| Click **Return for Revision** | `→ RETURNED_FOR_REVISION`                   |
 
 Either way this revision is done — you don't edit it (nothing about a
 revision's content may ever change). You create a new one instead: Drawings
@@ -511,9 +511,9 @@ file, and walk P2 through Submit → Review → Approve again.
 
 Same shared machine as drawings, from `SUBMITTED` or `UNDER_REVIEW`:
 
-| Action | State change |
-|---|---|
-| Click **Reject** | `→ REJECTED` |
+| Action                        | State change              |
+| ----------------------------- | ------------------------- |
+| Click **Reject**              | `→ REJECTED`              |
 | Click **Return for Revision** | `→ RETURNED_FOR_REVISION` |
 
 No "create P2" convention here — you'd normally just create a fresh
@@ -524,46 +524,46 @@ back.
 
 From `UNDER_REVIEW`:
 
-| Action | State change |
-|---|---|
-| Click **Reject** | `→ REJECTED` *(terminal)* |
+| Action                        | State change                                                                                                           |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Click **Reject**              | `→ REJECTED` _(terminal)_                                                                                              |
 | Click **Return for Revision** | `→ RETURNED_FOR_REVISION` — edit (PATCH) and click **Submit** again to push back to `SUBMITTED`, then **Review** again |
 
 From (most) active states:
 
-| Action | State change |
-|---|---|
-| Click **Withdraw** | `→ WITHDRAWN` *(pulled back voluntarily)* |
-| Click **Halt** | `→ HALTED` *(paused; `preHaltStatus` quietly remembers what it was, e.g. `UNDER_REVIEW`)* |
-| Click **Resume** | `→` back to whatever `preHaltStatus` recorded *(`preHaltStatus` cleared once resumed)* |
-| Click **Cancel** | `→ CANCELLED` *(terminal)* |
+| Action             | State change                                                                              |
+| ------------------ | ----------------------------------------------------------------------------------------- |
+| Click **Withdraw** | `→ WITHDRAWN` _(pulled back voluntarily)_                                                 |
+| Click **Halt**     | `→ HALTED` _(paused; `preHaltStatus` quietly remembers what it was, e.g. `UNDER_REVIEW`)_ |
+| Click **Resume**   | `→` back to whatever `preHaltStatus` recorded _(`preHaltStatus` cleared once resumed)_    |
+| Click **Cancel**   | `→ CANCELLED` _(terminal)_                                                                |
 
 Clarification round-trip (independent of the status column):
 
-| Action | Result |
-|---|---|
-| Click **Request Clarification** | `clarificationRequested = true`, `clarificationRequestedAt` stamped |
-| Click **Respond to Clarification**, response = `Setback corrected to 3m as required.` | `clarificationResponse` stored, `clarificationRespondedAt` stamped *(`clarificationRequested` stays `true` — it's a log, not a re-usable flag)* |
+| Action                                                                                | Result                                                                                                                                          |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Click **Request Clarification**                                                       | `clarificationRequested = true`, `clarificationRequestedAt` stamped                                                                             |
+| Click **Respond to Clarification**, response = `Setback corrected to 3m as required.` | `clarificationResponse` stored, `clarificationRespondedAt` stamped _(`clarificationRequested` stays `true` — it's a log, not a re-usable flag)_ |
 
 ### Issue reopened
 
 From `CLOSED`:
 
-| Action | State change |
-|---|---|
-| Click **Reopen** | `→ OPEN` *(goes right back to the start of the same OPEN → IN_PROGRESS → RESOLVED → CLOSED chain from Stage 10f)* |
+| Action           | State change                                                                                                      |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Click **Reopen** | `→ OPEN` _(goes right back to the start of the same OPEN → IN_PROGRESS → RESOLVED → CLOSED chain from Stage 10f)_ |
 
 ### Proposal: lost / on hold / resumed
 
 From most active states (`NEW`, `CONCEPT`, `CLIENT_REVISION`, `APPROVED`):
 
-| Action | State change |
-|---|---|
-| Click **Lose** | `→ LOST` *(terminal — the inquiry didn't convert)* |
-| Click **Hold** | `→ ON_HOLD` *(paused, e.g. client went quiet)* |
+| Action                            | State change                                                                                                                                                  |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Click **Lose**                    | `→ LOST` _(terminal — the inquiry didn't convert)_                                                                                                            |
+| Click **Hold**                    | `→ ON_HOLD` _(paused, e.g. client went quiet)_                                                                                                                |
 | Click **Resume** (from `ON_HOLD`) | `→ CONCEPT` — always lands back in `CONCEPT` regardless of what it was paused from; it does not remember the exact prior state the way `Submission.halt` does |
 
-Note: `WON → CONVERTED` is the *one* path that mints a Project; `LOST`/
+Note: `WON → CONVERTED` is the _one_ path that mints a Project; `LOST`/
 `ON_HOLD` proposals never do, even if later resumed and re-approved.
 
 ---
@@ -577,15 +577,15 @@ chart firms up.
 
 ### Roles in this system
 
-| Role | Scope | What it's for |
-|---|---|---|
-| SYSTEM_ADMINISTRATOR | Global | Everything: users, roles, config, override |
-| DIRECTOR | Global | View everything + approve (planning, drawings). Never creates. |
-| PROJECT_MANAGER | Mostly project | Sets up and runs the project day to day. Broadest hands-on role. |
-| PLANNING | Project | Planning activities/submissions/drawings, scoped to their projects |
-| SUPERVISION | Project | Site visits/observations/instructions/issues, scoped to their projects |
-| DOCUMENT_CONTROLLER | Project | Owns the document register, scoped to their projects |
-| CLIENT_STAKEHOLDER | — | Placeholder, no permissions granted yet ("when enabled" per PRD) |
+| Role                 | Scope          | What it's for                                                          |
+| -------------------- | -------------- | ---------------------------------------------------------------------- |
+| SYSTEM_ADMINISTRATOR | Global         | Everything: users, roles, config, override                             |
+| DIRECTOR             | Global         | View everything + approve (planning, drawings). Never creates.         |
+| PROJECT_MANAGER      | Mostly project | Sets up and runs the project day to day. Broadest hands-on role.       |
+| PLANNING             | Project        | Planning activities/submissions/drawings, scoped to their projects     |
+| SUPERVISION          | Project        | Site visits/observations/instructions/issues, scoped to their projects |
+| DOCUMENT_CONTROLLER  | Project        | Owns the document register, scoped to their projects                   |
+| CLIENT_STAKEHOLDER   | —              | Placeholder, no permissions granted yet ("when enabled" per PRD)       |
 
 Everything except a few GLOBAL admin/portfolio permissions is
 PROJECT-scoped — a person only acts on projects where a `ProjectMember` row
@@ -593,18 +593,18 @@ PROJECT-scoped — a person only acts on projects where a `ProjectMember` row
 
 ### Stage-by-stage responsibility and handoffs
 
-| Stage(s) | Who | Notes |
-|---|---|---|
-| 1–2 Proposal intake → WON | PLANNING or PROJECT_MANAGER | Both hold `proposal:create`/`edit`. DIRECTOR has no `proposal:*` permission at all. |
-| 3–5 Client / Contact / Property | PROJECT_MANAGER or SYSTEM_ADMINISTRATOR | `client:create`/`property:create` are GLOBAL-only; PLANNING/SUPERVISION can only view. **Handoff:** Planning hands the won proposal to a PM, who formalizes the client record. |
-| 6 Convert proposal → project | PROJECT_MANAGER or SYSTEM_ADMINISTRATOR | `proposal:convert` is a narrower permission than `proposal:edit`, gated separately since it also creates a Project. |
-| 7–8 Activate, add members | PROJECT_MANAGER | `project:edit`, `project:manage_members`. **Handoff:** the PM staffs the project — adding the Planning/Supervision people who do Stages 9–13. |
-| 9 Planning workstream | Create/edit: PLANNING or PROJECT_MANAGER. Approve: PLANNING itself, DIRECTOR, or ADMIN | `PROJECT_MANAGER` does **not** hold `planning:approve` — a PM can prepare a submission but cannot approve their own work. **Handoff:** Planning submits → a Director (or another Planning-team member, per current config) approves. |
-| 10 Supervision workstream | SUPERVISION or PROJECT_MANAGER | Issue **close** is its own gate (`issue:close`) — PLANNING can only view issues. Typically the Supervision engineer logs the visit/issue on site; the PM or same engineer closes it once fixed. |
-| 11 Drawings + revisions | Create/upload: PLANNING or PROJECT_MANAGER. **Approve: DIRECTOR or SYSTEM_ADMINISTRATOR only.** | Hard separation of duty — PLANNING and PROJECT_MANAGER do not hold `drawing:approve` at all. Whoever drafts/uploads a revision can never approve it themselves. |
-| 12 Documents | DOCUMENT_CONTROLLER (day to day) or PROJECT_MANAGER | PLANNING/SUPERVISION/DIRECTOR can only view. **Handoff:** PM or Supervision hands paperwork to the Document Controller to register/upload/categorize. |
-| 13 Modifications | Same as Stage 9 (shares `planning:*` permissions) | PLANNING/PROJECT_MANAGER create; PLANNING/DIRECTOR/ADMIN approve. |
-| 14 Handover / closure | PROJECT_MANAGER or SYSTEM_ADMINISTRATOR only | `project:close` is not held by Planning/Supervision/Director. **Handoff:** PM confirms handover checklist items (often chasing Document Controller/Supervision for evidence), then clicks Complete → Close. |
+| Stage(s)                        | Who                                                                                             | Notes                                                                                                                                                                                                                                |
+| ------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1–2 Proposal intake → WON       | PLANNING or PROJECT_MANAGER                                                                     | Both hold `proposal:create`/`edit`. DIRECTOR has no `proposal:*` permission at all.                                                                                                                                                  |
+| 3–5 Client / Contact / Property | PROJECT_MANAGER or SYSTEM_ADMINISTRATOR                                                         | `client:create`/`property:create` are GLOBAL-only; PLANNING/SUPERVISION can only view. **Handoff:** Planning hands the won proposal to a PM, who formalizes the client record.                                                       |
+| 6 Convert proposal → project    | PROJECT_MANAGER or SYSTEM_ADMINISTRATOR                                                         | `proposal:convert` is a narrower permission than `proposal:edit`, gated separately since it also creates a Project.                                                                                                                  |
+| 7–8 Activate, add members       | PROJECT_MANAGER                                                                                 | `project:edit`, `project:manage_members`. **Handoff:** the PM staffs the project — adding the Planning/Supervision people who do Stages 9–13.                                                                                        |
+| 9 Planning workstream           | Create/edit: PLANNING or PROJECT_MANAGER. Approve: PLANNING itself, DIRECTOR, or ADMIN          | `PROJECT_MANAGER` does **not** hold `planning:approve` — a PM can prepare a submission but cannot approve their own work. **Handoff:** Planning submits → a Director (or another Planning-team member, per current config) approves. |
+| 10 Supervision workstream       | SUPERVISION or PROJECT_MANAGER                                                                  | Issue **close** is its own gate (`issue:close`) — PLANNING can only view issues. Typically the Supervision engineer logs the visit/issue on site; the PM or same engineer closes it once fixed.                                      |
+| 11 Drawings + revisions         | Create/upload: PLANNING or PROJECT_MANAGER. **Approve: DIRECTOR or SYSTEM_ADMINISTRATOR only.** | Hard separation of duty — PLANNING and PROJECT_MANAGER do not hold `drawing:approve` at all. Whoever drafts/uploads a revision can never approve it themselves.                                                                      |
+| 12 Documents                    | DOCUMENT_CONTROLLER (day to day) or PROJECT_MANAGER                                             | PLANNING/SUPERVISION/DIRECTOR can only view. **Handoff:** PM or Supervision hands paperwork to the Document Controller to register/upload/categorize.                                                                                |
+| 13 Modifications                | Same as Stage 9 (shares `planning:*` permissions)                                               | PLANNING/PROJECT_MANAGER create; PLANNING/DIRECTOR/ADMIN approve.                                                                                                                                                                    |
+| 14 Handover / closure           | PROJECT_MANAGER or SYSTEM_ADMINISTRATOR only                                                    | `project:close` is not held by Planning/Supervision/Director. **Handoff:** PM confirms handover checklist items (often chasing Document Controller/Supervision for evidence), then clicks Complete → Close.                          |
 
 ### One line per role
 

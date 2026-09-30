@@ -132,15 +132,13 @@ export class NotificationsService {
     return withUsage
       .filter((a): a is NonNullable<typeof a> => a !== null && a.visitsAllowed > 0)
       .filter((a) => a.visitsUsed / a.visitsAllowed >= 0.8)
-      .map(
-        (a): NotificationItem => ({
-          type: 'SUPERVISION_QUOTA_APPROACHING',
-          severity: a.visitsUsed >= a.visitsAllowed ? 'CRITICAL' : 'WARNING',
-          message: `Supervision visit quota nearly used (${a.visitsUsed}/${a.visitsAllowed}).`,
-          projectId: a.projectId,
-          link: `/projects/${a.projectId}`,
-        }),
-      );
+      .map((a): NotificationItem => ({
+        type: 'SUPERVISION_QUOTA_APPROACHING',
+        severity: a.visitsUsed >= a.visitsAllowed ? 'CRITICAL' : 'WARNING',
+        message: `Supervision visit quota nearly used (${a.visitsUsed}/${a.visitsAllowed}).`,
+        projectId: a.projectId,
+        link: `/projects/${a.projectId}`,
+      }));
   }
 
   private async missingDocuments(visible: string[] | null): Promise<NotificationItem[]> {
@@ -153,7 +151,10 @@ export class NotificationsService {
     });
 
     const results = await Promise.all(
-      projects.map(async (p) => ({ project: p, completeness: await this.documents.completeness(p.id) })),
+      projects.map(async (p) => ({
+        project: p,
+        completeness: await this.documents.completeness(p.id),
+      })),
     );
 
     return results

@@ -35,7 +35,9 @@ async function main(): Promise<void> {
   const dbName = process.env['DB_NAME'] ?? 'ecms';
   const dbUser = process.env['DB_APP_USER'] ?? 'ecms_app';
   const dbPassword = encodeURIComponent(process.env['DB_APP_PASSWORD'] ?? '');
-  const prisma = new PrismaClient({ datasourceUrl: `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}` });
+  const prisma = new PrismaClient({
+    datasourceUrl: `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}`,
+  });
   const normalisedUsername = username.trim().toLowerCase();
   const normalisedEmail = email ? email.trim().toLowerCase() : null;
   const passwordHash = await hash(password, { memoryCost: 19_456, timeCost: 2, parallelism: 1 });

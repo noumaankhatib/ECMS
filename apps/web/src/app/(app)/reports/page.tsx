@@ -168,7 +168,9 @@ export default async function ReportsPage() {
                     <span className="stat__label">Active</span>
                   </div>
                   <div className="stat">
-                    <span className="stat__value">{summary.supervisionAgreements.nearingQuota}</span>
+                    <span className="stat__value">
+                      {summary.supervisionAgreements.nearingQuota}
+                    </span>
                     <span className="stat__label">Nearing quota</span>
                   </div>
                 </div>
@@ -178,7 +180,10 @@ export default async function ReportsPage() {
         </div>
       )}
 
-      {!summary.projects && !summary.proposals && !summary.issues && !summary.supervisionAgreements ? (
+      {!summary.projects &&
+      !summary.proposals &&
+      !summary.issues &&
+      !summary.supervisionAgreements ? (
         <Card>
           <CardBody>
             <Empty title="Nothing to chart yet">

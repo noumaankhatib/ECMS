@@ -107,8 +107,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         <div className="command-palette__body">
           {trimmed.length === 0 ? (
             <p className="command-palette__hint">
-              Type to search every register you can view — or press{' '}
-              <kbd>Esc</kbd> to close.
+              Type to search every register you can view — or press <kbd>Esc</kbd> to close.
             </p>
           ) : loading ? (
             <p className="command-palette__hint">Searching...</p>

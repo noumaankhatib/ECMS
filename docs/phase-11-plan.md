@@ -132,11 +132,11 @@ confirmed need, and CSV alone already satisfies "Excel/CSV" of the spec's "Excel
 
 ## 9. Build order
 
-| #   | Step                                                                                                                  | Done when                                                                                                                 |
-| --- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| #   | Step                                                                                                                                | Done when                                                                                                                   |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | 41  | **Dashboard + Notifications** — `InsightsModule`, `DashboardService`/`NotificationsService`, `GET /dashboard`, `GET /notifications` | Each count/alert is gated and scoped by the same permission and `visibleProjectIds` its source resource already uses        |
-| 42  | **Search + Export** — `SearchService`/`ExportService`, `GET /search`, five `GET /export/*.csv` routes                | Search fans out only to resources the caller holds `:view` on; export CSV matches what that register's list page would show |
-| 43  | **Web** — dashboard landing page, notifications badge/list, sidebar search box, per-register export links             | Tested through the browser: dashboard/notifications/search reflect permission scoping; export downloads a valid CSV        |
+| 42  | **Search + Export** — `SearchService`/`ExportService`, `GET /search`, five `GET /export/*.csv` routes                               | Search fans out only to resources the caller holds `:view` on; export CSV matches what that register's list page would show |
+| 43  | **Web** — dashboard landing page, notifications badge/list, sidebar search box, per-register export links                           | Tested through the browser: dashboard/notifications/search reflect permission scoping; export downloads a valid CSV         |
 
 ## 10. Definition of done
 

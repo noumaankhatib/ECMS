@@ -189,15 +189,33 @@ export class ImpactService {
     }
 
     for (const w of p.workstreams) {
-      children.push({ id: w.id, type: 'workstream', label: `${w.type} — ${w.name}`, archivedAt: null, children: [] });
+      children.push({
+        id: w.id,
+        type: 'workstream',
+        label: `${w.type} — ${w.name}`,
+        archivedAt: null,
+        children: [],
+      });
     }
 
     for (const a of p.planningActivities) {
-      children.push({ id: a.id, type: 'planningActivity', label: a.name, archivedAt: a.archivedAt?.toISOString() ?? null, children: [] });
+      children.push({
+        id: a.id,
+        type: 'planningActivity',
+        label: a.name,
+        archivedAt: a.archivedAt?.toISOString() ?? null,
+        children: [],
+      });
     }
 
     for (const m of p.milestones) {
-      children.push({ id: m.id, type: 'milestone', label: m.name, archivedAt: m.archivedAt?.toISOString() ?? null, children: [] });
+      children.push({
+        id: m.id,
+        type: 'milestone',
+        label: m.name,
+        archivedAt: m.archivedAt?.toISOString() ?? null,
+        children: [],
+      });
     }
 
     for (const sub of p.submissions) {
@@ -217,7 +235,13 @@ export class ImpactService {
           children: [] as ImpactNode[],
         })),
       ];
-      children.push({ id: sub.id, type: 'submission', label: `${sub.reference} (${sub.status})`, archivedAt: null, children: subChildren });
+      children.push({
+        id: sub.id,
+        type: 'submission',
+        label: `${sub.reference} (${sub.status})`,
+        archivedAt: null,
+        children: subChildren,
+      });
     }
 
     for (const sv of p.siteVisits) {
@@ -248,19 +272,49 @@ export class ImpactService {
         });
       }
       for (const instr of sv.instructions) {
-        svChildren.push({ id: instr.id, type: 'instruction', label: instr.directiveText.slice(0, 60), archivedAt: null, children: [] });
+        svChildren.push({
+          id: instr.id,
+          type: 'instruction',
+          label: instr.directiveText.slice(0, 60),
+          archivedAt: null,
+          children: [],
+        });
       }
-      const visitDate = sv.visitDate instanceof Date ? sv.visitDate.toISOString().slice(0, 10) : String(sv.visitDate);
-      children.push({ id: sv.id, type: 'siteVisit', label: visitDate, archivedAt: null, children: svChildren });
+      const visitDate =
+        sv.visitDate instanceof Date
+          ? sv.visitDate.toISOString().slice(0, 10)
+          : String(sv.visitDate);
+      children.push({
+        id: sv.id,
+        type: 'siteVisit',
+        label: visitDate,
+        archivedAt: null,
+        children: svChildren,
+      });
     }
 
     for (const sa of p.supervisionAgreements) {
-      const startDate = sa.startDate instanceof Date ? sa.startDate.toISOString().slice(0, 10) : String(sa.startDate);
-      children.push({ id: sa.id, type: 'supervisionAgreement', label: `${sa.type} — ${startDate}`, archivedAt: null, children: [] });
+      const startDate =
+        sa.startDate instanceof Date
+          ? sa.startDate.toISOString().slice(0, 10)
+          : String(sa.startDate);
+      children.push({
+        id: sa.id,
+        type: 'supervisionAgreement',
+        label: `${sa.type} — ${startDate}`,
+        archivedAt: null,
+        children: [],
+      });
     }
 
     for (const issue of p.issues) {
-      children.push({ id: issue.id, type: 'issue', label: `${issue.title} (${issue.status})`, archivedAt: null, children: [] });
+      children.push({
+        id: issue.id,
+        type: 'issue',
+        label: `${issue.title} (${issue.status})`,
+        archivedAt: null,
+        children: [],
+      });
     }
 
     for (const dr of p.drawings) {
@@ -271,19 +325,43 @@ export class ImpactService {
         archivedAt: null,
         children: [],
       }));
-      children.push({ id: dr.id, type: 'drawing', label: `${dr.number} — ${dr.title}`, archivedAt: null, children: revNodes });
+      children.push({
+        id: dr.id,
+        type: 'drawing',
+        label: `${dr.number} — ${dr.title}`,
+        archivedAt: null,
+        children: revNodes,
+      });
     }
 
     for (const doc of p.documents) {
-      children.push({ id: doc.id, type: 'document', label: `${doc.category}: ${doc.title}`, archivedAt: doc.archivedAt?.toISOString() ?? null, children: [] });
+      children.push({
+        id: doc.id,
+        type: 'document',
+        label: `${doc.category}: ${doc.title}`,
+        archivedAt: doc.archivedAt?.toISOString() ?? null,
+        children: [],
+      });
     }
 
     for (const mod of p.modifications) {
-      children.push({ id: mod.id, type: 'modification', label: mod.requestText.slice(0, 60), archivedAt: null, children: [] });
+      children.push({
+        id: mod.id,
+        type: 'modification',
+        label: mod.requestText.slice(0, 60),
+        archivedAt: null,
+        children: [],
+      });
     }
 
     if (p.handoverChecklist) {
-      children.push({ id: p.handoverChecklist.id, type: 'handoverChecklist', label: 'Handover checklist', archivedAt: null, children: [] });
+      children.push({
+        id: p.handoverChecklist.id,
+        type: 'handoverChecklist',
+        label: 'Handover checklist',
+        archivedAt: null,
+        children: [],
+      });
     }
 
     return { id, type: 'project', label: `${p.code} — ${p.name}`, archivedAt: null, children };

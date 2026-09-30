@@ -497,7 +497,9 @@ export default async function DashboardPage() {
                                 <Link href={`/projects/${row.projectId}`}>{row.label}</Link>
                               </td>
                               <td>
-                                <span className={`badge ${DEADLINE_BADGE_CLASS[row.deadline.status]}`}>
+                                <span
+                                  className={`badge ${DEADLINE_BADGE_CLASS[row.deadline.status]}`}
+                                >
                                   {DEADLINE_LABEL[row.deadline.status]}
                                 </span>
                               </td>
@@ -656,56 +658,59 @@ export default async function DashboardPage() {
                   </CardBody>
                 </Card>
               ) : null}
-
             </div>
           </div>
 
           {summary.recentActivity && summary.recentActivity.length > 0 ? (
             <div style={{ marginTop: 'var(--space-5)' }}>
-            <Card>
-              <CardHead title="Recent activity" />
-              <CardBody>
-                <div className="activity-columns">
-                  <div className="activity-column">
-                    <h3 className="activity-column__head">Delivery (projects &amp; issues)</h3>
-                    {deliveryActivity.length > 0 ? (
-                      <ul className="activity-list">
-                        {deliveryActivity.map((item, index) => (
-                          <li key={index}>
-                            <ActivityIcon entityType={item.entityType} />
-                            <span className="activity-list__text">{activityLabel(item)}</span>
-                            <span className="activity-list__time">{timeAgo(item.occurredAt)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="muted" style={{ fontSize: 13 }}>
-                        Nothing yet.
-                      </p>
-                    )}
-                  </div>
+              <Card>
+                <CardHead title="Recent activity" />
+                <CardBody>
+                  <div className="activity-columns">
+                    <div className="activity-column">
+                      <h3 className="activity-column__head">Delivery (projects &amp; issues)</h3>
+                      {deliveryActivity.length > 0 ? (
+                        <ul className="activity-list">
+                          {deliveryActivity.map((item, index) => (
+                            <li key={index}>
+                              <ActivityIcon entityType={item.entityType} />
+                              <span className="activity-list__text">{activityLabel(item)}</span>
+                              <span className="activity-list__time">
+                                {timeAgo(item.occurredAt)}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="muted" style={{ fontSize: 13 }}>
+                          Nothing yet.
+                        </p>
+                      )}
+                    </div>
 
-                  <div className="activity-column">
-                    <h3 className="activity-column__head">Clients &amp; proposals</h3>
-                    {clientActivity.length > 0 ? (
-                      <ul className="activity-list">
-                        {clientActivity.map((item, index) => (
-                          <li key={index}>
-                            <ActivityIcon entityType={item.entityType} />
-                            <span className="activity-list__text">{activityLabel(item)}</span>
-                            <span className="activity-list__time">{timeAgo(item.occurredAt)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="muted" style={{ fontSize: 13 }}>
-                        Nothing yet.
-                      </p>
-                    )}
+                    <div className="activity-column">
+                      <h3 className="activity-column__head">Clients &amp; proposals</h3>
+                      {clientActivity.length > 0 ? (
+                        <ul className="activity-list">
+                          {clientActivity.map((item, index) => (
+                            <li key={index}>
+                              <ActivityIcon entityType={item.entityType} />
+                              <span className="activity-list__text">{activityLabel(item)}</span>
+                              <span className="activity-list__time">
+                                {timeAgo(item.occurredAt)}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="muted" style={{ fontSize: 13 }}>
+                          Nothing yet.
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </CardBody>
-            </Card>
+                </CardBody>
+              </Card>
             </div>
           ) : null}
         </>

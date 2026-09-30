@@ -24,12 +24,18 @@ export class ApprovalsInboxService {
   async list(userId: string): Promise<ApprovalInboxItem[]> {
     const items: ApprovalInboxItem[] = [];
 
-    const visibleForDrawings = await this.authorization.visibleProjectIds(userId, 'drawing:approve');
+    const visibleForDrawings = await this.authorization.visibleProjectIds(
+      userId,
+      'drawing:approve',
+    );
     if (visibleForDrawings === null || visibleForDrawings.length > 0) {
       items.push(...(await this.pendingDrawingRevisions(visibleForDrawings)));
     }
 
-    const visibleForPlanning = await this.authorization.visibleProjectIds(userId, 'planning:approve');
+    const visibleForPlanning = await this.authorization.visibleProjectIds(
+      userId,
+      'planning:approve',
+    );
     if (visibleForPlanning === null || visibleForPlanning.length > 0) {
       items.push(...(await this.pendingModifications(visibleForPlanning)));
       items.push(...(await this.pendingSubmissions(visibleForPlanning, userId)));
@@ -59,17 +65,15 @@ export class ApprovalsInboxService {
       },
     });
 
-    return revisions.map(
-      (r): ApprovalInboxItem => ({
-        entityType: 'DrawingRevision',
-        id: r.id,
-        title: `Drawing ${r.drawing.number} revision ${r.revisionCode}`,
-        projectId: r.drawing.projectId,
-        submittedBy: r.createdBy,
-        submittedAt: r.createdAt.toISOString(),
-        link: `/projects/${r.drawing.projectId}/drawings/${r.drawing.id}`,
-      }),
-    );
+    return revisions.map((r): ApprovalInboxItem => ({
+      entityType: 'DrawingRevision',
+      id: r.id,
+      title: `Drawing ${r.drawing.number} revision ${r.revisionCode}`,
+      projectId: r.drawing.projectId,
+      submittedBy: r.createdBy,
+      submittedAt: r.createdAt.toISOString(),
+      link: `/projects/${r.drawing.projectId}/drawings/${r.drawing.id}`,
+    }));
   }
 
   private async pendingModifications(visible: string[] | null): Promise<ApprovalInboxItem[]> {
@@ -81,17 +85,15 @@ export class ApprovalsInboxService {
       select: { id: true, requestText: true, projectId: true, createdAt: true, createdBy: true },
     });
 
-    return modifications.map(
-      (m): ApprovalInboxItem => ({
-        entityType: 'Modification',
-        id: m.id,
-        title: `Modification: ${m.requestText.slice(0, 80)}`,
-        projectId: m.projectId,
-        submittedBy: m.createdBy,
-        submittedAt: m.createdAt.toISOString(),
-        link: `/projects/${m.projectId}/modifications`,
-      }),
-    );
+    return modifications.map((m): ApprovalInboxItem => ({
+      entityType: 'Modification',
+      id: m.id,
+      title: `Modification: ${m.requestText.slice(0, 80)}`,
+      projectId: m.projectId,
+      submittedBy: m.createdBy,
+      submittedAt: m.createdAt.toISOString(),
+      link: `/projects/${m.projectId}/modifications`,
+    }));
   }
 
   private async pendingSubmissions(
@@ -110,17 +112,15 @@ export class ApprovalsInboxService {
       select: { id: true, reference: true, projectId: true, createdAt: true, createdBy: true },
     });
 
-    return submissions.map(
-      (s): ApprovalInboxItem => ({
-        entityType: 'Submission',
-        id: s.id,
-        title: `Submission ${s.reference}`,
-        projectId: s.projectId,
-        submittedBy: s.createdBy,
-        submittedAt: s.createdAt.toISOString(),
-        link: `/projects/${s.projectId}/planning/submissions/${s.id}`,
-      }),
-    );
+    return submissions.map((s): ApprovalInboxItem => ({
+      entityType: 'Submission',
+      id: s.id,
+      title: `Submission ${s.reference}`,
+      projectId: s.projectId,
+      submittedBy: s.createdBy,
+      submittedAt: s.createdAt.toISOString(),
+      link: `/projects/${s.projectId}/planning/submissions/${s.id}`,
+    }));
   }
 
   private async pendingProposals(): Promise<ApprovalInboxItem[]> {
@@ -129,16 +129,14 @@ export class ApprovalsInboxService {
       select: { id: true, sketchNumber: true, contactName: true, createdAt: true, createdBy: true },
     });
 
-    return proposals.map(
-      (p): ApprovalInboxItem => ({
-        entityType: 'Proposal',
-        id: p.id,
-        title: `Proposal ${p.sketchNumber} — ${p.contactName}`,
-        projectId: null,
-        submittedBy: p.createdBy,
-        submittedAt: p.createdAt.toISOString(),
-        link: `/proposals/${p.id}/edit`,
-      }),
-    );
+    return proposals.map((p): ApprovalInboxItem => ({
+      entityType: 'Proposal',
+      id: p.id,
+      title: `Proposal ${p.sketchNumber} — ${p.contactName}`,
+      projectId: null,
+      submittedBy: p.createdBy,
+      submittedAt: p.createdAt.toISOString(),
+      link: `/proposals/${p.id}/edit`,
+    }));
   }
 }

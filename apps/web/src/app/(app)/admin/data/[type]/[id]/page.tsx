@@ -4,6 +4,7 @@ import { Breadcrumb, Card, CardBody, CardHead, PageHead } from '@/components/ui'
 import { requirePermission } from '@/lib/session';
 
 import { fetchImpactTree } from '../../actions';
+
 import { ImpactTreeClient } from './impact-tree-client';
 
 export const metadata = { title: 'Impact tree — ECMS' };

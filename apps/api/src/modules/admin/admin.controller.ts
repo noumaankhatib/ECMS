@@ -30,10 +30,7 @@ export class AdminController {
 
   @Get('impact/:type/:id')
   @RequirePermission('admin:data')
-  async getImpact(
-    @Param('type') type: string,
-    @Param('id') id: string,
-  ): Promise<ImpactTree> {
+  async getImpact(@Param('type') type: string, @Param('id') id: string): Promise<ImpactTree> {
     return this.impact.forEntity(type, id);
   }
 
@@ -55,7 +52,10 @@ export class AdminController {
     @Req() req: Request,
   ): Promise<void> {
     const root = body.items[0];
-    if (!root) throw appError('VALIDATION_FAILED', { fields: [{ field: 'items', reason: 'At least one item required.' }] });
+    if (!root)
+      throw appError('VALIDATION_FAILED', {
+        fields: [{ field: 'items', reason: 'At least one item required.' }],
+      });
 
     // Fetch the root label for confirm-name validation
     const tree = await this.impact.forEntity(root.type, root.id).catch(() => null);

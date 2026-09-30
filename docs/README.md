@@ -46,18 +46,18 @@ number — a `Client`/`Property` is never required up front, only attached once/
 
 **Fields captured on intake:**
 
-| Field                  | Meaning                                                                                          |
-| ----------------------- | -------------------------------------------------------------------------------------------------- |
-| `contactName` / `contactPhone` | Who actually rang or walked in — free text, not tied to any Client record                |
-| `clientId` / `propertyId`      | Optional links, attach now if known or later once the records exist                      |
-| `sketchTypeId`          | Picked from the admin-managed **Sketch types** list (see below) — not free text                 |
-| `projectType`           | The eventual `PLANNING` / `SUPERVISION` / `BOTH`, carried onto the Project on conversion          |
-| `approxAreaSqm`         | Approximate plot area                                                                             |
-| `source`                | Provenance — "old customer", "referral", "walk-in" — **separate** from `status`, never confused with it |
-| `assignedArchitectId`   | Who's working the sketch                                                                          |
-| `receivedAt` / `dueAt`  | Date the inquiry came in, and the follow-up deadline it's due by                                   |
-| `notes`                 | Free text, e.g. a prior job reference                                                             |
-| `sketchNumber`          | Generated automatically on save — `YY-SB-NNN` (e.g. `26-SB-118`), never entered by hand           |
+| Field                          | Meaning                                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `contactName` / `contactPhone` | Who actually rang or walked in — free text, not tied to any Client record                               |
+| `clientId` / `propertyId`      | Optional links, attach now if known or later once the records exist                                     |
+| `sketchTypeId`                 | Picked from the admin-managed **Sketch types** list (see below) — not free text                         |
+| `projectType`                  | The eventual `PLANNING` / `SUPERVISION` / `BOTH`, carried onto the Project on conversion                |
+| `approxAreaSqm`                | Approximate plot area                                                                                   |
+| `source`                       | Provenance — "old customer", "referral", "walk-in" — **separate** from `status`, never confused with it |
+| `assignedArchitectId`          | Who's working the sketch                                                                                |
+| `receivedAt` / `dueAt`         | Date the inquiry came in, and the follow-up deadline it's due by                                        |
+| `notes`                        | Free text, e.g. a prior job reference                                                                   |
+| `sketchNumber`                 | Generated automatically on save — `YY-SB-NNN` (e.g. `26-SB-118`), never entered by hand                 |
 
 **Sketch types.** A short admin-managed pick list (`/sketch-types`, needs `sketch_type:admin`), seeded
 by migration with the values already in real use: Villa - GF Only, Villa - G+1, Villa - G+1+PH, Twin
@@ -82,16 +82,16 @@ never editable again once its Proposal reaches `CONVERTED`. In practice that mea
 **Status lifecycle.** Every change goes through a named action, never a direct status write; the UI only
 ever offers the moves legal from the current status, and the server re-checks regardless.
 
-| Status            | Can move to                                    |
-| ------------------ | ------------------------------------------------ |
-| `NEW`              | `CONCEPT`, `ON_HOLD`, `LOST`                     |
-| `CONCEPT`          | `CLIENT_REVISION`, `ON_HOLD`, `LOST`             |
-| `CLIENT_REVISION`  | `CONCEPT` (rework), `APPROVED`, `ON_HOLD`, `LOST` |
-| `APPROVED`         | `WON`, `LOST`                                    |
-| `WON`              | *(terminal — only "Convert to project" leads out)* |
-| `LOST`             | *(terminal)*                                     |
-| `ON_HOLD`          | `CONCEPT` (resume), `LOST`                       |
-| `CONVERTED`        | *(terminal — reached only via convert, never a status edit)* |
+| Status            | Can move to                                                  |
+| ----------------- | ------------------------------------------------------------ |
+| `NEW`             | `CONCEPT`, `ON_HOLD`, `LOST`                                 |
+| `CONCEPT`         | `CLIENT_REVISION`, `ON_HOLD`, `LOST`                         |
+| `CLIENT_REVISION` | `CONCEPT` (rework), `APPROVED`, `ON_HOLD`, `LOST`            |
+| `APPROVED`        | `WON`, `LOST`                                                |
+| `WON`             | _(terminal — only "Convert to project" leads out)_           |
+| `LOST`            | _(terminal)_                                                 |
+| `ON_HOLD`         | `CONCEPT` (resume), `LOST`                                   |
+| `CONVERTED`       | _(terminal — reached only via convert, never a status edit)_ |
 
 **Convert to project.** `POST /proposals/:id/convert`, allowed only `WON → CONVERTED`, needs
 `proposal:convert`. Refuses if `propertyId` is not set — a project always needs a real property, never
@@ -102,12 +102,12 @@ the link recorded both ways.
 
 **Permissions:**
 
-| Role                   | Can do                                                                 |
-| ----------------------- | ------------------------------------------------------------------------ |
-| `SYSTEM_ADMINISTRATOR` | Everything, plus manage the sketch-type list                             |
-| `DIRECTOR`              | View only — oversight, not data entry                                    |
-| `PROJECT_MANAGER`       | Everything, including convert and managing the sketch-type list          |
-| `PLANNING`              | Create/edit day to day; conversion is a manager decision, not theirs     |
+| Role                   | Can do                                                               |
+| ---------------------- | -------------------------------------------------------------------- |
+| `SYSTEM_ADMINISTRATOR` | Everything, plus manage the sketch-type list                         |
+| `DIRECTOR`             | View only — oversight, not data entry                                |
+| `PROJECT_MANAGER`      | Everything, including convert and managing the sketch-type list      |
+| `PLANNING`             | Create/edit day to day; conversion is a manager decision, not theirs |
 
 All `GLOBAL` scope — a proposal predates any Project, so there's no membership to scope it by.
 
@@ -120,14 +120,14 @@ most common source of "why is my document not counting" — see `phase-9-plan.md
 (needs `required_document:admin`) is a small, hand-maintained list of categories every project is
 expected to hold evidence for. Seeded by migration with:
 
-| Category      | Label                                                                    | Scope |
-| -------------- | -------------------------------------------------------------------------- | ----- |
-| `Design`       | Approved architectural, structural and MEP drawings                        | ANY   |
-| `Tests`        | Soil, concrete, block, waterproofing and other applicable reports          | ANY   |
-| `Authority`    | Municipality approvals, permits and stage approvals                        | ANY   |
-| `Contract`     | Client agreement, contractor documents and related approvals               | ANY   |
-| `Construction` | Material approvals, inspection records and certificates                    | ANY   |
-| `Completion`   | As-built drawings, completion documents, warranties and handover records   | ANY   |
+| Category       | Label                                                                    | Scope |
+| -------------- | ------------------------------------------------------------------------ | ----- |
+| `Design`       | Approved architectural, structural and MEP drawings                      | ANY   |
+| `Tests`        | Soil, concrete, block, waterproofing and other applicable reports        | ANY   |
+| `Authority`    | Municipality approvals, permits and stage approvals                      | ANY   |
+| `Contract`     | Client agreement, contractor documents and related approvals             | ANY   |
+| `Construction` | Material approvals, inspection records and certificates                  | ANY   |
+| `Completion`   | As-built drawings, completion documents, warranties and handover records | ANY   |
 
 `scope` is `PLANNING`, `SUPERVISION`, or `ANY` — a requirement scoped to one workstream still applies to
 a `BOTH`-type project, since a `BOTH` project runs both workstreams at once. An administrator can add,
@@ -140,12 +140,12 @@ missed `pnpm db:deploy`, not the intended starting state.
 is where real files get attached — this is ongoing, spread across the whole project's life, not a
 one-time form:
 
-| Field       | Meaning                                                                                  |
-| ------------ | -------------------------------------------------------------------------------------------- |
-| `category`   | Free text — **type it to match a catalogue category exactly** (e.g. `Design`) to have this upload count toward that checklist item; anything else still uploads fine, it just satisfies nothing |
-| `title`      | A human name for the file                                                                 |
-| `description`| Optional notes                                                                            |
-| `file`       | The upload itself — metadata is stored here; bytes go to Google Shared Drive              |
+| Field         | Meaning                                                                                                                                                                                         |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `category`    | Free text — **type it to match a catalogue category exactly** (e.g. `Design`) to have this upload count toward that checklist item; anything else still uploads fine, it just satisfies nothing |
+| `title`       | A human name for the file                                                                                                                                                                       |
+| `description` | Optional notes                                                                                                                                                                                  |
+| `file`        | The upload itself — metadata is stored here; bytes go to Google Shared Drive                                                                                                                    |
 
 The web form's Category field is a dropdown built from the project's own applicable catalogue entries
 (plus an "Other…" escape hatch for anything not on the checklist), so a typo can no longer silently miss
@@ -170,21 +170,21 @@ Three ideas, and the order they matter in:
    (`packages/contracts/src/index.ts`'s `ROLE_DEFINITIONS`) — adding an
    eighth is a migration, not a config change.
 
-   | Role                   | What it's for                                              |
-   | ----------------------- | ----------------------------------------------------------- |
-   | `SYSTEM_ADMINISTRATOR` | Users, roles, permissions, system configuration              |
-   | `DIRECTOR`              | Portfolio-wide visibility, dashboards, approvals            |
-   | `PROJECT_MANAGER`       | Project setup, coordination, assignments                    |
-   | `PLANNING`              | Planning activities, submissions, drawings, approvals        |
-   | `SUPERVISION`           | Site visits, observations, instructions, issue closure       |
-   | `DOCUMENT_CONTROLLER`   | Document metadata, revisions, controlled records            |
-   | `CLIENT_STAKEHOLDER`    | Restricted, read-only access when explicitly enabled         |
+   | Role                   | What it's for                                          |
+   | ---------------------- | ------------------------------------------------------ |
+   | `SYSTEM_ADMINISTRATOR` | Users, roles, permissions, system configuration        |
+   | `DIRECTOR`             | Portfolio-wide visibility, dashboards, approvals       |
+   | `PROJECT_MANAGER`      | Project setup, coordination, assignments               |
+   | `PLANNING`             | Planning activities, submissions, drawings, approvals  |
+   | `SUPERVISION`          | Site visits, observations, instructions, issue closure |
+   | `DOCUMENT_CONTROLLER`  | Document metadata, revisions, controlled records       |
+   | `CLIENT_STAKEHOLDER`   | Restricted, read-only access when explicitly enabled   |
 
 2. **Every permission a role holds is tagged `GLOBAL` or `PROJECT`.** This is
    the distinction the whole authorization model rests on
    (`AuthorizationService`, `apps/api/src/modules/access/authorization.service.ts`).
    `GLOBAL` means "anywhere in the portfolio." `PROJECT` means "only on
-   projects this person is a *member* of." A role says what kind of thing
+   projects this person is a _member_ of." A role says what kind of thing
    someone may do; membership says where. Example — what `SUPERVISION`
    actually holds:
 

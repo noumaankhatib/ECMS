@@ -20,7 +20,12 @@ export function DonutChart({
 
   return (
     <div className="donut">
-      <svg viewBox="0 0 140 140" className="donut__svg" role="img" aria-label="Project status breakdown">
+      <svg
+        viewBox="0 0 140 140"
+        className="donut__svg"
+        role="img"
+        aria-label="Project status breakdown"
+      >
         <circle cx="70" cy="70" r={R} fill="none" stroke="var(--slate-100)" strokeWidth={STROKE} />
         {total === 0
           ? null
