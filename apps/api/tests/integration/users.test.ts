@@ -163,6 +163,21 @@ describe('users', () => {
   });
 
   it('grants and revokes a role, and the permissions follow immediately', async () => {
+    // Another administrator, so removing the subject's role is not refused as
+    // the last one. Made here rather than assumed: a fresh test database has
+    // no administrator at all.
+    await inContext(() =>
+      users.create(
+        {
+          username: username(),
+          email: email(),
+          displayName: 'Other Administrator',
+          password: 'a-perfectly-fine-password',
+          roleCode: 'SYSTEM_ADMINISTRATOR',
+        },
+        actor,
+      ),
+    );
     expect(await authorization.can(subject, 'user:admin')).toBe(false);
 
     await inContext(() => users.assignRole(subject, { roleCode: 'SYSTEM_ADMINISTRATOR' }, actor));

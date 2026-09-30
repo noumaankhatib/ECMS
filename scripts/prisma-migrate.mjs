@@ -23,8 +23,7 @@ const appUser = process.env.DB_APP_USER ?? 'ecms_app';
 const superUser = process.env.DB_SUPER_USER ?? 'postgres';
 const superPassword = encodeURIComponent(process.env.DB_SUPER_PASSWORD ?? '');
 
-process.env.MIGRATION_DATABASE_URL =
-  `postgresql://${ownerUser}:${ownerPassword}@${host}:${port}/${dbName}`;
+process.env.MIGRATION_DATABASE_URL = `postgresql://${ownerUser}:${ownerPassword}@${host}:${port}/${dbName}`;
 
 const [, , command = 'status', ...rest] = process.argv;
 
@@ -48,6 +47,10 @@ if (command === 'reset' || command === 'dev') {
     `ALTER DEFAULT PRIVILEGES FOR ROLE ${ownerUser} IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO ${appUser}`,
     `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${appUser}`,
     `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${appUser}`,
+    // The blanket grant above includes audit_entry. Re-apply the lock from
+    // 20260830103543_lock_audit_trail, or every local reset silently gives
+    // the application back the power to rewrite history.
+    `REVOKE UPDATE, DELETE, TRUNCATE ON TABLE audit_entry FROM ${appUser}`,
   ].join('; ');
 
   execFileSync('psql', [superUrl, '-c', sql], { stdio: 'inherit' });

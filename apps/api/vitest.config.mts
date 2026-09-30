@@ -8,6 +8,8 @@ config({ path: '../../.env' });
 
 export default defineConfig({
   test: {
+    // Creates and migrates the separate test database once, before any file.
+    globalSetup: ['tests/global-setup.ts'],
     setupFiles: ['tests/setup.ts'],
     include: ['tests/integration/**/*.test.ts', 'src/**/*.test.ts'],
     passWithNoTests: false,

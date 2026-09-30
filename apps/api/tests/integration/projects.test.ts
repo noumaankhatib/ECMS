@@ -183,7 +183,10 @@ describe('projects', () => {
     // and none is needed.
     expect(await authorization.visibleProjectIds(director, 'project:view')).toBeNull();
 
-    const page = await projects.list({ page: 1, pageSize: 100 }, director);
+    // Searched by its own code: the shared test database accumulates projects
+    // across runs, so an unfiltered first page eventually stops including it.
+    const { code } = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
+    const page = await projects.list({ page: 1, pageSize: 100, search: code }, director);
     expect(page.items.map((p) => p.id)).toContain(projectId);
 
     // Seeing everything is not the same as touching anything.
