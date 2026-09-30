@@ -17,6 +17,10 @@ async function bootstrap(): Promise<void> {
   // retrofitted. The reference codebase had neither, which is defensible for a
   // machine-to-machine API behind a gateway and not defensible for anything a
   // browser talks to.
+  // Trust the first proxy (nginx) so req.ip resolves to the real client IP
+  // rather than the nginx container IP. Required for per-IP rate limiting to work.
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
   app.use(helmet());
   app.use(cookieParser());
 

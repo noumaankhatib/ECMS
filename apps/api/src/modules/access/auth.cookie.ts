@@ -7,17 +7,19 @@ export const SESSION_COOKIE = 'ecms_session';
  *
  * httpOnly   JavaScript cannot read it, so a cross-site scripting flaw cannot
  *            steal the session.
- * sameSite   'lax' is our CSRF control. Browsers will not attach this cookie to
- *            a cross-site POST, which is what a forged request would be. That
- *            plus the CORS allow-list covers it without a token scheme.
- * secure     HTTPS only, outside local development (PRD §14).
+ * sameSite   'strict' is our CSRF control. Browsers will not attach this cookie
+ *            to any cross-site request. ECMS has no OAuth callback or external
+ *            deep-link requirement that needs 'lax'.
+ * secure     Controlled solely by COOKIE_SECURE env var. Set COOKIE_SECURE=false
+ *            explicitly for local HTTP development; defaults to true (secure).
+ *            NODE_ENV is a build-behaviour flag, not a security gate.
  * path       Sent for the whole application, and nothing above it.
  */
 export function sessionCookieOptions(expiresAt: Date): CookieOptions {
   return {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env['COOKIE_SECURE'] !== 'false' && process.env['NODE_ENV'] === 'production',
+    sameSite: 'strict',
+    secure: process.env['COOKIE_SECURE'] !== 'false',
     path: '/',
     expires: expiresAt,
   };
@@ -26,8 +28,8 @@ export function sessionCookieOptions(expiresAt: Date): CookieOptions {
 export function clearSessionCookie(res: Response): void {
   res.clearCookie(SESSION_COOKIE, {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env['COOKIE_SECURE'] !== 'false' && process.env['NODE_ENV'] === 'production',
+    sameSite: 'strict',
+    secure: process.env['COOKIE_SECURE'] !== 'false',
     path: '/',
   });
 }

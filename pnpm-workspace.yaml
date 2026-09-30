@@ -8,3 +8,8 @@ allowBuilds:
   '@prisma/engines': true
   prisma: true
   unrs-resolver: true
+
+# Force patched versions for transitive dependencies with known CVEs.
+# multer <2.3.0: DoS via crafted uploads (High) — CVE in @nestjs/platform-express@11.2.5
+overrides:
+  '@nestjs/platform-express>multer': '^2.4.0'
