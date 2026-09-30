@@ -2143,3 +2143,56 @@ the portfolio grows enough for `/notifications` to be slow in practice.
 Phase 11 is complete — the roadmap `~/.claude/plans/swirling-singing-book.md` set out is fully
 built. All of `docs/phase-11-plan.md` §10's definition of done is demonstrated either by an
 API-level test or by the manual browser verification above.
+
+## Post-roadmap — Test isolation and audit-lock fix ✅
+
+**Problem:** the integration suite ran against the development database (`ecms`). Every run left
+"Test Client …" rows, projects and users behind, and once those lists passed a page of 100 the
+tests themselves started failing at random. Separately, `scripts/prisma-migrate.mjs` re-granted
+`UPDATE, DELETE` on **all** tables to `ecms_app` after every `db:migrate`/`db:reset`, silently
+undoing `20260830103543_lock_audit_trail` — the two audit-trail tests were failing because the
+application account could once again rewrite history.
+
+**Built:**
+
+- `tests/global-setup.ts` + `tests/test-db.ts` — the suite now runs in its own database
+  (`DB_TEST_NAME`, default `<DB_NAME>_test`), created, granted as `init.sql` does, and migrated
+  once before any file, as `ecms_owner` (no superuser needed). Refuses to run if the test name
+  equals `DB_NAME`.
+- `scripts/prisma-migrate.mjs` re-applies the audit-table REVOKE after its blanket grant.
+- Two tests that only passed because of leftover dev data now set up what they need
+  (`users.test.ts` creates its own second administrator; `projects.test.ts` searches by code).
+
+**Result:** 242/242 on a clean database, twice in a row; the dev database's row counts are
+unchanged by a test run.
+
+**Known limit:** CI sets only `DATABASE_URL`, but `tests/setup.ts` has built URLs from
+`DB_APP_PASSWORD`/`DB_OWNER_PASSWORD` since before this change — CI needs those two set.
+
+## Post-roadmap — Duplicate detection, Phase A (server) ✅
+
+**Agreed rule:** warn, never hard-block; the user decides according to their permission.
+
+- **EXACT** — CR number or Civil ID (clients); plot number + wilayat, or Krookie serial
+  (properties, across all clients). Refused with `DUPLICATE_SUSPECTED` unless the request carries
+  `duplicateOverride.reason` **and** the caller holds the new `directory:override_duplicate`
+  (System Administrator and Director only). The reason and matched ids go into the audit entry.
+- **LIKELY** — similar name (pg_trgm on a normalised name, threshold 0.45) or the same normalised
+  contact phone. Reported only, never refused.
+- `POST /clients/duplicates`, `POST /properties/duplicates` return matches for the UI (POST so
+  Civil IDs never appear in proxy access logs).
+
+**Decisions:**
+
+- **No UNIQUE constraint.** It would make the override impossible and fail the migration on any
+  environment that already has duplicates. Concurrent saves of one identity are serialised with a
+  transaction-scoped advisory lock instead.
+- **Threshold 0.45 was measured**, not guessed: genuine transliterations scored ≥ 0.48
+  ("Muhammad Al Rawahi" / "Mohammed Al-Rawahi"), different people sharing a family name ≤ 0.42.
+- **Plot numbers keep their slash** (`102/8` ≠ `10/28`); CR/Civil ID/Krookie drop separators.
+- **Contact phones** get a separate `phone_normalized`; the typed original is never rewritten.
+- `pg_trgm` is installed by the migration itself — trusted extension, owner owns the database.
+
+**Next:** Phase B — web warning panel (Cancel / Use existing / Update existing / Create anyway, by
+permission); Phase C — proposal conversion "link existing client?" and as-you-type hints;
+Phase D — admin merge tool.

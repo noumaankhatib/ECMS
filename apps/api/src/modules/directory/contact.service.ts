@@ -1,4 +1,4 @@
-import type { CreateContact, UpdateContact } from '@ecms/contracts';
+import { normalizePhone, type CreateContact, type UpdateContact } from '@ecms/contracts';
 import { Injectable } from '@nestjs/common';
 import type { Contact } from '@prisma/client';
 
@@ -46,6 +46,7 @@ export class ContactService {
           position: input.position ?? null,
           email: input.email ?? null,
           phone: input.phone ?? null,
+          phoneNormalized: input.phone ? normalizePhone(input.phone) : null,
           isPrimary: input.isPrimary,
         },
       });
@@ -80,7 +81,12 @@ export class ContactService {
           ...(input.name !== undefined ? { name: input.name } : {}),
           ...(input.position !== undefined ? { position: input.position } : {}),
           ...(input.email !== undefined ? { email: input.email } : {}),
-          ...(input.phone !== undefined ? { phone: input.phone } : {}),
+          ...(input.phone !== undefined
+            ? {
+                phone: input.phone,
+                phoneNormalized: input.phone ? normalizePhone(input.phone) : null,
+              }
+            : {}),
           ...(input.isPrimary !== undefined ? { isPrimary: input.isPrimary } : {}),
           version: { increment: 1 },
         },

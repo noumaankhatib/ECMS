@@ -28,6 +28,10 @@ export const ERROR_CATALOGUE = {
     status: 409,
     message: 'This cannot be archived because other records depend on it.',
   },
+  DUPLICATE_SUSPECTED: {
+    status: 409,
+    message: 'A record with the same official identity already exists.',
+  },
   HANDOVER_INCOMPLETE: {
     status: 409,
     message: 'The handover checklist must be complete before this project can be closed.',

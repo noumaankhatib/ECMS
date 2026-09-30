@@ -1,10 +1,18 @@
-import type { CreateProperty, ListQuery, Page, UpdateProperty } from '@ecms/contracts';
+import type {
+  CreateProperty,
+  DuplicateMatch,
+  ListQuery,
+  Page,
+  UpdateProperty,
+} from '@ecms/contracts';
 import { Injectable } from '@nestjs/common';
 import type { Prisma, Property } from '@prisma/client';
 
 import { PrismaService } from '../../shared/database/prisma.service';
 import { appError } from '../../shared/errors/app-error';
 import { AuditService } from '../audit';
+
+import { findPropertyDuplicates, refuseUnlessOverridden } from './duplicates';
 
 @Injectable()
 export class PropertyService {
@@ -67,6 +75,20 @@ export class PropertyService {
         });
       }
 
+      const overridden = refuseUnlessOverridden(
+        await findPropertyDuplicates(
+          tx,
+          {
+            plotNumber: input.plotNumber ?? undefined,
+            wilayat: input.wilayat ?? undefined,
+            surveyReference: input.surveyReference ?? undefined,
+          },
+          { lock: true },
+        ),
+        input.duplicateOverride,
+        describeMatch,
+      );
+
       const property = await tx.property
         .create({
           data: {
@@ -95,7 +117,11 @@ export class PropertyService {
         action: 'CREATED',
         entityType: 'Property',
         entityId: property.id,
-        after: { name: property.name, clientId: property.clientId },
+        after: {
+          name: property.name,
+          clientId: property.clientId,
+          ...(overridden ? { duplicateOverride: overridden } : {}),
+        },
       });
 
       return property;
@@ -108,7 +134,41 @@ export class PropertyService {
       if (!before) throw appError('NOT_FOUND');
       if (before.archivedAt) throw appError('CONFLICT');
 
-      const { version: _version, ...fields } = input;
+      // Checked only when the plot's identity is being changed, against the
+      // identity it will have afterwards — a new plot number is compared with
+      // the wilayat already on file.
+      const identityChanged = [
+        ['plotNumber', before.plotNumber],
+        ['wilayat', before.wilayat],
+        ['surveyReference', before.surveyReference],
+      ].some(([key, old]) => {
+        const next = input[key as 'plotNumber' | 'wilayat' | 'surveyReference'];
+        return next != null && next !== old;
+      });
+      const overridden = identityChanged
+        ? refuseUnlessOverridden(
+            await findPropertyDuplicates(
+              tx,
+              {
+                plotNumber:
+                  (input.plotNumber !== undefined ? input.plotNumber : before.plotNumber) ??
+                  undefined,
+                wilayat:
+                  (input.wilayat !== undefined ? input.wilayat : before.wilayat) ?? undefined,
+                surveyReference:
+                  (input.surveyReference !== undefined
+                    ? input.surveyReference
+                    : before.surveyReference) ?? undefined,
+                excludeId: id,
+              },
+              { lock: true },
+            ),
+            input.duplicateOverride,
+            describeMatch,
+          )
+        : null;
+
+      const { version: _version, duplicateOverride: _override, ...fields } = input;
       const data: Prisma.PropertyUpdateManyMutationInput = { version: { increment: 1 } };
       for (const [key, value] of Object.entries(fields)) {
         if (value !== undefined) {
@@ -129,7 +189,12 @@ export class PropertyService {
         entityType: 'Property',
         entityId: id,
         before: { name: before.name, reference: before.reference, city: before.city },
-        after: { name: after.name, reference: after.reference, city: after.city },
+        after: {
+          name: after.name,
+          reference: after.reference,
+          city: after.city,
+          ...(overridden ? { duplicateOverride: overridden } : {}),
+        },
       });
 
       return after;
@@ -195,6 +260,12 @@ export class PropertyService {
       });
     });
   }
+}
+
+/** What the user is told a clashing plot is already recorded as. */
+function describeMatch(match: DuplicateMatch): string {
+  const ref = match.reference ? ` (${match.reference})` : '';
+  return `Already recorded as property "${match.name}"${ref}.`;
 }
 
 function rethrowDuplicateReference(error: unknown): never {

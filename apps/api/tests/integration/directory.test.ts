@@ -139,15 +139,19 @@ describe('directory', () => {
   });
 
   it('records the Oman land-registry identity on a property, all fields optional', async () => {
+    // Real-shaped values, made unique per run: the same plot twice is now
+    // refused as a duplicate, and this database outlives any one test run.
+    const n = String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0');
+    const plotNumber = `102/${n}`;
     const property = await inContext(() =>
       properties.create(
         {
           clientId,
           name: 'Villa, Al Mawaleh South',
-          plotNumber: '102/8',
+          plotNumber,
           wilayat: 'Al Seeb',
           village: 'Al Mawaleh South',
-          surveyReference: '1-35-055-01-585',
+          surveyReference: `1-35-055-01-${n}`,
           titleDeedReference: '2015/19618',
           ownerName: 'Nasreen bint Abdul Rahim bin Sheikh',
           ownerNationalId: '62898538',
@@ -156,7 +160,7 @@ describe('directory', () => {
       ),
     );
 
-    expect(property.plotNumber).toBe('102/8');
+    expect(property.plotNumber).toBe(plotNumber);
     expect(property.titleDeedReference).toBe('2015/19618');
     expect(property.ownerNationalId).toBe('62898538');
 

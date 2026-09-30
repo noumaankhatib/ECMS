@@ -1,16 +1,22 @@
 import {
+  clientDuplicateQuerySchema,
   createClientSchema,
   createContactSchema,
   createPropertySchema,
   listQuerySchema,
+  propertyDuplicateQuerySchema,
   propertyListQuerySchema,
   updateClientSchema,
   updateContactSchema,
   updatePropertySchema,
+  type ClientDuplicateQuery,
   type CreateClient,
   type CreateContact,
   type CreateProperty,
+  type DuplicateMatch,
+  type DuplicateOverride,
   type ListQuery,
+  type PropertyDuplicateQuery,
   type PropertyListQuery,
   type Page,
   type UpdateClient,
@@ -35,10 +41,11 @@ import type { Request } from 'express';
 
 import { appError } from '../../shared/errors/app-error';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
-import { RequirePermission } from '../access';
+import { AuthorizationService, RequirePermission } from '../access';
 
 import { ClientService } from './client.service';
 import { ContactService } from './contact.service';
+import { DuplicateService } from './duplicates';
 import { PropertyService } from './property.service';
 
 /** The signed-in user. The guard guarantees it; this keeps the assertion in one place. */
@@ -48,17 +55,46 @@ function actorOf(req: Request): string {
   return user.id;
 }
 
+/**
+ * Saving over an identity match is a separate authority from saving at all.
+ * Checked before the service runs, so a caller without it is refused whether
+ * or not a match turns out to exist — the answer never depends on data they
+ * may not be entitled to know about.
+ */
+async function requireOverrideIfRequested(
+  authorization: AuthorizationService,
+  actorId: string,
+  override: DuplicateOverride | undefined,
+): Promise<void> {
+  if (override) await authorization.require(actorId, 'directory:override_duplicate');
+}
+
 @Controller('clients')
 export class ClientController {
   constructor(
     private readonly clients: ClientService,
     private readonly contacts: ContactService,
+    private readonly duplicates: DuplicateService,
+    private readonly authorization: AuthorizationService,
   ) {}
 
   @Get()
   @RequirePermission('client:view')
   list(@Query(new ZodValidationPipe(listQuerySchema)) query: ListQuery): Promise<Page<Client>> {
     return this.clients.list(query);
+  }
+
+  /**
+   * A read, but a POST: the body carries CR numbers and Civil IDs, which in a
+   * query string would be written to every proxy's access log.
+   */
+  @Post('duplicates')
+  @HttpCode(200)
+  @RequirePermission('client:view')
+  findDuplicates(
+    @Body(new ZodValidationPipe(clientDuplicateQuerySchema)) query: ClientDuplicateQuery,
+  ): Promise<DuplicateMatch[]> {
+    return this.duplicates.clients(query);
   }
 
   @Get(':id')
@@ -69,21 +105,25 @@ export class ClientController {
 
   @Post()
   @RequirePermission('client:create')
-  create(
+  async create(
     @Body(new ZodValidationPipe(createClientSchema)) body: CreateClient,
     @Req() req: Request,
   ): Promise<Client> {
-    return this.clients.create(body, actorOf(req));
+    const actor = actorOf(req);
+    await requireOverrideIfRequested(this.authorization, actor, body.duplicateOverride);
+    return this.clients.create(body, actor);
   }
 
   @Patch(':id')
   @RequirePermission('client:edit')
-  update(
+  async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(updateClientSchema)) body: UpdateClient,
     @Req() req: Request,
   ): Promise<Client> {
-    return this.clients.update(id, body, actorOf(req));
+    const actor = actorOf(req);
+    await requireOverrideIfRequested(this.authorization, actor, body.duplicateOverride);
+    return this.clients.update(id, body, actor);
   }
 
   /**
@@ -137,7 +177,11 @@ export class ContactController {
 
 @Controller('properties')
 export class PropertyController {
-  constructor(private readonly properties: PropertyService) {}
+  constructor(
+    private readonly properties: PropertyService,
+    private readonly duplicates: DuplicateService,
+    private readonly authorization: AuthorizationService,
+  ) {}
 
   @Get()
   @RequirePermission('property:view')
@@ -145,6 +189,19 @@ export class PropertyController {
     @Query(new ZodValidationPipe(propertyListQuerySchema)) query: PropertyListQuery,
   ): Promise<Page<Property>> {
     return this.properties.list(query, query.clientId);
+  }
+
+  /**
+   * A read, but a POST: the body carries CR numbers and Civil IDs, which in a
+   * query string would be written to every proxy's access log.
+   */
+  @Post('duplicates')
+  @HttpCode(200)
+  @RequirePermission('property:view')
+  findDuplicates(
+    @Body(new ZodValidationPipe(propertyDuplicateQuerySchema)) query: PropertyDuplicateQuery,
+  ): Promise<DuplicateMatch[]> {
+    return this.duplicates.properties(query);
   }
 
   @Get(':id')
@@ -155,21 +212,25 @@ export class PropertyController {
 
   @Post()
   @RequirePermission('property:create')
-  create(
+  async create(
     @Body(new ZodValidationPipe(createPropertySchema)) body: CreateProperty,
     @Req() req: Request,
   ): Promise<Property> {
-    return this.properties.create(body, actorOf(req));
+    const actor = actorOf(req);
+    await requireOverrideIfRequested(this.authorization, actor, body.duplicateOverride);
+    return this.properties.create(body, actor);
   }
 
   @Patch(':id')
   @RequirePermission('property:edit')
-  update(
+  async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(updatePropertySchema)) body: UpdateProperty,
     @Req() req: Request,
   ): Promise<Property> {
-    return this.properties.update(id, body, actorOf(req));
+    const actor = actorOf(req);
+    await requireOverrideIfRequested(this.authorization, actor, body.duplicateOverride);
+    return this.properties.update(id, body, actor);
   }
 
   @Delete(':id')

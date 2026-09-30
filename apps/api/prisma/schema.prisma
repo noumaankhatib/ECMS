@@ -197,6 +197,15 @@ model Client {
   reference String? @db.VarChar(50)
   notes     String? @db.Text
 
+  /// COMPANY or INDIVIDUAL. Optional — a client entered from a phone call is
+  /// not blocked until the paperwork arrives.
+  clientType String? @map("client_type") @db.VarChar(20)
+  /// Official identity, stored normalised (see `normalizeIdentifier`). Not
+  /// unique in the database on purpose: a clash is a warning the user may
+  /// override with a reason, not a hard refusal — see the migration.
+  crNumber   String? @map("cr_number") @db.VarChar(50)
+  civilId    String? @map("civil_id") @db.VarChar(50)
+
   /// Incremented on every change. A caller sends the version it read; if the
   /// record has moved on since, the write is refused rather than silently
   /// overwriting somebody else's edit.
@@ -232,6 +241,10 @@ model Contact {
   position  String? @db.VarChar(150)
   email     String? @db.VarChar(320)
   phone     String? @db.VarChar(50)
+  /// `phone` reduced to "+" and digits (see `normalizePhone`), so the same
+  /// number typed two ways still matches. Written alongside `phone`; the
+  /// original is never rewritten.
+  phoneNormalized String? @map("phone_normalized") @db.VarChar(20)
   /// The default person to contact. At most one per client, enforced by a
   /// partial unique index rather than by application logic.
   isPrimary Boolean @default(false) @map("is_primary")

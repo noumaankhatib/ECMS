@@ -166,6 +166,13 @@ export const PERMISSIONS = [
   'role:admin',
 
   'admin:data',
+
+  /** Saving a client or property whose official identity (CR number, Civil
+   *  ID, plot + wilayat, Krookie serial) already belongs to a live record.
+   *  A name- or phone-only likeness is a warning anyone may dismiss; an
+   *  identity match is not, so dismissing it is reserved for System
+   *  Administrator and Director and always carries a written reason. */
+  'directory:override_duplicate',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -260,11 +267,61 @@ export const propertyListQuerySchema = listQuerySchema.extend({
 
 export type PropertyListQuery = z.infer<typeof propertyListQuerySchema>;
 
+/**
+ * Official identifiers are compared as the registry writes them: no spaces,
+ * dashes, slashes or dots, upper case. "1234 567" and "1234-567" are the same
+ * CR number, so they must be the same stored value.
+ */
+export function normalizeIdentifier(value: string): string {
+  return value.replace(/[\s\-/.]+/g, '').toUpperCase();
+}
+
+/**
+ * A phone number reduced to one comparable form, "+" and digits only.
+ *
+ * An eight-digit number is a local Omani one and gains the 968 country code;
+ * a leading 00 is the international prefix, not part of the number. Anything
+ * too short to identify a line returns null, so it can never "match".
+ */
+export function normalizePhone(value: string): string | null {
+  let digits = value.replace(/\D+/g, '');
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  if (digits.length === 8) digits = `968${digits}`;
+  return digits.length >= 8 ? `+${digits}` : null;
+}
+
+const optionalIdentifier = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .transform((v) => (v === '' ? null : normalizeIdentifier(v)))
+    .nullish();
+
+export const CLIENT_TYPES = ['COMPANY', 'INDIVIDUAL'] as const;
+export type ClientType = (typeof CLIENT_TYPES)[number];
+
+/**
+ * Sent only after the user has seen an identity match and chosen to save
+ * anyway. The reason is kept in the audit trail beside the new record.
+ */
+export const duplicateOverrideSchema = z
+  .object({ reason: z.string().trim().min(5, 'Explain why this is not a duplicate').max(500) })
+  .strict();
+
+export type DuplicateOverride = z.infer<typeof duplicateOverrideSchema>;
+
 export const createClientSchema = z
   .object({
     name: z.string().trim().min(1, 'A name is required').max(200),
     reference: optionalText(50),
     notes: optionalText(5000),
+    clientType: z.enum(CLIENT_TYPES).nullish(),
+    /** Commercial Registration number — companies. */
+    crNumber: optionalIdentifier(50),
+    /** Civil ID (or passport number) — individuals. */
+    civilId: optionalIdentifier(50),
+    duplicateOverride: duplicateOverrideSchema.optional(),
   })
   .strict();
 
@@ -326,6 +383,7 @@ export const createPropertySchema = z
     /** The registered owner per the title deed — may differ from the client. */
     ownerName: optionalText(200),
     ownerNationalId: optionalText(50),
+    duplicateOverride: duplicateOverrideSchema.optional(),
   })
   .strict();
 
@@ -337,6 +395,60 @@ export const updatePropertySchema = createPropertySchema
   .extend({ version: z.number().int().min(1) });
 
 export type UpdateProperty = z.infer<typeof updatePropertySchema>;
+
+// ---------------------------------------------------------------------------
+// Duplicate detection
+// ---------------------------------------------------------------------------
+
+/**
+ * EXACT  — an official identifier is already on a live record. Almost certainly
+ *          the same client or plot; saving anyway needs
+ *          `directory:override_duplicate` and a reason.
+ * LIKELY — a similar name or the same phone. Possibly the same; anyone who may
+ *          create the record may dismiss it.
+ */
+export const DUPLICATE_STRENGTHS = ['EXACT', 'LIKELY'] as const;
+export type DuplicateStrength = (typeof DUPLICATE_STRENGTHS)[number];
+
+export interface DuplicateMatch {
+  readonly id: string;
+  readonly name: string;
+  readonly reference: string | null;
+  readonly strength: DuplicateStrength;
+  /** The fields that matched, e.g. ["crNumber"] or ["name", "phone"]. */
+  readonly matchedOn: readonly string[];
+  /** Name similarity between 0 and 1, when the name was compared. */
+  readonly similarity: number | null;
+  /** Set for property matches: the client the matching plot belongs to. */
+  readonly clientId?: string;
+}
+
+export const clientDuplicateQuerySchema = z
+  .object({
+    name: z.string().trim().max(200).optional(),
+    crNumber: optionalIdentifier(50),
+    civilId: optionalIdentifier(50),
+    phone: z.string().trim().max(50).optional(),
+    /** The record being edited, so it is not reported as its own duplicate. */
+    excludeId: z.string().uuid().optional(),
+  })
+  .strict();
+
+export type ClientDuplicateQuery = z.infer<typeof clientDuplicateQuerySchema>;
+
+export const propertyDuplicateQuerySchema = z
+  .object({
+    name: z.string().trim().max(200).optional(),
+    /** Name likeness is only meaningful between one client's own properties. */
+    clientId: z.string().uuid().optional(),
+    plotNumber: z.string().trim().max(50).optional(),
+    wilayat: z.string().trim().max(100).optional(),
+    surveyReference: z.string().trim().max(100).optional(),
+    excludeId: z.string().uuid().optional(),
+  })
+  .strict();
+
+export type PropertyDuplicateQuery = z.infer<typeof propertyDuplicateQuerySchema>;
 
 export interface Page<T> {
   readonly items: readonly T[];

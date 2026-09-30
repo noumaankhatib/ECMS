@@ -1,10 +1,12 @@
-import type { CreateClient, ListQuery, Page, UpdateClient } from '@ecms/contracts';
+import type { CreateClient, DuplicateMatch, ListQuery, Page, UpdateClient } from '@ecms/contracts';
 import { Injectable } from '@nestjs/common';
 import type { Client, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../shared/database/prisma.service';
 import { appError } from '../../shared/errors/app-error';
 import { AuditService } from '../audit';
+
+import { findClientDuplicates, refuseUnlessOverridden } from './duplicates';
 
 @Injectable()
 export class ClientService {
@@ -48,12 +50,28 @@ export class ClientService {
 
   async create(input: CreateClient, actorId: string): Promise<Client> {
     return this.prisma.$transaction(async (tx) => {
+      const overridden = refuseUnlessOverridden(
+        await findClientDuplicates(
+          tx,
+          {
+            crNumber: input.crNumber ?? undefined,
+            civilId: input.civilId ?? undefined,
+          },
+          { lock: true },
+        ),
+        input.duplicateOverride,
+        describeMatch,
+      );
+
       const client = await tx.client
         .create({
           data: {
             name: input.name,
             reference: input.reference ?? null,
             notes: input.notes ?? null,
+            clientType: input.clientType ?? null,
+            crNumber: input.crNumber ?? null,
+            civilId: input.civilId ?? null,
             createdBy: actorId,
           },
         })
@@ -63,7 +81,13 @@ export class ClientService {
         action: 'CREATED',
         entityType: 'Client',
         entityId: client.id,
-        after: { name: client.name, reference: client.reference },
+        after: {
+          name: client.name,
+          reference: client.reference,
+          crNumber: client.crNumber,
+          civilId: client.civilId,
+          ...(overridden ? { duplicateOverride: overridden } : {}),
+        },
       });
 
       return client;
@@ -84,12 +108,36 @@ export class ClientService {
       if (!before) throw appError('NOT_FOUND');
       if (before.archivedAt) throw appError('CONFLICT');
 
+      // Only a CHANGED identifier is checked. Re-saving a record that was
+      // already let through with an override must not demand the reason again.
+      const crChanged = input.crNumber != null && input.crNumber !== before.crNumber;
+      const civilChanged = input.civilId != null && input.civilId !== before.civilId;
+      const overridden =
+        crChanged || civilChanged
+          ? refuseUnlessOverridden(
+              await findClientDuplicates(
+                tx,
+                {
+                  crNumber: crChanged ? (input.crNumber ?? undefined) : undefined,
+                  civilId: civilChanged ? (input.civilId ?? undefined) : undefined,
+                  excludeId: id,
+                },
+                { lock: true },
+              ),
+              input.duplicateOverride,
+              describeMatch,
+            )
+          : null;
+
       const { count } = await tx.client.updateMany({
         where: { id, version: input.version },
         data: {
           ...(input.name !== undefined ? { name: input.name } : {}),
           ...(input.reference !== undefined ? { reference: input.reference } : {}),
           ...(input.notes !== undefined ? { notes: input.notes } : {}),
+          ...(input.clientType !== undefined ? { clientType: input.clientType } : {}),
+          ...(input.crNumber !== undefined ? { crNumber: input.crNumber } : {}),
+          ...(input.civilId !== undefined ? { civilId: input.civilId } : {}),
           version: { increment: 1 },
         },
       });
@@ -102,8 +150,23 @@ export class ClientService {
         action: 'UPDATED',
         entityType: 'Client',
         entityId: id,
-        before: { name: before.name, reference: before.reference, notes: before.notes },
-        after: { name: after.name, reference: after.reference, notes: after.notes },
+        before: {
+          name: before.name,
+          reference: before.reference,
+          notes: before.notes,
+          clientType: before.clientType,
+          crNumber: before.crNumber,
+          civilId: before.civilId,
+        },
+        after: {
+          name: after.name,
+          reference: after.reference,
+          notes: after.notes,
+          clientType: after.clientType,
+          crNumber: after.crNumber,
+          civilId: after.civilId,
+          ...(overridden ? { duplicateOverride: overridden } : {}),
+        },
       });
 
       return after;
@@ -202,6 +265,12 @@ export class ClientService {
       });
     });
   }
+}
+
+/** What the user is told a clashing identifier already belongs to. */
+function describeMatch(match: DuplicateMatch): string {
+  const ref = match.reference ? ` (${match.reference})` : '';
+  return `Already recorded for client "${match.name}"${ref}.`;
 }
 
 /**
