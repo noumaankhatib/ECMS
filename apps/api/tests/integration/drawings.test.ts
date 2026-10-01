@@ -8,10 +8,12 @@ import { PropertyService } from '../../src/modules/directory/property.service';
 import { DrawingRevisionService } from '../../src/modules/drawings/drawing-revision.service';
 import { DrawingService } from '../../src/modules/drawings/drawing.service';
 import { HandoverService } from '../../src/modules/handover';
+import { CompletionGateService } from '../../src/modules/projects/completion-gate.service';
 import { ProjectService } from '../../src/modules/projects/project.service';
 import { SequenceService } from '../../src/modules/sequence';
 import { runInRequestContext } from '../../src/shared/context/request-context';
 import type { PrismaService } from '../../src/shared/database/prisma.service';
+import { finishWorkstreams } from '../fixtures/workstreams';
 
 /**
  * Drawings — the strictest invariant in the system
@@ -37,6 +39,7 @@ describe('drawings', () => {
     authorization,
     new SequenceService(),
     handover,
+    new CompletionGateService(prisma),
   );
   const drawings = new DrawingService(prisma, audit);
   const revisions = new DrawingRevisionService(prisma, audit);
@@ -426,6 +429,7 @@ describe('drawings', () => {
     let current = await inContext(() =>
       projects.transition(closingProject.id, 'activate', { version: 1 }, admin),
     );
+    await finishWorkstreams(prisma, closingProject.id);
     current = await inContext(() =>
       projects.transition(closingProject.id, 'complete', { version: current.version }, admin),
     );

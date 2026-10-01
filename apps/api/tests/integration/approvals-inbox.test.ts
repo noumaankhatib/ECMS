@@ -7,6 +7,7 @@ import { ClientService } from '../../src/modules/directory/client.service';
 import { PropertyService } from '../../src/modules/directory/property.service';
 import { HandoverService } from '../../src/modules/handover';
 import { ApprovalsInboxService } from '../../src/modules/insights/approvals-inbox.service';
+import { CompletionGateService } from '../../src/modules/projects/completion-gate.service';
 import { ProjectService } from '../../src/modules/projects/project.service';
 import { SequenceService } from '../../src/modules/sequence';
 import { runInRequestContext } from '../../src/shared/context/request-context';
@@ -35,6 +36,7 @@ describe('approvals inbox', () => {
     authorization,
     new SequenceService(),
     handover,
+    new CompletionGateService(prisma),
   );
 
   const approvalsInbox = new ApprovalsInboxService(prisma, authorization);

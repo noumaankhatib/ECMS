@@ -670,6 +670,11 @@ export function ActionForm({
  * `confirm` is used for the ones that are hard to walk back. It is a browser
  * dialogue rather than a bespoke modal: it cannot be dismissed by accident, it
  * works without JavaScript having hydrated, and nobody has to learn it.
+ *
+ * An action may return a FormState (via `runAction`), in which case a refusal
+ * from the API — an illegal move, an unmet completion condition, a stale
+ * record — is shown right under the button, with each reason the API gave,
+ * instead of throwing to the generic error page and losing them.
  */
 export function ActionButton({
   action,
@@ -679,7 +684,9 @@ export function ActionButton({
   hidden,
   disabledReason,
 }: {
-  action: () => Promise<void>;
+  /** Either kind works: a plain `Promise<void>`, or a FormState from
+   *  `runAction` whose refusal is then shown under the button. */
+  action: () => Promise<unknown>;
   label: string;
   confirm?: string;
   variant?: 'primary' | 'secondary' | 'danger';
@@ -690,6 +697,11 @@ export function ActionButton({
    *  button (docs/phase-10-plan.md §6). */
   disabledReason?: string;
 }) {
+  const [state, formAction] = useActionState<FormState, FormData>(async () => {
+    const result = await action();
+    return typeof result === 'object' && result !== null ? (result as FormState) : {};
+  }, {});
+
   if (hidden) return null;
 
   const className =
@@ -708,15 +720,36 @@ export function ActionButton({
   }
 
   return (
-    <form
-      action={action}
-      onSubmit={(event) => {
-        if (confirm !== undefined && !window.confirm(confirm)) event.preventDefault();
-      }}
-    >
-      <button type="submit" className={className}>
-        {label}
-      </button>
-    </form>
+    <div className="action-button">
+      <form
+        action={formAction}
+        onSubmit={(event) => {
+          if (confirm !== undefined && !window.confirm(confirm)) event.preventDefault();
+        }}
+      >
+        <ActionButtonSubmit className={className} label={label} />
+      </form>
+      {state.error ? (
+        <div className="action-button__error" role="alert">
+          <strong>{state.error}</strong>
+          {state.fields && state.fields.length > 0 && state.fields[0]?.reason !== state.error ? (
+            <ul>
+              {state.fields.map((field) => (
+                <li key={field.field}>{field.reason}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ActionButtonSubmit({ className, label }: { className: string; label: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" className={className} disabled={pending}>
+      {pending ? 'Working…' : label}
+    </button>
   );
 }

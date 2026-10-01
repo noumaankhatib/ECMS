@@ -84,9 +84,11 @@ export async function transitionProposal(
   id: string,
   action: ProposalAction,
   version: number,
-): Promise<void> {
-  await api.post(`/proposals/${id}/${ROUTE_FOR_ACTION[action]}`, { version });
-  await refresh(`/proposals/${id}`);
+): Promise<FormState> {
+  return runAction(async () => {
+    await api.post(`/proposals/${id}/${ROUTE_FOR_ACTION[action]}`, { version });
+    await refresh(`/proposals/${id}`);
+  });
 }
 
 /**

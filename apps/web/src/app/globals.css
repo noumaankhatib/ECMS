@@ -177,6 +177,20 @@ a:hover {
   border-radius: var(--radius-sm);
 }
 
+/* Read by assistive tech, not drawn — for a label the layout already implies
+ * visually (a step number, an action column's heading). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Layout ------------------------------------------------------------------- */
 
 :root {
@@ -192,6 +206,10 @@ a:hover {
 }
 
 .sidebar {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
   width: var(--sidebar-w);
   flex: 0 0 auto;
   background: var(--nav-bg);
@@ -287,6 +305,9 @@ a:hover {
   background: rgb(255 255 255 / 8%);
   color: var(--white);
 }
+.sidebar__toggle:focus-visible {
+  outline-color: var(--white);
+}
 .sidebar__toggle-icon--flipped {
   transform: rotate(180deg);
 }
@@ -295,21 +316,38 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-height: 0;
   overflow-y: auto;
+  /* On a short window the rail scrolls — with a thin scrollbar in the
+     rail's own colours, not the browser's default white one. */
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 18%) transparent;
+}
+.nav::-webkit-scrollbar {
+  width: 6px;
+}
+.nav::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 18%);
+  border-radius: 999px;
+}
+.nav__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .nav__group + .nav__group {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  margin-top: 4px;
-  padding-top: 4px;
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
 }
 .nav__group-label {
   display: block;
-  padding: 8px 12px 2px;
+  padding: 6px 12px 4px;
   font-size: 0.65rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.42);
   user-select: none;
 }
 .nav__item {
@@ -320,13 +358,18 @@ a:hover {
   color: var(--nav-text);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
+  min-height: 36px;
   font-size: 14px;
   font-weight: 500;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 .nav__icon {
   flex: 0 0 auto;
   width: 18px;
   height: 18px;
+  opacity: 0.8;
 }
 .nav__label {
   white-space: nowrap;
@@ -335,10 +378,19 @@ a:hover {
 }
 .nav__item:hover {
   background: var(--nav-bg-hover);
+  color: var(--white);
   text-decoration: none;
 }
+.nav__item:hover .nav__icon,
+.nav__item[aria-current='page'] .nav__icon {
+  opacity: 1;
+}
+.nav__item:focus-visible {
+  outline-color: var(--white);
+  outline-offset: -2px;
+}
 .nav__item[aria-current='page'] {
-  background: linear-gradient(90deg, rgb(255 255 255 / 12%), rgb(255 255 255 / 4%));
+  background: rgb(255 255 255 / 10%);
   color: var(--white);
   font-weight: 600;
 }
@@ -350,7 +402,7 @@ a:hover {
   bottom: 4px;
   width: 3px;
   border-radius: 999px;
-  background: var(--white);
+  background: var(--nav-active);
 }
 .sidebar--collapsed .nav__item[aria-current='page']::before {
   left: 2px;
@@ -837,6 +889,21 @@ a:hover {
   color: var(--text-muted);
   font-size: 14px;
 }
+.page-head__date {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.page-head__date svg {
+  color: var(--brand-700);
+}
 
 .breadcrumb {
   font-size: 13px;
@@ -851,13 +918,6 @@ a:hover {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  transition:
-    box-shadow 150ms ease,
-    transform 150ms ease;
-}
-.card:hover {
-  box-shadow: var(--shadow-raised);
-  transform: translateY(-1px);
 }
 .card__head {
   padding: var(--space-4);
@@ -876,6 +936,9 @@ a:hover {
   grid-template-columns: 2fr 1fr;
   gap: var(--space-5);
   align-items: start;
+}
+.grid-2--even {
+  grid-template-columns: 1fr 1fr;
 }
 
 .doc-preview {
@@ -945,9 +1008,12 @@ a:hover {
 
 /* KPI cards ------------------------------------------------------------------ */
 
+/* One row however many of the four this person can see — each takes an
+ * equal share — until the width runs out (see the media queries below). */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: var(--space-4);
 }
 .kpi-card {
@@ -955,20 +1021,30 @@ a:hover {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: var(--space-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
   transition:
     box-shadow 150ms ease,
-    transform 150ms ease,
     border-color 150ms ease;
 }
-.kpi-card:hover {
+.kpi-card:hover,
+.kpi-card.details--open {
   box-shadow: var(--shadow-raised);
   border-color: var(--brand-700);
-  transform: translateY(-1px);
+}
+.kpi-card__link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border-radius: inherit;
+  color: var(--text);
+}
+.kpi-card__link:hover {
   text-decoration: none;
+}
+.kpi-card > .kpi-card__details-trigger {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
 }
 .kpi-card__head {
   display: flex;
@@ -977,8 +1053,9 @@ a:hover {
   gap: var(--space-2);
 }
 .kpi-card__icon {
-  width: 36px;
-  height: 36px;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
   border-radius: var(--radius-sm);
   background: var(--info-bg);
   color: var(--info-text);
@@ -1001,19 +1078,38 @@ a:hover {
   color: var(--danger-text);
 }
 .kpi-card__value {
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 700;
-  line-height: 1.1;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
 .kpi-card__label {
   font-size: 13px;
+  font-weight: 500;
   color: var(--text-muted);
+}
+.kpi-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 22px;
+}
+.kpi-card__detail {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.kpi-card__detail--danger {
+  color: var(--danger-text);
+  font-weight: 600;
 }
 .trend {
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  margin-left: auto;
   font-size: 12px;
   font-weight: 600;
   padding: 2px 7px;
@@ -1032,61 +1128,281 @@ a:hover {
   background: var(--slate-100);
 }
 
-/* Hero banner ----------------------------------------------------------------- */
+/* Dashboard ------------------------------------------------------------------ */
 
-.hero-banner {
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* Your next step — the primary guidance section, so it alone carries the
+ * brand accent along its top edge. */
+.workflow-card {
+  border-top: 3px solid var(--brand-700);
+}
+.workflow-card__head {
+  padding: var(--space-4) var(--space-4) 0;
+}
+.workflow-card__head p {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* Horizontal on anything wide enough. Every step is a column of the same
+ * six rows (rail, label, title, description, counts, action) shared through
+ * subgrid, so each row lines up across all steps whatever its text length.
+ * The row scrolls inside its own card (never the page) before a step is
+ * squeezed below a readable width; under 700px it becomes a vertical stepper. */
+.workflow {
+  /* Positioned so nothing absolutely placed inside can widen the page. */
   position: relative;
-  overflow: hidden;
-  background: linear-gradient(135deg, var(--brand-900) 0%, var(--nav-bg) 65%, var(--nav-bg) 100%);
-  color: var(--white);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(200px, 1fr);
+  grid-template-rows: repeat(5, auto);
+  column-gap: var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.workflow__step {
+  grid-row: span 5;
+  position: relative;
+  display: grid;
+  grid-template-rows: subgrid;
+  row-gap: 6px;
+  align-items: start;
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid transparent;
   border-radius: var(--radius);
-  padding: var(--space-5) var(--space-6);
+}
+.workflow__rail {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-5);
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-2);
 }
-/* A very subtle architectural motif — thin drafting-line rectangles, the
- * kind of mark this business's own drawings already carry — not a stock
- * illustration. Opacity kept low enough to read as texture, not decoration. */
-.hero-banner::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    repeating-linear-gradient(115deg, rgb(255 255 255 / 5%) 0 1px, transparent 1px 64px),
-    radial-gradient(circle at 88% 15%, rgb(255 255 255 / 10%), transparent 55%);
-}
-.hero-banner > * {
+.workflow__marker {
   position: relative;
-}
-.hero-banner h2 {
-  color: var(--white);
-  font-family: var(--font);
-  font-size: 24px;
-  font-weight: 700;
-  text-transform: none;
-  letter-spacing: -0.01em;
-}
-.hero-banner p {
-  margin: var(--space-1) 0 0;
-  color: var(--nav-text);
-  font-size: 14px;
-  max-width: 46ch;
-}
-.hero-banner__date {
+  z-index: 1;
   flex: 0 0 auto;
-  text-align: right;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
   font-size: 13px;
-  color: var(--nav-text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
-.hero-banner__date strong {
-  display: block;
+/* Runs through this step's padding and the column gap to meet the next
+ * marker, so the steps read as one continuous line. */
+.workflow__connector {
+  flex: 1 1 auto;
+  height: 2px;
+  margin: 0 calc(-1 * (var(--space-3) * 2 + var(--space-2) + 2px)) 0 var(--space-2);
+  border-radius: 999px;
+  background: var(--border);
+}
+.workflow__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.workflow__state {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--neutral-bg);
+  color: var(--neutral-text);
+}
+.workflow__state--next {
+  background: var(--brand-700);
   color: var(--white);
+}
+.workflow__state--active {
+  background: var(--info-bg);
+  color: var(--info-text);
+}
+.workflow__state--done {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+.workflow__title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.workflow__icon {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+.workflow__title {
   font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+}
+.workflow__meta {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+/* Sits at the right of the "Step N" label row. */
+.workflow__step > .workflow__details-trigger {
+  position: absolute;
+  top: calc(var(--space-3) + 28px + var(--space-2) - 3px);
+  right: var(--space-2);
+}
+.workflow__cta {
+  justify-self: start;
+  margin-top: var(--space-1);
+}
+
+.workflow__step--next {
+  background: var(--brand-50);
+  border-color: rgb(23 105 224 / 22%);
+}
+.workflow__step--next .workflow__marker {
+  background: var(--brand-700);
+  border-color: var(--brand-700);
+  color: var(--white);
+  box-shadow: 0 0 0 4px var(--surface);
+}
+.workflow__step--next .workflow__eyebrow {
+  color: var(--brand-text);
+}
+.workflow__step--next .workflow__icon {
+  color: var(--brand-700);
+}
+.workflow__step--active .workflow__marker {
+  border-color: var(--brand-700);
+  background: var(--brand-50);
+  color: var(--brand-text);
+}
+.workflow__step--done .workflow__marker {
+  border-color: var(--success);
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+.workflow__step--done .workflow__connector {
+  background: var(--success);
+  opacity: 0.45;
+}
+.workflow__step--locked .workflow__marker {
+  border-style: dashed;
+  color: var(--text-faint);
+}
+.workflow__step--locked .workflow__title,
+.workflow__step--locked .workflow__icon,
+.workflow__step--locked .workflow__meta {
+  color: var(--text-faint);
+}
+
+/* Completed steps stay quiet, so the next step is the one thing that stands
+ * out: muted title and count, and the action drops to a plain text link. */
+.workflow__step--done .workflow__title {
+  color: var(--text-muted);
   font-weight: 500;
+}
+.workflow__step--done .workflow__meta {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.workflow__step--done .workflow__cta {
+  padding-left: 0;
+  padding-right: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+}
+.workflow__step--done .workflow__cta:hover {
+  background: transparent;
+  color: var(--brand-text);
+}
+
+/* Needs attention -------------------------------------------------------------- */
+
+.count-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--neutral-bg);
+  color: var(--neutral-text);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.attention-table {
+  font-size: 13px;
+}
+.attention-table__item .details-area:hover strong,
+.attention-table__item .details--open strong {
+  color: var(--brand-text);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.attention-table__item strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+}
+.attention-table__item span {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.all-clear {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.all-clear__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+.all-clear strong {
+  display: block;
+  font-size: 14px;
+}
+.all-clear span {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
 /* Donut & funnel --------------------------------------------------------------- */
@@ -1124,10 +1440,35 @@ a:hover {
   font-size: 13px;
   flex: 1 1 160px;
 }
+.donut__legend-item > .details-area {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  width: auto;
+  margin: -4px -6px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+}
+.donut__legend-item > .details-area:hover,
+.donut__legend-item.details--open > .details-area {
+  background: var(--slate-100);
+}
 .donut__legend li {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+.donut__legend a,
+.funnel__label a {
+  color: inherit;
+}
+.donut__legend a:hover,
+.funnel__label a:hover {
+  color: var(--brand-text);
+}
+.donut__legend--zero {
+  color: var(--text-faint);
 }
 .donut__legend strong {
   margin-left: auto;
@@ -1147,6 +1488,24 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+}
+.funnel li.details {
+  display: block;
+}
+.funnel li > .details-area {
+  display: grid;
+  grid-template-columns: 108px 1fr 34px;
+  align-items: center;
+  gap: var(--space-3);
+  width: calc(100% + 12px);
+  margin: -4px -6px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+.funnel li > .details-area:hover,
+.funnel li.details--open > .details-area {
+  background: var(--slate-100);
 }
 .funnel li {
   display: grid;
@@ -1184,6 +1543,11 @@ a:hover {
 .funnel--zero .funnel__value {
   color: var(--text-faint);
   font-weight: 400;
+}
+.funnel-divider {
+  margin: var(--space-4) 0 var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--border);
 }
 
 /* Activity feed ----------------------------------------------------------------- */
@@ -1442,19 +1806,32 @@ a:hover {
 
 .quick-actions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-2);
+}
+/* The create actions that start or advance work — first and stronger; the
+ * admin/utility links sit quieter beneath a divider. */
+.quick-actions--primary {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
 }
 .quick-action {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-3);
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  color: var(--text);
-  font-size: 14px;
+  color: var(--text-muted);
+  font-size: 13px;
   font-weight: 500;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
 }
 .quick-action:hover {
   border-color: var(--brand-700);
@@ -1462,9 +1839,28 @@ a:hover {
   color: var(--brand-text);
   text-decoration: none;
 }
-.quick-action svg {
-  color: var(--brand-700);
+.quick-action__icon {
   flex: 0 0 auto;
+  display: inline-flex;
+  color: var(--text-muted);
+}
+.quick-action:hover .quick-action__icon {
+  color: var(--brand-700);
+}
+.quick-action--primary {
+  min-height: 46px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.quick-action--primary .quick-action__icon {
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--brand-50);
+  color: var(--brand-700);
 }
 
 .stack {
@@ -1907,6 +2303,9 @@ select:disabled {
   font-size: 15px;
   margin-bottom: var(--space-1);
 }
+.empty p {
+  margin: 0 0 var(--space-3);
+}
 
 /*
  * Every status pill: a dark semantic text colour on its matching light
@@ -2058,6 +2457,708 @@ select:disabled {
   color: var(--text-muted);
 }
 
+/* Workflow guide (/workflow) ------------------------------------------------------ */
+
+.workflow-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.workflow-card__more {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Jump links — one chip per step, the next step carrying the brand tint. */
+.guide-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.guide-jump a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 4px 12px 4px 4px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+}
+.guide-jump a:hover {
+  border-color: var(--brand-700);
+  text-decoration: none;
+}
+.guide-jump a span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--slate-100);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.guide-jump a.guide-jump--next {
+  border-color: rgb(23 105 224 / 35%);
+  background: var(--brand-50);
+  color: var(--brand-text);
+}
+.guide-jump a.guide-jump--next span {
+  background: var(--brand-700);
+  color: var(--white);
+}
+
+.guide-step {
+  scroll-margin-top: var(--space-5);
+}
+.guide-step--next {
+  border-top: 3px solid var(--brand-700);
+}
+.guide-step__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+.guide-step__number {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 16px;
+  font-weight: 700;
+}
+.guide-step__number--next {
+  background: var(--brand-700);
+  border-color: var(--brand-700);
+  color: var(--white);
+}
+.guide-step__number--active {
+  border-color: var(--brand-700);
+  background: var(--brand-50);
+  color: var(--brand-text);
+}
+.guide-step__number--done {
+  border-color: var(--success);
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+.guide-step__number--locked {
+  border-style: dashed;
+  color: var(--text-faint);
+}
+.guide-step__heading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.guide-step__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.guide-step__heading h2 {
+  margin-top: 2px;
+  font-size: 20px;
+  font-weight: 700;
+}
+.guide-step__heading p {
+  margin: var(--space-1) 0 0;
+  max-width: 68ch;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.guide-step__cta {
+  flex: 0 0 auto;
+}
+
+.guide-step__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+}
+.guide-step__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  min-width: 0;
+}
+.guide-block h3 {
+  margin-bottom: var(--space-2);
+}
+.guide-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.guide-list--numbered {
+  padding-left: 20px;
+}
+.guide-checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-2) var(--space-4);
+  font-size: 14px;
+}
+.guide-checklist li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.guide-checklist__box {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--slate-400);
+  border-radius: 4px;
+}
+
+.guide-step__rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border-left: 1px solid var(--border);
+  background: var(--slate-50);
+  border-radius: 0 0 var(--radius) 0;
+}
+.guide-status {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.guide-status li {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+.guide-status li:last-child {
+  border-bottom: none;
+}
+.guide-status__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: 14px;
+}
+.guide-status__top strong {
+  font-variant-numeric: tabular-nums;
+}
+.guide-status__moves {
+  display: block;
+  margin-top: 1px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.guide-status__note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.guide-step__following {
+  margin-top: auto;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Example form — looks like the real form, reads as a picture of it. */
+.sample-form {
+  margin: 0;
+  border: 1px dashed var(--slate-400);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.sample-form__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px dashed var(--border);
+}
+.sample-form__head strong {
+  display: block;
+  font-size: 14px;
+}
+.sample-form__head span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.sample-form__head .sample-form__badge {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 11px;
+  font-weight: 600;
+}
+.sample-form__grid {
+  margin: 0;
+  padding: var(--space-4);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+}
+.sample-form__field--wide {
+  grid-column: 1 / -1;
+}
+.sample-form__field dt {
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.sample-form__required {
+  margin-left: 2px;
+  color: var(--danger-text);
+}
+.sample-form__field dd {
+  margin: 0;
+}
+.sample-form__value {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--slate-50);
+  color: var(--text);
+  font-size: 14px;
+}
+.sample-form__value > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sample-form__value svg {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+}
+.sample-form__value--area {
+  align-items: flex-start;
+  min-height: 60px;
+}
+.sample-form__hint {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.sample-form__more {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-3);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.sample-form__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px dashed var(--border);
+}
+.sample-form__submit {
+  opacity: 0.55;
+  cursor: default;
+  pointer-events: none;
+}
+.sample-form__open {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .guide-step__body {
+    grid-template-columns: 1fr;
+  }
+  .guide-step__rail {
+    border-left: none;
+    border-top: 1px solid var(--border);
+    border-radius: 0 0 var(--radius) var(--radius);
+  }
+}
+@media (max-width: 700px) {
+  .workflow-card__head {
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  .guide-step__head {
+    flex-wrap: wrap;
+    padding: var(--space-4);
+  }
+  .guide-step__cta {
+    width: 100%;
+    justify-content: center;
+  }
+  .guide-step__main,
+  .guide-step__rail {
+    padding: var(--space-4);
+  }
+  .sample-form__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Completion gates ------------------------------------------------------------------
+ * The checklist beside "Mark complete"/"Complete", the inline refusal under
+ * any action button, and the Director/Administrator override. */
+
+.action-button {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+.action-button__error {
+  max-width: 320px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  font-size: 12px;
+  text-align: left;
+  white-space: normal;
+}
+.action-button__error ul {
+  margin: 2px 0 0;
+  padding-left: 16px;
+}
+
+.readiness {
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--slate-50);
+  text-align: left;
+  white-space: normal;
+}
+.readiness--ready {
+  border-color: rgb(22 163 74 / 30%);
+  background: var(--success-bg);
+}
+.readiness__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-2);
+  font-size: 13px;
+}
+.readiness__title span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.readiness--ready .readiness__title span {
+  color: var(--success-text);
+  font-weight: 600;
+}
+.readiness__checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+.readiness__checks li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.readiness__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 999px;
+}
+.readiness__check--met .readiness__icon {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+.readiness__check--unmet .readiness__icon {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+.readiness__check--met .readiness__text {
+  color: var(--text-muted);
+}
+.readiness__detail {
+  display: block;
+  font-size: 12px;
+  color: var(--danger-text);
+}
+.readiness-row td {
+  padding-top: 0;
+  background: var(--surface);
+}
+tbody tr.readiness-row:hover {
+  background: transparent;
+}
+
+.override {
+  margin-top: var(--space-2);
+  font-size: 13px;
+  text-align: left;
+  white-space: normal;
+}
+.override summary {
+  display: inline-block;
+  cursor: pointer;
+  color: var(--warning-text);
+  font-weight: 600;
+}
+.override[open] {
+  padding: var(--space-3);
+  border: 1px dashed var(--warning);
+  border-radius: var(--radius-sm);
+  background: var(--warning-bg);
+}
+.override[open] summary {
+  margin-bottom: var(--space-2);
+}
+.override .field {
+  padding-left: 0;
+}
+
+/* Details popover (progressive disclosure) ---------------------------------------
+ * The card keeps the essentials; this holds the rest. Same surface, border,
+ * radius and raised shadow as every other card — no new colour. */
+
+.details {
+  position: relative;
+}
+
+/* The small (i) beside a region that already holds its own links. */
+.details-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+/* A larger touch target than the visible circle. */
+.details-trigger::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+.details-trigger:hover,
+.details--open > .details-trigger {
+  background: var(--slate-100);
+  color: var(--text);
+}
+
+/* A region that is itself the trigger (chart rows, attention items). */
+.details-area {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.details-panel {
+  position: fixed;
+  z-index: 60;
+  width: 288px;
+  max-width: calc(100vw - 16px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-raised);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  cursor: auto;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .details-panel {
+    animation: details-in 120ms ease-out;
+  }
+}
+@keyframes details-in {
+  from {
+    opacity: 0;
+  }
+}
+.details-panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.details-panel__head strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.details-panel__description {
+  margin: 0;
+  color: var(--text-muted);
+}
+.details-panel__rows {
+  margin: 0;
+}
+.details-panel__rows div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 4px 0;
+}
+.details-panel__rows div + div {
+  border-top: 1px solid var(--slate-100);
+}
+.details-panel__rows dt {
+  color: var(--text-muted);
+}
+.details-panel__rows dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.details-panel__value--danger {
+  color: var(--danger-text);
+}
+.details-panel__value--success {
+  color: var(--success-text);
+}
+.details-panel__note span {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.details-panel__note p {
+  margin: 1px 0 0;
+}
+.details-panel__link {
+  align-self: flex-start;
+  font-weight: 600;
+}
+.details-panel__close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin: -6px -6px 0 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.details-panel__close:hover {
+  background: var(--slate-100);
+  color: var(--text);
+}
+
+/* Narrow screens: the same content as a bottom sheet. */
+.details-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgb(15 23 42 / 35%);
+}
+.details-panel--sheet {
+  z-index: 61;
+  inset: auto 0 0 0;
+  width: auto;
+  max-width: none;
+  max-height: 75vh;
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
+  border-radius: 14px 14px 0 0;
+  border-bottom: none;
+  font-size: 14px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .details-panel--sheet {
+    animation: details-sheet-in 160ms ease-out;
+  }
+}
+@keyframes details-sheet-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+.details-panel--sheet .details-panel__head strong {
+  font-size: 16px;
+}
+.details-panel--sheet .details-panel__rows div {
+  padding: 8px 0;
+}
+
+/* Touch screens have no hover — the (i) grows to a comfortable tap size. */
+@media (hover: none) {
+  .details-trigger {
+    width: 32px;
+    height: 32px;
+  }
+}
+
 /* Small screens ------------------------------------------------------------ */
 
 .header__menu-toggle {
@@ -2067,11 +3168,19 @@ select:disabled {
 /* Tablet: the rail keeps working exactly as it does on desktop (it is
  * already collapsible), the two-column layouts stack, and nothing is
  * hidden — PRD §19's own requirement that key workflows work on a tablet. */
+@media (max-width: 1100px) {
+  .kpi-grid {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 900px) {
   .main {
     padding: var(--space-4);
   }
   .grid-2,
+  .grid-2--even,
   .form-grid {
     grid-template-columns: 1fr;
   }
@@ -2149,7 +3258,103 @@ select:disabled {
   .header__account-name {
     display: none;
   }
+  .header {
+    gap: var(--space-2);
+    padding: 0 var(--space-3);
+  }
   .header__search {
     flex: 1 1 auto;
+    min-width: 0;
+  }
+  .header__actions {
+    gap: var(--space-1);
+  }
+  .header__quick-create-label {
+    display: none;
+  }
+
+  .page-head {
+    flex-wrap: wrap;
+  }
+  h1 {
+    font-size: 26px;
+  }
+
+  /* The workflow becomes a vertical stepper: marker and connector down the
+   * left, each step's content beside it. */
+  .workflow {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    grid-template-rows: none;
+    row-gap: var(--space-1);
+    overflow-x: visible;
+  }
+  .workflow__step {
+    grid-row: auto;
+    grid-template-rows: none;
+    grid-template-columns: 28px minmax(0, 1fr);
+    column-gap: var(--space-3);
+  }
+  .workflow__step > * {
+    grid-column: 2;
+  }
+  .workflow__step > .workflow__rail {
+    grid-column: 1;
+    grid-row: 1 / span 5;
+    align-self: stretch;
+    flex-direction: column;
+    margin: 0;
+  }
+  .workflow__step > .workflow__details-trigger {
+    top: calc(var(--space-3) - 4px);
+  }
+  .workflow__connector {
+    width: 2px;
+    height: auto;
+    margin: var(--space-2) 0 calc(-1 * (var(--space-3) * 2 + var(--space-1) + 2px));
+  }
+  /* Needs attention: each row becomes a small card — item on top, its
+   * type/status/due underneath, the action to the right. */
+  .attention-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .attention-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--border);
+  }
+  .attention-table tbody tr:last-child {
+    border-bottom: none;
+  }
+  .attention-table td {
+    display: block;
+    padding: 0;
+    border: none;
+  }
+  .attention-table__item {
+    flex: 1 1 100%;
+  }
+  .attention-table td[data-label='Due'] {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .attention-table td[data-label='Due']::before {
+    content: 'Due ';
+  }
+  .attention-table__action {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 520px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
   }
 }

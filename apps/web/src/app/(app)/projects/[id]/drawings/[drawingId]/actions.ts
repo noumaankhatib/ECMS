@@ -45,10 +45,12 @@ export async function transitionRevision(
   id: string,
   action: DrawingRevisionAction,
   version: number,
-): Promise<void> {
-  await api.post(
-    `/projects/${projectId}/drawings/${drawingId}/revisions/${id}/${ACTION_PATHS[action]}`,
-    { version },
-  );
-  await refresh(`/projects/${projectId}/drawings/${drawingId}`);
+): Promise<FormState> {
+  return runAction(async () => {
+    await api.post(
+      `/projects/${projectId}/drawings/${drawingId}/revisions/${id}/${ACTION_PATHS[action]}`,
+      { version },
+    );
+    await refresh(`/projects/${projectId}/drawings/${drawingId}`);
+  });
 }

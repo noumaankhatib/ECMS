@@ -11,8 +11,10 @@ import {
   type AddProjectMember,
   type CreateProject,
   type CreateWorkstream,
+  type GateOverride,
   type Page,
   type ProjectListQuery,
+  type ProjectReadiness,
   type ProjectTransition,
   type UpdateProject,
   type UpdateWorkstream,
@@ -37,8 +39,9 @@ import type { Request } from 'express';
 
 import { appError } from '../../shared/errors/app-error';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
-import { RequirePermission, RequirePermissionAnywhere } from '../access';
+import { AuthorizationService, RequirePermission, RequirePermissionAnywhere } from '../access';
 
+import { CompletionGateService } from './completion-gate.service';
 import { MembershipService } from './membership.service';
 import { ProjectService } from './project.service';
 import { WorkstreamService } from './workstream.service';
@@ -48,6 +51,32 @@ function actorOf(req: Request): string {
   const user = req.currentUser;
   if (!user) throw appError('UNAUTHENTICATED');
   return user.id;
+}
+
+/**
+ * Who may move something to Completed.
+ *
+ * Ordinarily, whoever may edit the project. Pushing past an unmet completion
+ * gate is a separate authority (`workflow:override_gate`), held by Director
+ * and System Administrator — and a Director does not edit projects, so the
+ * override must stand on its own: someone without `project:edit` may complete
+ * only by sending an override, and only if they hold that permission.
+ *
+ * Checked before the service runs, so the answer never depends on whether the
+ * gate turns out to be met — the same rule the directory's duplicate
+ * override follows.
+ */
+async function requireCompletionAuthority(
+  authorization: AuthorizationService,
+  actorId: string,
+  projectId: string,
+  override: GateOverride | undefined,
+): Promise<void> {
+  if (override) {
+    await authorization.require(actorId, 'workflow:override_gate');
+    return;
+  }
+  await authorization.require(actorId, 'project:edit', projectId);
 }
 
 /**
@@ -64,6 +93,8 @@ export class ProjectController {
     private readonly projects: ProjectService,
     private readonly members: MembershipService,
     private readonly workstreams: WorkstreamService,
+    private readonly gates: CompletionGateService,
+    private readonly authorization: AuthorizationService,
   ) {}
 
   /**
@@ -134,14 +165,29 @@ export class ProjectController {
     return this.projects.transition(id, 'hold', body, actorOf(req));
   }
 
+  /** `project:view` gets a caller this far; `requireCompletionAuthority`
+   *  then decides between ordinary editing and a gate override. */
   @Post(':id/complete')
-  @RequirePermission('project:edit')
-  complete(
+  @RequirePermission('project:view')
+  async complete(
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(projectTransitionSchema)) body: ProjectTransition,
     @Req() req: Request,
   ): Promise<Project> {
-    return this.projects.transition(id, 'complete', body, actorOf(req));
+    const actor = actorOf(req);
+    await requireCompletionAuthority(this.authorization, actor, id, body.override);
+    return this.projects.transition(id, 'complete', body, actor);
+  }
+
+  /**
+   * What completing the project, and each of its workstreams, still depends
+   * on — the same checks the transitions enforce, so the page can show them
+   * before anyone presses the button. Read-only, computed fresh each call.
+   */
+  @Get(':id/readiness')
+  @RequirePermission('project:view')
+  readiness(@Param('id', ParseUUIDPipe) id: string): Promise<ProjectReadiness> {
+    return this.gates.readiness(id);
   }
 
   /** Closing is its own permission: it is the one move nothing comes back from. */
@@ -232,13 +278,18 @@ export class ProjectController {
     return this.workstreams.update(projectId, id, body);
   }
 
+  /** As `complete`: editing moves a workstream; an override (Director or
+   *  System Administrator) may only ever complete one. */
   @Post(':projectId/workstreams/:id/status')
-  @RequirePermission('project:edit')
-  transitionWorkstream(
+  @RequirePermission('project:view')
+  async transitionWorkstream(
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(workstreamTransitionSchema)) body: WorkstreamTransition,
+    @Req() req: Request,
   ): Promise<Workstream> {
+    if (body.override && body.to !== 'COMPLETED') throw appError('FORBIDDEN');
+    await requireCompletionAuthority(this.authorization, actorOf(req), projectId, body.override);
     return this.workstreams.transition(projectId, id, body);
   }
 }

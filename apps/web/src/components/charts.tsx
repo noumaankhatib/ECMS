@@ -4,7 +4,33 @@
  * rule (`shared/csv/to-csv.ts`, this file's own web equivalent). Neither
  * relies on colour alone: every segment and bar carries its own label and
  * number alongside the colour, the same rule `StatusBadge` already follows.
+ *
+ * The chart itself stays clean — label, bar/swatch, count. An optional
+ * `details` per segment/stage turns its row into a trigger for the exact
+ * share, stage context and a link to the matching filtered list.
  */
+import type { ReactNode } from 'react';
+
+import { Details, type DetailsContent } from './popover';
+
+/** A row with `details` becomes its own trigger; one without stays plain. */
+function Row({
+  details,
+  className,
+  children,
+}: {
+  details: DetailsContent | undefined;
+  className: string;
+  children: ReactNode;
+}) {
+  return details ? (
+    <Details as="li" trigger="area" content={details} className={className}>
+      {children}
+    </Details>
+  ) : (
+    <li className={className}>{children}</li>
+  );
+}
 
 const R = 54;
 const STROKE = 16;
@@ -13,7 +39,7 @@ const CIRCUMFERENCE = 2 * Math.PI * R;
 export function DonutChart({
   segments,
 }: {
-  segments: { label: string; value: number; color: string }[];
+  segments: { label: string; value: number; color: string; details?: DetailsContent }[];
 }) {
   const total = segments.reduce((sum, s) => sum + s.value, 0);
   let offset = 0;
@@ -61,11 +87,15 @@ export function DonutChart({
 
       <ul className="donut__legend">
         {segments.map((s) => (
-          <li key={s.label}>
+          <Row
+            key={s.label}
+            details={s.details}
+            className={`donut__legend-item ${s.value === 0 ? 'donut__legend--zero' : ''}`}
+          >
             <span className="donut__swatch" style={{ background: s.color }} />
-            {s.label}
+            <span className="donut__legend-label">{s.label}</span>
             <strong>{s.value}</strong>
-          </li>
+          </Row>
         ))}
       </ul>
     </div>
@@ -75,14 +105,23 @@ export function DonutChart({
 export function Funnel({
   stages,
 }: {
-  stages: { label: string; value: number; color?: string | undefined }[];
+  stages: {
+    label: string;
+    value: number;
+    color?: string | undefined;
+    details?: DetailsContent;
+  }[];
 }) {
   const max = Math.max(1, ...stages.map((s) => s.value));
 
   return (
     <ul className="funnel">
       {stages.map((s) => (
-        <li key={s.label} className={s.value === 0 ? 'funnel--zero' : ''}>
+        <Row
+          key={s.label}
+          details={s.details}
+          className={`funnel__item ${s.value === 0 ? 'funnel--zero' : ''}`}
+        >
           <span className="funnel__label">{s.label}</span>
           <span className="funnel__track">
             <span
@@ -94,7 +133,7 @@ export function Funnel({
             />
           </span>
           <strong className="funnel__value">{s.value}</strong>
-        </li>
+        </Row>
       ))}
     </ul>
   );

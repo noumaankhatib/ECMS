@@ -6,6 +6,7 @@ import { AuditService } from '../../src/modules/audit/audit.service';
 import { ClientService } from '../../src/modules/directory/client.service';
 import { PropertyService } from '../../src/modules/directory/property.service';
 import { HandoverService } from '../../src/modules/handover';
+import { CompletionGateService } from '../../src/modules/projects/completion-gate.service';
 import { ProjectService } from '../../src/modules/projects/project.service';
 import { SequenceService } from '../../src/modules/sequence';
 import { InstructionService } from '../../src/modules/supervision/instruction.service';
@@ -14,6 +15,7 @@ import { SiteVisitService } from '../../src/modules/supervision/site-visit.servi
 import { SupervisionAgreementService } from '../../src/modules/supervision/supervision-agreement.service';
 import { runInRequestContext } from '../../src/shared/context/request-context';
 import type { PrismaService } from '../../src/shared/database/prisma.service';
+import { finishWorkstreams } from '../fixtures/workstreams';
 
 /**
  * Supervision — site visits, observations and instructions.
@@ -39,6 +41,7 @@ describe('supervision', () => {
     authorization,
     new SequenceService(),
     handover,
+    new CompletionGateService(prisma),
   );
   const siteVisits = new SiteVisitService(prisma, audit);
   const observations = new ObservationService(prisma, audit);
@@ -466,6 +469,7 @@ describe('supervision', () => {
     let current = await inContext(() =>
       projects.transition(closingProject.id, 'activate', { version: 1 }, admin),
     );
+    await finishWorkstreams(prisma, closingProject.id);
     current = await inContext(() =>
       projects.transition(closingProject.id, 'complete', { version: current.version }, admin),
     );

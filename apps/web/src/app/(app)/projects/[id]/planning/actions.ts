@@ -27,14 +27,18 @@ export async function setActivityDone(
   id: string,
   done: boolean,
   version: number,
-): Promise<void> {
-  await api.patch(`/projects/${projectId}/planning/activities/${id}`, { done, version });
-  await refresh(`/projects/${projectId}/planning`);
+): Promise<FormState> {
+  return runAction(async () => {
+    await api.patch(`/projects/${projectId}/planning/activities/${id}`, { done, version });
+    await refresh(`/projects/${projectId}/planning`);
+  });
 }
 
-export async function archiveActivity(projectId: string, id: string): Promise<void> {
-  await api.delete(`/projects/${projectId}/planning/activities/${id}`);
-  await refresh(`/projects/${projectId}/planning`);
+export async function archiveActivity(projectId: string, id: string): Promise<FormState> {
+  return runAction(async () => {
+    await api.delete(`/projects/${projectId}/planning/activities/${id}`);
+    await refresh(`/projects/${projectId}/planning`);
+  });
 }
 
 export async function createMilestone(_state: FormState, form: FormData): Promise<FormState> {
@@ -56,17 +60,21 @@ export async function markMilestoneReached(
   projectId: string,
   id: string,
   version: number,
-): Promise<void> {
-  await api.patch(`/projects/${projectId}/planning/milestones/${id}`, {
-    achievedDate: new Date().toISOString(),
-    version,
+): Promise<FormState> {
+  return runAction(async () => {
+    await api.patch(`/projects/${projectId}/planning/milestones/${id}`, {
+      achievedDate: new Date().toISOString(),
+      version,
+    });
+    await refresh(`/projects/${projectId}/planning`);
   });
-  await refresh(`/projects/${projectId}/planning`);
 }
 
-export async function archiveMilestone(projectId: string, id: string): Promise<void> {
-  await api.delete(`/projects/${projectId}/planning/milestones/${id}`);
-  await refresh(`/projects/${projectId}/planning`);
+export async function archiveMilestone(projectId: string, id: string): Promise<FormState> {
+  return runAction(async () => {
+    await api.delete(`/projects/${projectId}/planning/milestones/${id}`);
+    await refresh(`/projects/${projectId}/planning`);
+  });
 }
 
 export async function createSubmission(_state: FormState, form: FormData): Promise<FormState> {
@@ -112,12 +120,14 @@ export async function transitionSubmission(
   id: string,
   action: SubmissionAction,
   version: number,
-): Promise<void> {
-  await api.post(`/projects/${projectId}/planning/submissions/${id}/${ACTION_PATHS[action]}`, {
-    version,
+): Promise<FormState> {
+  return runAction(async () => {
+    await api.post(`/projects/${projectId}/planning/submissions/${id}/${ACTION_PATHS[action]}`, {
+      version,
+    });
+    await refresh(`/projects/${projectId}/planning`);
+    await refresh(submissionPath(projectId, id));
   });
-  await refresh(`/projects/${projectId}/planning`);
-  await refresh(submissionPath(projectId, id));
 }
 
 /**
@@ -154,21 +164,25 @@ export async function resumeSubmission(
   projectId: string,
   id: string,
   version: number,
-): Promise<void> {
-  await api.post(`/projects/${projectId}/planning/submissions/${id}/resume`, { version });
-  await refresh(`/projects/${projectId}/planning`);
-  await refresh(submissionPath(projectId, id));
+): Promise<FormState> {
+  return runAction(async () => {
+    await api.post(`/projects/${projectId}/planning/submissions/${id}/resume`, { version });
+    await refresh(`/projects/${projectId}/planning`);
+    await refresh(submissionPath(projectId, id));
+  });
 }
 
 export async function requestClarification(
   projectId: string,
   id: string,
   version: number,
-): Promise<void> {
-  await api.post(`/projects/${projectId}/planning/submissions/${id}/request-clarification`, {
-    version,
+): Promise<FormState> {
+  return runAction(async () => {
+    await api.post(`/projects/${projectId}/planning/submissions/${id}/request-clarification`, {
+      version,
+    });
+    await refresh(submissionPath(projectId, id));
   });
-  await refresh(submissionPath(projectId, id));
 }
 
 export async function respondClarification(_state: FormState, form: FormData): Promise<FormState> {

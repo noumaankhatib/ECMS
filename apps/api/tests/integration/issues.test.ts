@@ -7,12 +7,14 @@ import { ClientService } from '../../src/modules/directory/client.service';
 import { PropertyService } from '../../src/modules/directory/property.service';
 import { HandoverService } from '../../src/modules/handover';
 import { IssueService } from '../../src/modules/issues/issue.service';
+import { CompletionGateService } from '../../src/modules/projects/completion-gate.service';
 import { ProjectService } from '../../src/modules/projects/project.service';
 import { SequenceService } from '../../src/modules/sequence';
 import { ObservationService } from '../../src/modules/supervision/observation.service';
 import { SiteVisitService } from '../../src/modules/supervision/site-visit.service';
 import { runInRequestContext } from '../../src/shared/context/request-context';
 import type { PrismaService } from '../../src/shared/database/prisma.service';
+import { finishWorkstreams } from '../fixtures/workstreams';
 
 /**
  * Issues — the fourth state machine in the system (phase-1-plan.md §5a).
@@ -38,6 +40,7 @@ describe('issues', () => {
     authorization,
     new SequenceService(),
     handover,
+    new CompletionGateService(prisma),
   );
   const siteVisits = new SiteVisitService(prisma, audit);
   const observations = new ObservationService(prisma, audit);
@@ -468,6 +471,7 @@ describe('issues', () => {
     let current = await inContext(() =>
       projects.transition(closingProject.id, 'activate', { version: 1 }, admin),
     );
+    await finishWorkstreams(prisma, closingProject.id);
     current = await inContext(() =>
       projects.transition(closingProject.id, 'complete', { version: current.version }, admin),
     );

@@ -8,6 +8,7 @@ import { PropertyService } from '../../src/modules/directory/property.service';
 import { DocumentService } from '../../src/modules/documents/document.service';
 import { RequiredDocumentService } from '../../src/modules/documents/required-document.service';
 import { HandoverService } from '../../src/modules/handover';
+import { CompletionGateService } from '../../src/modules/projects/completion-gate.service';
 import { ProjectService } from '../../src/modules/projects/project.service';
 import { SequenceService } from '../../src/modules/sequence';
 import { runInRequestContext } from '../../src/shared/context/request-context';
@@ -46,6 +47,7 @@ describe('required documents', () => {
     authorization,
     new SequenceService(),
     new HandoverService(prisma, audit),
+    new CompletionGateService(prisma),
   );
   const documents = new DocumentService(prisma, audit, new LocalDriveAdapter());
   const requiredDocuments = new RequiredDocumentService(prisma, audit);

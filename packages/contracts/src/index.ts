@@ -173,6 +173,11 @@ export const PERMISSIONS = [
    *  identity match is not, so dismissing it is reserved for System
    *  Administrator and Director and always carries a written reason. */
   'directory:override_duplicate',
+
+  /** Moving a project or workstream to Completed while its completion
+   *  conditions are not all met. Held by System Administrator and Director
+   *  only, and always carries a written reason kept in the audit trail. */
+  'workflow:override_gate',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -628,11 +633,24 @@ export const projectListQuerySchema = z
 
 export type ProjectListQuery = z.infer<typeof projectListQuerySchema>;
 
+/**
+ * Sent only after the caller has seen which completion conditions are unmet
+ * and chosen to proceed anyway (`workflow:override_gate`). The reason is kept
+ * in the audit trail beside the status change, with the list of what was
+ * unmet at the time.
+ */
+export const gateOverrideSchema = z
+  .object({ reason: z.string().trim().min(5, 'Explain why this can proceed').max(500) })
+  .strict();
+
+export type GateOverride = z.infer<typeof gateOverrideSchema>;
+
 /** A reason may accompany any transition, and is kept in the audit trail. */
 export const projectTransitionSchema = z
   .object({
     version: z.number().int().min(1),
     reason: optionalText(1000),
+    override: gateOverrideSchema.optional(),
   })
   .strict();
 
@@ -677,10 +695,35 @@ export const workstreamTransitionSchema = z
   .object({
     to: z.enum(WORKSTREAM_STATUSES),
     version: z.number().int().min(1),
+    override: gateOverrideSchema.optional(),
   })
   .strict();
 
 export type WorkstreamTransition = z.infer<typeof workstreamTransitionSchema>;
+
+/**
+ * One condition a move to Completed depends on (docs: completion gates).
+ * `met` is computed fresh from the project's own records every time — never
+ * stored — and `detail` says what is still outstanding when it is not.
+ */
+export interface GateCheck {
+  key: string;
+  label: string;
+  met: boolean;
+  detail?: string;
+}
+
+export interface GateReadiness {
+  ready: boolean;
+  checks: GateCheck[];
+}
+
+/** What `GET /projects/:id/readiness` returns: the gate on completing the
+ *  project, and the gate on completing each of its workstreams. */
+export interface ProjectReadiness {
+  project: GateReadiness;
+  workstreams: { workstreamId: string; type: WorkstreamType; readiness: GateReadiness }[];
+}
 
 /**
  * Membership of a project.

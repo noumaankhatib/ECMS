@@ -162,9 +162,10 @@ export function Header({
               onClick={() => setCreateOpen((o) => !o)}
               aria-haspopup="menu"
               aria-expanded={createOpen}
+              aria-label="Quick create"
             >
               <PlusIcon width={16} height={16} />
-              Quick create
+              <span className="header__quick-create-label">Quick create</span>
               <ChevronDownIcon />
             </button>
 

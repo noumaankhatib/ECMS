@@ -13,6 +13,7 @@ import { NotificationsService } from '../../src/modules/insights/notifications.s
 import { SearchService } from '../../src/modules/insights/search.service';
 import { WorkstreamStatsService } from '../../src/modules/insights/workstream-stats.service';
 import { IssueService } from '../../src/modules/issues/issue.service';
+import { CompletionGateService } from '../../src/modules/projects/completion-gate.service';
 import { ProjectService } from '../../src/modules/projects/project.service';
 import { ProposalService } from '../../src/modules/proposals/proposal.service';
 import { SequenceService } from '../../src/modules/sequence';
@@ -45,6 +46,7 @@ describe('insights', () => {
     authorization,
     new SequenceService(),
     handover,
+    new CompletionGateService(prisma),
   );
   const proposals = new ProposalService(prisma, audit, new SequenceService());
   const documents = new DocumentService(prisma, audit, new LocalDriveAdapter());

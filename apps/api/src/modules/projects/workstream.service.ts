@@ -4,6 +4,7 @@ import {
   type UpdateWorkstream,
   type WorkstreamStatus,
   type WorkstreamTransition,
+  type WorkstreamType,
 } from '@ecms/contracts';
 import { Injectable } from '@nestjs/common';
 import type { Prisma, Workstream } from '@prisma/client';
@@ -11,6 +12,8 @@ import type { Prisma, Workstream } from '@prisma/client';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { appError } from '../../shared/errors/app-error';
 import { AuditService } from '../audit';
+
+import { CompletionGateService, type GateOverrideRecord } from './completion-gate.service';
 
 /**
  * The work inside a project.
@@ -24,6 +27,7 @@ export class WorkstreamService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly gates: CompletionGateService,
   ) {}
 
   async listForProject(projectId: string): Promise<Workstream[]> {
@@ -111,15 +115,29 @@ export class WorkstreamService {
   ): Promise<Workstream> {
     const current = await this.prisma.workstream.findUnique({
       where: { id },
-      select: { id: true, status: true, projectId: true },
+      select: {
+        id: true,
+        status: true,
+        type: true,
+        projectId: true,
+        project: { select: { status: true, type: true } },
+      },
     });
     // Same reasoning as `update`: the guard authorised the project in the URL,
     // so the record must actually be in it.
     if (!current || current.projectId !== projectId) throw appError('NOT_FOUND');
 
+    // A closed project accepts no further change of any kind — the same rule
+    // `create` above and every other module's `requireOpenProject` apply.
+    if (current.project.status === 'CLOSED') {
+      throw appError('ILLEGAL_TRANSITION', {
+        fields: [{ field: 'projectId', reason: 'This project is closed.' }],
+      });
+    }
+
     const from = current.status as WorkstreamStatus;
-    if (!canTransitionWorkstream(from, input.to)) {
-      await this.prisma.$transaction((tx) =>
+    const recordRefusal = () =>
+      this.prisma.$transaction((tx) =>
         this.audit.record(tx, {
           action: 'STATUS_CHANGED',
           entityType: 'Workstream',
@@ -131,9 +149,23 @@ export class WorkstreamService {
         }),
       );
 
+    if (!canTransitionWorkstream(from, input.to)) {
+      await recordRefusal();
       throw appError('ILLEGAL_TRANSITION', {
         fields: [{ field: 'status', reason: `This work cannot go from ${from} to ${input.to}.` }],
       });
+    }
+
+    // Completing the work requires its gate (CompletionGateService) — or an
+    // override with a reason, which the controller has already authorised.
+    let override: GateOverrideRecord | undefined;
+    if (input.to === 'COMPLETED') {
+      const gate = await this.gates.workstream(
+        projectId,
+        current.type as WorkstreamType,
+        current.project.type,
+      );
+      override = await this.gates.enforce(gate, input.override, recordRefusal);
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -149,7 +181,7 @@ export class WorkstreamService {
         entityId: id,
         projectId: current.projectId,
         before: { status: from },
-        after: { status: input.to },
+        after: { status: input.to, ...(override ? { gateOverride: override } : {}) },
       });
 
       return tx.workstream.findUniqueOrThrow({ where: { id } });

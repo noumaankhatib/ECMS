@@ -64,7 +64,19 @@ test.describe('Phase 10 through the browser', () => {
     projectId = page.url().split('/').pop() ?? '';
 
     await page.getByRole('button', { name: 'Activate' }).click();
-    await page.getByRole('button', { name: 'Mark complete' }).click();
+
+    // Completing the project waits on its work: the button is offered but
+    // disabled, with the outstanding condition listed beside it.
+    const markComplete = page.getByRole('button', { name: 'Mark complete' });
+    await expect(markComplete).toBeDisabled();
+    await expect(page.getByText('Every workstream completed')).toBeVisible();
+
+    // A fresh planning workstream has nothing outstanding, so it completes.
+    await page.getByRole('button', { name: 'Start' }).click();
+    await page.getByRole('button', { name: 'Complete', exact: true }).click();
+    await expect(markComplete).toBeEnabled();
+
+    await markComplete.click();
     await expect(page.getByText('Completed', { exact: true }).first()).toBeVisible();
   });
 

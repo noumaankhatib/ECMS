@@ -11,10 +11,12 @@ import { MilestoneService } from '../../src/modules/planning/milestone.service';
 import { SubmissionMeetingService } from '../../src/modules/planning/submission-meeting.service';
 import { SubmissionReviewService } from '../../src/modules/planning/submission-review.service';
 import { SubmissionService } from '../../src/modules/planning/submission.service';
+import { CompletionGateService } from '../../src/modules/projects/completion-gate.service';
 import { ProjectService } from '../../src/modules/projects/project.service';
 import { SequenceService } from '../../src/modules/sequence';
 import { runInRequestContext } from '../../src/shared/context/request-context';
 import type { PrismaService } from '../../src/shared/database/prisma.service';
+import { finishWorkstreams } from '../fixtures/workstreams';
 
 /**
  * Planning — activities, milestones and submissions.
@@ -41,6 +43,7 @@ describe('planning', () => {
     authorization,
     new SequenceService(),
     handover,
+    new CompletionGateService(prisma),
   );
   const activities = new ActivityService(prisma, audit);
   const milestones = new MilestoneService(prisma, audit);
@@ -513,6 +516,7 @@ describe('planning', () => {
     let current = await inContext(() =>
       projects.transition(closingProject.id, 'activate', { version: 1 }, admin),
     );
+    await finishWorkstreams(prisma, closingProject.id);
     current = await inContext(() =>
       projects.transition(closingProject.id, 'complete', { version: current.version }, admin),
     );

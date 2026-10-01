@@ -1,39 +1,48 @@
-import type {
-  ActivityItem,
-  DashboardSummary,
-  DeadlineItem,
-  NotificationItem,
-  Trend,
+import {
+  type ActivityItem,
+  type DashboardSummary,
+  type DeadlineItem,
+  type NotificationItem,
+  PROJECT_TRANSITIONS,
+  PROPOSAL_TRANSITIONS,
+  type Trend,
 } from '@ecms/contracts';
 import Link from 'next/link';
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 
 import { DonutChart, Funnel } from '@/components/charts';
 import {
+  CalendarIcon,
+  CheckIcon,
   ClientsIcon,
   DocumentsIcon,
   IssuesIcon,
   ProjectsIcon,
   ProposalsIcon,
   SettingsIcon,
-  TrendDownIcon,
-  TrendUpIcon,
   UsersIcon,
 } from '@/components/icons';
 import { MiniCalendar } from '@/components/mini-calendar';
+import { Details, type DetailsContent } from '@/components/popover';
 import { Card, CardBody, CardHead, Empty, PageHead } from '@/components/ui';
+import { WorkflowSteps } from '@/components/workflow';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
+import type { Page as ApiPage, Property } from '@/lib/types';
+import {
+  ACTIVITY_VERB,
+  buildWorkflow,
+  plural,
+  PROJECT_STATUS_LABEL,
+  PROPOSAL_FUNNEL_ORDER,
+  PROPOSAL_IN_PROGRESS,
+  PROPOSAL_STATUS_LABEL,
+  sumOf,
+  nextStatuses,
+  timeAgo,
+} from '@/lib/workflow';
 
 export const metadata = { title: 'Dashboard — ECMS' };
-
-const PROJECT_STATUS_LABEL: Record<string, string> = {
-  DRAFT: 'Draft',
-  ACTIVE: 'Active',
-  ON_HOLD: 'On hold',
-  COMPLETED: 'Completed',
-  CLOSED: 'Closed',
-};
 
 const PROJECT_STATUS_COLOR: Record<string, string> = {
   DRAFT: 'var(--status-draft)',
@@ -42,28 +51,6 @@ const PROJECT_STATUS_COLOR: Record<string, string> = {
   COMPLETED: 'var(--status-complete)',
   CLOSED: 'var(--status-closed)',
 };
-
-const PROPOSAL_STATUS_LABEL: Record<string, string> = {
-  NEW: 'New',
-  CONCEPT: 'Concept',
-  CLIENT_REVISION: 'Client revision',
-  APPROVED: 'Approved',
-  WON: 'Won',
-  LOST: 'Lost',
-  ON_HOLD: 'On hold',
-  CONVERTED: 'Converted',
-};
-
-const PROPOSAL_FUNNEL_ORDER = [
-  'NEW',
-  'CONCEPT',
-  'CLIENT_REVISION',
-  'APPROVED',
-  'WON',
-  'LOST',
-  'ON_HOLD',
-  'CONVERTED',
-];
 
 /** New/Concept are the same "in progress" blue family (concept a lighter
  *  tint); Approved/Won are both success-green; Lost is the one failure state
@@ -80,16 +67,6 @@ const PROPOSAL_STAGE_COLOR: Record<string, string> = {
   LOST: 'var(--danger)',
   ON_HOLD: 'var(--warning)',
   CONVERTED: 'var(--purple)',
-};
-
-const ACTIVITY_VERB: Record<ActivityItem['action'], string> = {
-  CREATED: 'created',
-  UPDATED: 'updated',
-  ARCHIVED: 'archived',
-  RESTORED: 'restored',
-  STATUS_CHANGED: 'changed the status of',
-  MEMBER_ADDED: 'added a member to',
-  MEMBER_REMOVED: 'removed a member from',
 };
 
 /** One accent per entity family, the same identity the KPI cards and
@@ -116,54 +93,71 @@ function ActivityIcon({ entityType }: { entityType: string }) {
   );
 }
 
-function TrendTag({ trend }: { trend: Trend | undefined }) {
-  if (!trend || trend.changePercent === null) return null;
-  const { changePercent } = trend;
-  if (changePercent === 0) {
-    return <span className="trend trend--flat">No change</span>;
-  }
-  const up = changePercent > 0;
-  const Icon = up ? TrendUpIcon : TrendDownIcon;
-  return (
-    <span className={`trend ${up ? 'trend--up' : 'trend--down'}`}>
-      <Icon width={12} height={12} />
-      {up ? '+' : ''}
-      {changePercent}%
-    </span>
-  );
+/** The API's own trend — new records in the trailing 30 days against the
+ *  30 before — as a popover row. `null` means there was nothing earlier to
+ *  compare against, and says so rather than showing a number. */
+function trendRows(trend: Trend | undefined): NonNullable<DetailsContent['rows']> {
+  if (!trend) return [];
+  const label = 'New vs previous 30 days';
+  const change = trend.changePercent;
+  if (change === null) return [{ label, value: 'No earlier data' }];
+  if (change === 0) return [{ label, value: 'No change' }];
+  return [
+    { label, value: `${change > 0 ? '+' : ''}${change}%`, tone: change > 0 ? 'success' : 'danger' },
+  ];
 }
 
 function KpiCard({
   icon: Icon,
   value,
   label,
-  trend,
   href,
   accent,
+  detail,
+  details,
 }: {
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   value: number;
   label: string;
-  trend?: Trend | undefined;
   href: string;
+  /** The one supporting figure that stays on the card (e.g. how many are
+   *  overdue) — never a derived or estimated figure. */
+  detail?: { text: string; tone?: 'danger' } | undefined;
+  /** Breakdowns and trend, shown on hover/tap. */
+  details: DetailsContent;
   /** One accent per metric identity, not a decorative rainbow — Projects is
    *  blue (the primary/informational colour), Proposals purple (this
    *  system's secondary-workflow colour), Clients green, Issues red. */
   accent?: 'blue' | 'purple' | 'green' | 'red';
 }) {
   return (
-    <Link href={href} className="kpi-card">
-      <div className="kpi-card__head">
-        <span
-          className={`kpi-card__icon ${accent && accent !== 'blue' ? `kpi-card__icon--${accent}` : ''}`}
-        >
-          <Icon width={18} height={18} />
+    <Details
+      className="kpi-card"
+      content={details}
+      triggerLabel={`Breakdown of ${label.toLowerCase()}`}
+      triggerClassName="kpi-card__details-trigger"
+    >
+      <Link href={href} className="kpi-card__link">
+        <span className="kpi-card__head">
+          <span className="kpi-card__label">{label}</span>
+          <span
+            className={`kpi-card__icon ${accent && accent !== 'blue' ? `kpi-card__icon--${accent}` : ''}`}
+          >
+            <Icon width={16} height={16} />
+          </span>
         </span>
-        <TrendTag trend={trend} />
-      </div>
-      <span className="kpi-card__value">{value.toLocaleString()}</span>
-      <span className="kpi-card__label">{label}</span>
-    </Link>
+        <span className="kpi-card__value">{value.toLocaleString()}</span>
+        <span className="kpi-card__foot">
+          {detail ? (
+            <span
+              className={`kpi-card__detail ${detail.tone === 'danger' ? 'kpi-card__detail--danger' : ''}`}
+            >
+              {detail.text}
+            </span>
+          ) : null}
+        </span>
+      </Link>
+    </Details>
   );
 }
 
@@ -192,16 +186,6 @@ function activityLabel(item: ActivityItem): ReactNode {
   );
 }
 
-function timeAgo(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const minutes = Math.round(ms / 60000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
-}
-
 const DEADLINE_BADGE_CLASS: Record<DeadlineItem['status'], string> = {
   OVERDUE: 'badge--critical',
   PENDING: 'badge--warning',
@@ -221,35 +205,88 @@ function QuickAction({
   href,
   icon: Icon,
   label,
+  primary = false,
 }: {
   href: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   label: string;
+  /** The create actions that start or move work along the workflow get the
+   *  stronger treatment; admin/utility links stay quieter beneath them. */
+  primary?: boolean;
 }) {
   return (
-    <Link href={href} className="quick-action">
-      <Icon width={18} height={18} />
+    <Link href={href} className={`quick-action ${primary ? 'quick-action--primary' : ''}`}>
+      <span className="quick-action__icon">
+        <Icon width={16} height={16} />
+      </span>
       {label}
     </Link>
   );
 }
+
+interface AttentionRow {
+  key: string;
+  item: string;
+  context?: string | undefined;
+  status: { label: string; className: string };
+  due: string | null;
+  action: { href: string; label: string };
+  /** Type, reason, related record and full date — shown on hover/tap. */
+  details: DetailsContent;
+}
+
+/** What `DeadlineItem.status` means, per its own contract comment. */
+const DEADLINE_REASON: Record<DeadlineItem['status'], string> = {
+  OVERDUE: 'The date has passed and it is still open.',
+  PENDING: 'Due within the next three days.',
+  UPCOMING: 'Due more than three days from now.',
+};
+
+function formatLongDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+function share(value: number, total: number): string {
+  return total > 0 ? `${Math.round((value / total) * 100)}%` : '—';
+}
+
+/** Where a proposal moves forward (PROPOSAL_TRANSITIONS' main line), kept
+ *  apart from the two states that step off it — so the funnel reads as a
+ *  pipeline, not one undifferentiated list of statuses. */
+const PROPOSAL_PIPELINE = ['NEW', 'CONCEPT', 'CLIENT_REVISION', 'APPROVED', 'WON', 'CONVERTED'];
+const PROPOSAL_OFF_PIPELINE = ['ON_HOLD', 'LOST'];
 
 /**
  * The signed-in landing page (docs/phase-11-plan.md §8, extended per the
  * enterprise-redesign brief). Every card below is rendered only when the
  * summary carries that key — the API omits a section entirely rather than
  * sending zeros for something this person may not see.
+ *
+ * Reads top to bottom as: what to do next (workflow + quick actions) → what
+ * needs attention → where things stand (KPIs, status, funnel) → detail.
  */
 export default async function DashboardPage() {
   const session = await requireSession();
-  const summary = await api.get<DashboardSummary>('/dashboard');
 
   // The same `/notifications` recompute the standalone page runs
-  // (docs/phase-11-plan.md §5) — nothing new fetched, just also surfaced
-  // here so the utility rail does not send someone away to see it.
-  const notifications = await api
-    .get<NotificationItem[]>('/notifications')
-    .catch(() => [] as NotificationItem[]);
+  // (docs/phase-11-plan.md §5), and the properties register's own total —
+  // the one prerequisite the summary does not count, read from the list
+  // endpoint the Properties page already uses. Nothing new is asked for.
+  const [summary, notifications, propertiesTotal] = await Promise.all([
+    api.get<DashboardSummary>('/dashboard'),
+    api.get<NotificationItem[]>('/notifications').catch(() => [] as NotificationItem[]),
+    session.can('property:view')
+      ? api
+          .get<ApiPage<Property>>('/properties?pageSize=1')
+          .then((page) => page.total)
+          .catch(() => null)
+      : null,
+  ]);
 
   const hasAnything =
     summary.projects ||
@@ -266,16 +303,12 @@ export default async function DashboardPage() {
     year: 'numeric',
   });
 
-  const projectsTotal = summary.projects
-    ? Object.entries(summary.projects)
-        .filter(([key]) => key !== 'trend')
-        .reduce((sum, [, count]) => sum + (typeof count === 'number' ? count : 0), 0)
-    : 0;
-  const proposalsTotal = summary.proposals
-    ? Object.entries(summary.proposals)
-        .filter(([key]) => key !== 'trend')
-        .reduce((sum, [, count]) => sum + (typeof count === 'number' ? count : 0), 0)
-    : 0;
+  const projectCounts = summary.projects as Record<string, number> | undefined;
+  const proposalCounts = summary.proposals as Record<string, number> | undefined;
+
+  const projectsTotal = sumOf(projectCounts, Object.keys(PROJECT_STATUS_LABEL));
+  const proposalsTotal = sumOf(proposalCounts, PROPOSAL_FUNNEL_ORDER);
+  const proposalsInProgress = sumOf(proposalCounts, PROPOSAL_IN_PROGRESS);
 
   const firstName = session.user.displayName.split(' ')[0];
   const hour = new Date().getHours();
@@ -303,19 +336,134 @@ export default async function DashboardPage() {
       );
     }
   }
-  const nextDeadlineByProject = new Map<string, DeadlineItem>();
-  for (const item of [...(summary.upcomingDeadlines ?? [])].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-  )) {
-    if (!nextDeadlineByProject.has(item.projectId)) {
-      nextDeadlineByProject.set(item.projectId, item);
-    }
-  }
-  const projectDeadlineRows = [...nextDeadlineByProject.entries()].map(([projectId, deadline]) => ({
-    projectId,
-    label: projectNameById.get(projectId) ?? `Project ${projectId.slice(0, 8)}`,
-    deadline,
-  }));
+
+  const { steps, nextSummary, wonAwaiting, activeProjects, readyToClose } = buildWorkflow(
+    session,
+    summary,
+    propertiesTotal,
+  );
+
+  /* Needs attention ----------------------------------------------------------
+   * Only things the summary already flags — dated items that are overdue or
+   * due within three days, and hand-offs the workflow above is waiting on. */
+  const attentionRows: AttentionRow[] = [
+    ...[...(summary.upcomingDeadlines ?? [])]
+      .filter((item) => item.status !== 'UPCOMING')
+      .sort(
+        (a, b) =>
+          (a.status === 'OVERDUE' ? 0 : 1) - (b.status === 'OVERDUE' ? 0 : 1) ||
+          new Date(a.date).getTime() - new Date(b.date).getTime(),
+      )
+      .slice(0, 6)
+      .map((item, index) => ({
+        key: `deadline-${index}`,
+        item: item.title,
+        context: projectNameById.get(item.projectId),
+        status: {
+          label: DEADLINE_LABEL[item.status],
+          className: DEADLINE_BADGE_CLASS[item.status],
+        },
+        due: item.date,
+        action: { href: `/projects/${item.projectId}`, label: 'Open' },
+        details: {
+          title: item.title,
+          rows: [
+            { label: 'Type', value: item.entityType },
+            {
+              label: 'Due',
+              value: formatLongDate(item.date),
+              tone: item.status === 'OVERDUE' ? ('danger' as const) : undefined,
+            },
+            ...(projectNameById.has(item.projectId)
+              ? [{ label: 'Project', value: projectNameById.get(item.projectId) ?? '' }]
+              : []),
+          ],
+          notes: [{ label: 'Why it is here', text: DEADLINE_REASON[item.status] }],
+          link: { href: `/projects/${item.projectId}`, label: 'Open project' },
+        },
+      })),
+    ...(wonAwaiting > 0
+      ? [
+          {
+            key: 'won',
+            item: `${plural(wonAwaiting, 'won proposal')} awaiting conversion`,
+            status: { label: 'Won', className: 'badge--success' },
+            due: null,
+            action: { href: '/proposals?status=WON', label: 'Review' },
+            details: {
+              title: 'Won proposals awaiting conversion',
+              rows: [
+                { label: 'Type', value: 'Proposal' },
+                { label: 'Waiting', value: wonAwaiting.toLocaleString() },
+              ],
+              notes: [
+                {
+                  label: 'Why it is here',
+                  text: 'A won proposal only becomes a project once someone converts it.',
+                },
+                { label: 'Needs', text: 'A property attached to each proposal.' },
+              ],
+            },
+          },
+        ]
+      : []),
+    ...(readyToClose > 0
+      ? [
+          {
+            key: 'handover',
+            item: `${plural(readyToClose, 'completed project')} ready to close`,
+            status: { label: 'Ready to close', className: 'badge--info' },
+            due: null,
+            action: { href: '/projects?status=COMPLETED', label: 'Review' },
+            details: {
+              title: 'Projects ready to close',
+              rows: [
+                { label: 'Type', value: 'Project' },
+                { label: 'Ready', value: readyToClose.toLocaleString() },
+                {
+                  label: 'Completed, not closed',
+                  value: (summary.handover?.completedNotClosed ?? 0).toLocaleString(),
+                },
+              ],
+              notes: [
+                {
+                  label: 'Why it is here',
+                  text: 'Every handover precondition is met — only the close itself remains.',
+                },
+              ],
+            },
+          },
+        ]
+      : []),
+    ...(summary.supervisionAgreements && summary.supervisionAgreements.nearingQuota > 0
+      ? [
+          {
+            key: 'quota',
+            item: `${plural(summary.supervisionAgreements.nearingQuota, 'supervision agreement')} nearing quota`,
+            status: { label: 'Nearing quota', className: 'badge--warning' },
+            due: null,
+            action: { href: '/supervision', label: 'Open' },
+            details: {
+              title: 'Supervision agreements nearing quota',
+              rows: [
+                { label: 'Type', value: 'Supervision agreement' },
+                {
+                  label: 'Nearing quota',
+                  value: summary.supervisionAgreements.nearingQuota.toLocaleString(),
+                },
+                { label: 'Active', value: summary.supervisionAgreements.active.toLocaleString() },
+              ],
+              notes: [
+                {
+                  label: 'Why it is here',
+                  text: 'These agreements have used most of their agreed site visits.',
+                },
+              ],
+            },
+          },
+        ]
+      : []),
+  ];
 
   // A data-supported split, not an invented taxonomy: `entityType` already
   // separates delivery work (Project/Issue) from client-facing/sales work
@@ -335,12 +483,56 @@ export default async function DashboardPage() {
     CRITICAL: 'notification-mini-list__dot--critical',
   };
 
+  const proposalStageDetails = (status: string): DetailsContent => {
+    const label = PROPOSAL_STATUS_LABEL[status] ?? status;
+    const value = proposalCounts?.[status] ?? 0;
+    return {
+      title: `${label} proposals`,
+      rows: [
+        { label: 'Proposals', value: value.toLocaleString() },
+        { label: 'Share of all proposals', value: share(value, proposalsTotal) },
+      ],
+      notes: [
+        {
+          label: 'Moves on to',
+          text:
+            status === 'WON'
+              ? 'Converted — by converting it to a project.'
+              : (nextStatuses(PROPOSAL_TRANSITIONS, PROPOSAL_STATUS_LABEL, status) ??
+                'Nothing — this is a final stage.'),
+        },
+      ],
+      link: { href: `/proposals?status=${status}`, label: `View ${label.toLowerCase()} proposals` },
+    };
+  };
+
+  const primaryActions = [
+    session.can('proposal:create')
+      ? { href: '/proposals/new', icon: ProposalsIcon, label: 'New proposal' }
+      : null,
+    session.can('project:create')
+      ? { href: '/projects/new', icon: ProjectsIcon, label: 'New project' }
+      : null,
+    session.can('client:create')
+      ? { href: '/clients/new', icon: ClientsIcon, label: 'New client' }
+      : null,
+  ].filter((action) => action !== null);
+  const secondaryActions = [
+    session.can('document:create')
+      ? { href: '/projects', icon: DocumentsIcon, label: 'Upload document' }
+      : null,
+    session.can('user:view') ? { href: '/users', icon: UsersIcon, label: 'Manage users' } : null,
+    { href: '/settings', icon: SettingsIcon, label: 'System settings' },
+  ].filter((action) => action !== null);
+
   return (
     <>
-      <PageHead
-        title="Dashboard"
-        description="Here's what's happening with your consultancy portfolio today."
-      />
+      <PageHead title="Dashboard" description={`${greeting}, ${firstName}. ${heroMessage}`}>
+        <div className="page-head__date">
+          <CalendarIcon width={16} height={16} />
+          <time dateTime={new Date().toISOString().slice(0, 10)}>{today}</time>
+        </div>
+      </PageHead>
 
       {!hasAnything ? (
         <Card>
@@ -351,29 +543,142 @@ export default async function DashboardPage() {
           </CardBody>
         </Card>
       ) : (
-        <>
-          <div className="hero-banner">
-            <div>
-              <h2>
-                {greeting}, {firstName}.
-              </h2>
-              <p>{heroMessage}</p>
+        <div className="dashboard">
+          <section className="card workflow-card" aria-labelledby="workflow-title">
+            <header className="workflow-card__head">
+              <div>
+                <h2 id="workflow-title">Your next step</h2>
+                {nextSummary ? <p>{nextSummary}</p> : null}
+              </div>
+              <Link href="/workflow" className="workflow-card__more">
+                View full workflow <span aria-hidden="true">→</span>
+              </Link>
+            </header>
+            <div className="card__body">
+              <WorkflowSteps steps={steps} />
             </div>
-            <div className="hero-banner__date">
-              <span>Today</span>
-              <strong>{today}</strong>
-            </div>
+          </section>
+
+          <div className="grid-2">
+            <Card>
+              <CardHead title="Needs attention">
+                {attentionRows.length > 0 ? (
+                  <span className="count-pill">{attentionRows.length}</span>
+                ) : null}
+              </CardHead>
+              {attentionRows.length > 0 ? (
+                <table className="attention-table">
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>Status</th>
+                      <th>Due</th>
+                      <th>
+                        <span className="sr-only">Action</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {attentionRows.map((row) => (
+                      <tr key={row.key}>
+                        <td className="attention-table__item">
+                          <Details trigger="area" content={row.details}>
+                            <strong>{row.item}</strong>
+                            {row.context ? <span>{row.context}</span> : null}
+                          </Details>
+                        </td>
+                        <td data-label="Status">
+                          <span className={`badge ${row.status.className}`}>
+                            {row.status.label}
+                          </span>
+                        </td>
+                        <td data-label="Due" className="nowrap">
+                          {row.due ? formatDeadlineDate(row.due) : <span className="faint">—</span>}
+                        </td>
+                        <td className="right attention-table__action">
+                          <Link
+                            href={row.action.href}
+                            className="button button--secondary button--small"
+                          >
+                            {row.action.label}
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <CardBody>
+                  <div className="all-clear">
+                    <span className="all-clear__icon">
+                      <CheckIcon width={16} height={16} />
+                    </span>
+                    <div>
+                      <strong>Nothing needs attention</strong>
+                      <span>No overdue or imminent deadlines, and no hand-offs waiting.</span>
+                    </div>
+                  </div>
+                </CardBody>
+              )}
+            </Card>
+
+            <Card>
+              <CardHead title="Quick actions" />
+              <CardBody>
+                {primaryActions.length > 0 ? (
+                  <div className="quick-actions quick-actions--primary">
+                    {primaryActions.map((action) => (
+                      <QuickAction key={action.href} {...action} primary />
+                    ))}
+                  </div>
+                ) : null}
+                <div className="quick-actions">
+                  {secondaryActions.map((action) => (
+                    <QuickAction key={action.label} {...action} />
+                  ))}
+                </div>
+              </CardBody>
+            </Card>
           </div>
 
-          <div className="kpi-grid" style={{ marginBottom: 'var(--space-5)' }}>
+          <div className="kpi-grid">
             {summary.projects ? (
               <KpiCard
                 icon={ProjectsIcon}
                 value={projectsTotal}
                 label="Total projects"
-                trend={summary.projects.trend}
                 href="/projects"
                 accent="blue"
+                detail={{ text: `${activeProjects.toLocaleString()} active` }}
+                details={{
+                  title: 'Projects by status',
+                  rows: [
+                    ...Object.entries(PROJECT_STATUS_LABEL).map(([status, label]) => ({
+                      label,
+                      value: (projectCounts?.[status] ?? 0).toLocaleString(),
+                    })),
+                    ...(summary.projects.byType
+                      ? [
+                          {
+                            label: 'With planning',
+                            value: summary.projects.byType.planning.toLocaleString(),
+                          },
+                          {
+                            label: 'With supervision',
+                            value: summary.projects.byType.supervision.toLocaleString(),
+                          },
+                        ]
+                      : []),
+                    ...trendRows(summary.projects.trend),
+                  ],
+                  notes: [
+                    {
+                      label: 'Note',
+                      text: 'A planning-and-supervision project counts towards both.',
+                    },
+                  ],
+                  link: { href: '/projects', label: 'View all projects' },
+                }}
               />
             ) : null}
             {summary.proposals ? (
@@ -381,9 +686,24 @@ export default async function DashboardPage() {
                 icon={ProposalsIcon}
                 value={proposalsTotal}
                 label="Total proposals"
-                trend={summary.proposals.trend}
                 href="/proposals"
                 accent="purple"
+                detail={{ text: `${proposalsInProgress.toLocaleString()} in progress` }}
+                details={{
+                  title: 'Proposals at a glance',
+                  rows: [
+                    { label: 'In progress', value: proposalsInProgress.toLocaleString() },
+                    { label: 'Won, awaiting conversion', value: wonAwaiting.toLocaleString() },
+                    {
+                      label: 'Converted',
+                      value: (proposalCounts?.CONVERTED ?? 0).toLocaleString(),
+                    },
+                    { label: 'On hold', value: (proposalCounts?.ON_HOLD ?? 0).toLocaleString() },
+                    { label: 'Lost', value: (proposalCounts?.LOST ?? 0).toLocaleString() },
+                    ...trendRows(summary.proposals.trend),
+                  ],
+                  link: { href: '/proposals', label: 'View all proposals' },
+                }}
               />
             ) : null}
             {summary.clients ? (
@@ -391,9 +711,19 @@ export default async function DashboardPage() {
                 icon={ClientsIcon}
                 value={summary.clients.total}
                 label="Total clients"
-                trend={summary.clients}
                 href="/clients"
                 accent="green"
+                details={{
+                  title: 'Clients',
+                  rows: [
+                    { label: 'Clients', value: summary.clients.total.toLocaleString() },
+                    ...(propertiesTotal !== null
+                      ? [{ label: 'Properties', value: propertiesTotal.toLocaleString() }]
+                      : []),
+                    ...trendRows(summary.clients),
+                  ],
+                  link: { href: '/clients', label: 'View all clients' },
+                }}
               />
             ) : null}
             {summary.issues ? (
@@ -403,47 +733,100 @@ export default async function DashboardPage() {
                 label="Open issues"
                 href="/projects"
                 accent="red"
+                detail={
+                  summary.issues.overdue > 0
+                    ? { text: `${summary.issues.overdue.toLocaleString()} overdue`, tone: 'danger' }
+                    : { text: 'None overdue' }
+                }
+                details={{
+                  title: 'Issues',
+                  rows: [
+                    { label: 'Open', value: summary.issues.open.toLocaleString() },
+                    {
+                      label: 'Overdue',
+                      value: summary.issues.overdue.toLocaleString(),
+                      tone: summary.issues.overdue > 0 ? 'danger' : undefined,
+                    },
+                    { label: 'Closed', value: summary.issues.closed.toLocaleString() },
+                    ...(summary.issues.byWorkstream
+                      ? [
+                          {
+                            label: 'Open on planning',
+                            value: summary.issues.byWorkstream.planning.toLocaleString(),
+                          },
+                          {
+                            label: 'Open on supervision',
+                            value: summary.issues.byWorkstream.supervision.toLocaleString(),
+                          },
+                        ]
+                      : []),
+                  ],
+                  notes: summary.issues.byWorkstream
+                    ? [
+                        {
+                          label: 'Note',
+                          text: 'An untagged issue on a planning-and-supervision project counts only in Open.',
+                        },
+                      ]
+                    : undefined,
+                }}
               />
             ) : null}
           </div>
 
-          <Card>
-            <CardHead title="Quick actions" />
-            <CardBody>
-              <div className="quick-actions">
-                {session.can('project:create') ? (
-                  <QuickAction href="/projects/new" icon={ProjectsIcon} label="New project" />
-                ) : null}
-                {session.can('proposal:create') ? (
-                  <QuickAction href="/proposals/new" icon={ProposalsIcon} label="New proposal" />
-                ) : null}
-                {session.can('client:create') ? (
-                  <QuickAction href="/clients/new" icon={ClientsIcon} label="New client" />
-                ) : null}
-                {session.can('document:create') ? (
-                  <QuickAction href="/projects" icon={DocumentsIcon} label="Upload document" />
-                ) : null}
-                {session.can('user:view') ? (
-                  <QuickAction href="/users" icon={UsersIcon} label="Manage users" />
-                ) : null}
-                <QuickAction href="/settings" icon={SettingsIcon} label="System settings" />
-              </div>
-            </CardBody>
-          </Card>
-
           {summary.projects || summary.proposals ? (
-            <div className="grid-2" style={{ marginTop: 'var(--space-5)' }}>
+            <div className="grid-2 grid-2--even">
               {summary.projects ? (
                 <Card>
-                  <CardHead title="Project status" />
+                  <CardHead title="Project status">
+                    <Link href="/projects" className="button button--secondary button--small">
+                      View all
+                    </Link>
+                  </CardHead>
                   <CardBody>
-                    <DonutChart
-                      segments={Object.entries(PROJECT_STATUS_LABEL).map(([status, label]) => ({
-                        label,
-                        value: (summary.projects as Record<string, number>)[status] ?? 0,
-                        color: PROJECT_STATUS_COLOR[status] ?? 'var(--slate-400)',
-                      }))}
-                    />
+                    {projectsTotal > 0 ? (
+                      <DonutChart
+                        segments={Object.entries(PROJECT_STATUS_LABEL).map(([status, label]) => ({
+                          label,
+                          value: projectCounts?.[status] ?? 0,
+                          color: PROJECT_STATUS_COLOR[status] ?? 'var(--slate-400)',
+                          details: {
+                            title: `${label} projects`,
+                            rows: [
+                              {
+                                label: 'Projects',
+                                value: (projectCounts?.[status] ?? 0).toLocaleString(),
+                              },
+                              {
+                                label: 'Share of all projects',
+                                value: share(projectCounts?.[status] ?? 0, projectsTotal),
+                              },
+                            ],
+                            notes: [
+                              {
+                                label: 'Moves on to',
+                                text:
+                                  nextStatuses(PROJECT_TRANSITIONS, PROJECT_STATUS_LABEL, status) ??
+                                  'Nothing — a closed project accepts no further change.',
+                              },
+                            ],
+                            link: {
+                              href: `/projects?status=${status}`,
+                              label: `View ${label.toLowerCase()} projects`,
+                            },
+                          },
+                        }))}
+                      />
+                    ) : (
+                      <Empty title="No projects yet">
+                        <p>A project is created by converting a won proposal, or directly.</p>
+                        {session.can('project:create') ? (
+                          <Link href="/projects/new" className="button button--small">
+                            New project
+                          </Link>
+                        ) : null}
+                      </Empty>
+                    )}
                   </CardBody>
                 </Card>
               ) : null}
@@ -456,13 +839,36 @@ export default async function DashboardPage() {
                     </Link>
                   </CardHead>
                   <CardBody>
-                    <Funnel
-                      stages={PROPOSAL_FUNNEL_ORDER.map((status) => ({
-                        label: PROPOSAL_STATUS_LABEL[status] ?? status,
-                        value: (summary.proposals as Record<string, number>)[status] ?? 0,
-                        color: PROPOSAL_STAGE_COLOR[status],
-                      }))}
-                    />
+                    {proposalsTotal > 0 ? (
+                      <>
+                        <Funnel
+                          stages={PROPOSAL_PIPELINE.map((status) => ({
+                            label: PROPOSAL_STATUS_LABEL[status] ?? status,
+                            value: proposalCounts?.[status] ?? 0,
+                            color: PROPOSAL_STAGE_COLOR[status],
+                            details: proposalStageDetails(status),
+                          }))}
+                        />
+                        <h3 className="funnel-divider">Off the pipeline</h3>
+                        <Funnel
+                          stages={PROPOSAL_OFF_PIPELINE.map((status) => ({
+                            label: PROPOSAL_STATUS_LABEL[status] ?? status,
+                            value: proposalCounts?.[status] ?? 0,
+                            color: PROPOSAL_STAGE_COLOR[status],
+                            details: proposalStageDetails(status),
+                          }))}
+                        />
+                      </>
+                    ) : (
+                      <Empty title="No proposals yet">
+                        <p>Work starts with a proposal — no client or property needed yet.</p>
+                        {session.can('proposal:create') ? (
+                          <Link href="/proposals/new" className="button button--small">
+                            New proposal
+                          </Link>
+                        ) : null}
+                      </Empty>
+                    )}
                   </CardBody>
                 </Card>
               ) : null}
@@ -472,47 +878,9 @@ export default async function DashboardPage() {
           {/* Two independent-height columns, left for delivery-status cards, right
               for a shorter utility rail (calendar/notifications/deadlines) — kept
               close in height on purpose so neither column trails off into a long
-              empty gap below the other. The two naturally tallest cards (the
-              chart pair above, and Recent activity below) are full-width instead
-              of forced into one of these columns. */}
-          <div className="grid-2" style={{ marginTop: 'var(--space-5)' }}>
+              empty gap below the other. */}
+          <div className="grid-2">
             <div className="stack">
-              {projectDeadlineRows.length > 0 ? (
-                <Card>
-                  <CardHead title="Projects with upcoming deadlines" />
-                  <CardBody>
-                    <div className="table-scroll">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>Project</th>
-                            <th>Deadline status</th>
-                            <th>Next deadline</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {projectDeadlineRows.map((row) => (
-                            <tr key={row.projectId}>
-                              <td>
-                                <Link href={`/projects/${row.projectId}`}>{row.label}</Link>
-                              </td>
-                              <td>
-                                <span
-                                  className={`badge ${DEADLINE_BADGE_CLASS[row.deadline.status]}`}
-                                >
-                                  {DEADLINE_LABEL[row.deadline.status]}
-                                </span>
-                              </td>
-                              <td>{formatDeadlineDate(row.deadline.date)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardBody>
-                </Card>
-              ) : null}
-
               {summary.issues ? (
                 <Card>
                   <CardHead title="Issues overview" />
@@ -662,58 +1030,52 @@ export default async function DashboardPage() {
           </div>
 
           {summary.recentActivity && summary.recentActivity.length > 0 ? (
-            <div style={{ marginTop: 'var(--space-5)' }}>
-              <Card>
-                <CardHead title="Recent activity" />
-                <CardBody>
-                  <div className="activity-columns">
-                    <div className="activity-column">
-                      <h3 className="activity-column__head">Delivery (projects &amp; issues)</h3>
-                      {deliveryActivity.length > 0 ? (
-                        <ul className="activity-list">
-                          {deliveryActivity.map((item, index) => (
-                            <li key={index}>
-                              <ActivityIcon entityType={item.entityType} />
-                              <span className="activity-list__text">{activityLabel(item)}</span>
-                              <span className="activity-list__time">
-                                {timeAgo(item.occurredAt)}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="muted" style={{ fontSize: 13 }}>
-                          Nothing yet.
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="activity-column">
-                      <h3 className="activity-column__head">Clients &amp; proposals</h3>
-                      {clientActivity.length > 0 ? (
-                        <ul className="activity-list">
-                          {clientActivity.map((item, index) => (
-                            <li key={index}>
-                              <ActivityIcon entityType={item.entityType} />
-                              <span className="activity-list__text">{activityLabel(item)}</span>
-                              <span className="activity-list__time">
-                                {timeAgo(item.occurredAt)}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="muted" style={{ fontSize: 13 }}>
-                          Nothing yet.
-                        </p>
-                      )}
-                    </div>
+            <Card>
+              <CardHead title="Recent activity" />
+              <CardBody>
+                <div className="activity-columns">
+                  <div className="activity-column">
+                    <h3 className="activity-column__head">Delivery (projects &amp; issues)</h3>
+                    {deliveryActivity.length > 0 ? (
+                      <ul className="activity-list">
+                        {deliveryActivity.map((item, index) => (
+                          <li key={index}>
+                            <ActivityIcon entityType={item.entityType} />
+                            <span className="activity-list__text">{activityLabel(item)}</span>
+                            <span className="activity-list__time">{timeAgo(item.occurredAt)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="muted" style={{ fontSize: 13 }}>
+                        Nothing yet.
+                      </p>
+                    )}
                   </div>
-                </CardBody>
-              </Card>
-            </div>
+
+                  <div className="activity-column">
+                    <h3 className="activity-column__head">Clients &amp; proposals</h3>
+                    {clientActivity.length > 0 ? (
+                      <ul className="activity-list">
+                        {clientActivity.map((item, index) => (
+                          <li key={index}>
+                            <ActivityIcon entityType={item.entityType} />
+                            <span className="activity-list__text">{activityLabel(item)}</span>
+                            <span className="activity-list__time">{timeAgo(item.occurredAt)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="muted" style={{ fontSize: 13 }}>
+                        Nothing yet.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
           ) : null}
-        </>
+        </div>
       )}
     </>
   );

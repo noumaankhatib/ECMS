@@ -32,6 +32,10 @@ export const ERROR_CATALOGUE = {
     status: 409,
     message: 'A record with the same official identity already exists.',
   },
+  PRECONDITIONS_UNMET: {
+    status: 409,
+    message: 'This cannot be completed yet — some conditions are not met.',
+  },
   HANDOVER_INCOMPLETE: {
     status: 409,
     message: 'The handover checklist must be complete before this project can be closed.',

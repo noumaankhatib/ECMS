@@ -40,9 +40,11 @@ export async function transitionModification(
   id: string,
   action: ModificationAction,
   version: number,
-): Promise<void> {
-  await api.post(`/projects/${projectId}/modifications/${id}/${ACTION_PATHS[action]}`, {
-    version,
+): Promise<FormState> {
+  return runAction(async () => {
+    await api.post(`/projects/${projectId}/modifications/${id}/${ACTION_PATHS[action]}`, {
+      version,
+    });
+    await refresh(`/projects/${projectId}/modifications`);
   });
-  await refresh(`/projects/${projectId}/modifications`);
 }

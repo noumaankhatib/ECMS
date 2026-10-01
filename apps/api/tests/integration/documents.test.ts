@@ -8,6 +8,7 @@ import { PropertyService } from '../../src/modules/directory/property.service';
 import { DocumentService } from '../../src/modules/documents/document.service';
 import { HandoverService } from '../../src/modules/handover';
 import { ActivityService } from '../../src/modules/planning/activity.service';
+import { CompletionGateService } from '../../src/modules/projects/completion-gate.service';
 import { MembershipService } from '../../src/modules/projects/membership.service';
 import { ProjectService } from '../../src/modules/projects/project.service';
 import { SequenceService } from '../../src/modules/sequence';
@@ -15,6 +16,7 @@ import { runInRequestContext } from '../../src/shared/context/request-context';
 import type { PrismaService } from '../../src/shared/database/prisma.service';
 import type { DriveAdapter } from '../../src/shared/drive/drive-adapter';
 import { LocalDriveAdapter } from '../../src/shared/drive/local-drive-adapter';
+import { finishWorkstreams } from '../fixtures/workstreams';
 
 /** A stand-in that never completes the upload, so the FAILED path — the
  *  other half of the write flow the LocalDriveAdapter's happy path does not
@@ -64,6 +66,7 @@ describe('documents', () => {
     authorization,
     new SequenceService(),
     handover,
+    new CompletionGateService(prisma),
   );
   const activities = new ActivityService(prisma, audit);
   const members = new MembershipService(prisma, audit);
@@ -459,6 +462,7 @@ describe('documents', () => {
     let current = await inContext(() =>
       projects.transition(closingProject.id, 'activate', { version: 1 }, admin),
     );
+    await finishWorkstreams(prisma, closingProject.id);
     current = await inContext(() =>
       projects.transition(closingProject.id, 'complete', { version: current.version }, admin),
     );

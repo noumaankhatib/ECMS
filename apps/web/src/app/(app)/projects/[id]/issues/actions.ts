@@ -58,7 +58,9 @@ export async function transitionIssue(
   id: string,
   action: IssueAction,
   version: number,
-): Promise<void> {
-  await api.post(`/projects/${projectId}/issues/${id}/${action}`, { version });
-  await refresh(`/projects/${projectId}/issues/${id}`);
+): Promise<FormState> {
+  return runAction(async () => {
+    await api.post(`/projects/${projectId}/issues/${id}/${action}`, { version });
+    await refresh(`/projects/${projectId}/issues/${id}`);
+  });
 }

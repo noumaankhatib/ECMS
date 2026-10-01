@@ -6,12 +6,14 @@ import { AuditService } from '../../src/modules/audit/audit.service';
 import { ClientService } from '../../src/modules/directory/client.service';
 import { PropertyService } from '../../src/modules/directory/property.service';
 import { HandoverService } from '../../src/modules/handover';
+import { CompletionGateService } from '../../src/modules/projects/completion-gate.service';
 import { MembershipService } from '../../src/modules/projects/membership.service';
 import { ProjectService } from '../../src/modules/projects/project.service';
 import { WorkstreamService } from '../../src/modules/projects/workstream.service';
 import { SequenceService } from '../../src/modules/sequence';
 import { runInRequestContext } from '../../src/shared/context/request-context';
 import type { PrismaService } from '../../src/shared/database/prisma.service';
+import { finishWorkstreams } from '../fixtures/workstreams';
 
 /**
  * Projects, membership and workstreams.
@@ -37,9 +39,10 @@ describe('projects', () => {
     authorization,
     new SequenceService(),
     handover,
+    new CompletionGateService(prisma),
   );
   const members = new MembershipService(prisma, audit);
-  const workstreams = new WorkstreamService(prisma, audit);
+  const workstreams = new WorkstreamService(prisma, audit, new CompletionGateService(prisma));
 
   const requestId = '55555555-4444-4333-8222-111111111111';
   const inContext = <T>(fn: () => Promise<T>): Promise<T> => runInRequestContext({ requestId }, fn);
@@ -321,6 +324,7 @@ describe('projects', () => {
     let project = await inContext(() =>
       projects.transition(projectId, 'activate', { version: 1 }, admin),
     );
+    await finishWorkstreams(prisma, projectId);
     project = await inContext(() =>
       projects.transition(projectId, 'complete', { version: project.version }, admin),
     );
@@ -458,6 +462,7 @@ describe('projects', () => {
     );
     expect(project.status).toBe('ACTIVE');
 
+    await finishWorkstreams(prisma, projectId);
     project = await inContext(() =>
       projects.transition(projectId, 'complete', { version: project.version }, admin),
     );
@@ -499,6 +504,7 @@ describe('projects', () => {
     let project = await inContext(() =>
       projects.transition(projectId, 'activate', { version: 1 }, admin),
     );
+    await finishWorkstreams(prisma, projectId);
     project = await inContext(() =>
       projects.transition(projectId, 'complete', { version: project.version }, admin),
     );

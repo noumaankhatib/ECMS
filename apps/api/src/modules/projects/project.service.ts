@@ -23,6 +23,8 @@ import { AuditService } from '../audit';
 import { HandoverService } from '../handover';
 import { SequenceService, type SequenceType } from '../sequence';
 
+import { CompletionGateService, type GateOverrideRecord } from './completion-gate.service';
+
 /**
  * A project of type BOTH gets the Planning-style code — most combined
  * projects reach that shape by a Supervision workstream opening on top of an
@@ -43,6 +45,7 @@ export class ProjectService {
     private readonly authorization: AuthorizationService,
     private readonly sequence: SequenceService,
     private readonly handover: HandoverService,
+    private readonly gates: CompletionGateService,
   ) {}
 
   /**
@@ -394,6 +397,17 @@ export class ProjectService {
       });
     }
 
+    // Completing requires every workstream to be Completed first — unless a
+    // Director/Administrator overrides with a reason (the controller has
+    // already checked they may). The override and what was unmet at the time
+    // go into the audit row below.
+    let override: GateOverrideRecord | undefined;
+    if (target === 'COMPLETED') {
+      override = await this.gates.enforce(await this.gates.project(id), input.override, () =>
+        this.recordRefusal(id, from, target, actorId),
+      );
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const { count } = await tx.project.updateMany({
         // `status: from` is what makes this safe under concurrency: the second
@@ -414,7 +428,11 @@ export class ProjectService {
         entityId: id,
         projectId: id,
         before: { status: from },
-        after: { status: target, reason: input.reason ?? null },
+        after: {
+          status: target,
+          reason: input.reason ?? null,
+          ...(override ? { gateOverride: override } : {}),
+        },
       });
 
       return tx.project.findUniqueOrThrow({ where: { id } });

@@ -63,9 +63,11 @@ export async function transitionProject(
   id: string,
   action: ProjectAction,
   version: number,
-): Promise<void> {
-  await api.post(`/projects/${id}/${action}`, { version });
-  await refresh(`/projects/${id}`);
+): Promise<FormState> {
+  return runAction(async () => {
+    await api.post(`/projects/${id}/${action}`, { version });
+    await refresh(`/projects/${id}`);
+  });
 }
 
 export async function addMember(_state: FormState, form: FormData): Promise<FormState> {
@@ -84,9 +86,11 @@ export async function addMember(_state: FormState, form: FormData): Promise<Form
   redirect(`/projects/${projectId}`);
 }
 
-export async function removeMember(projectId: string, userId: string): Promise<void> {
-  await api.delete(`/projects/${projectId}/members/${userId}`);
-  await refresh(`/projects/${projectId}`);
+export async function removeMember(projectId: string, userId: string): Promise<FormState> {
+  return runAction(async () => {
+    await api.delete(`/projects/${projectId}/members/${userId}`);
+    await refresh(`/projects/${projectId}`);
+  });
 }
 
 /** Ticks one handover checklist item (docs/phase-10-plan.md §6) — a
@@ -96,9 +100,11 @@ export async function markHandoverItem(
   projectId: string,
   field: keyof Omit<UpdateHandoverChecklist, 'version'>,
   version: number,
-): Promise<void> {
-  await api.patch<HandoverStatus>(`/projects/${projectId}/handover`, { [field]: true, version });
-  await refresh(`/projects/${projectId}`);
+): Promise<FormState> {
+  return runAction(async () => {
+    await api.patch<HandoverStatus>(`/projects/${projectId}/handover`, { [field]: true, version });
+    await refresh(`/projects/${projectId}`);
+  });
 }
 
 export async function transitionWorkstream(
@@ -106,7 +112,35 @@ export async function transitionWorkstream(
   id: string,
   to: string,
   version: number,
-): Promise<void> {
-  await api.post(`/projects/${projectId}/workstreams/${id}/status`, { to, version });
+): Promise<FormState> {
+  return runAction(async () => {
+    await api.post(`/projects/${projectId}/workstreams/${id}/status`, { to, version });
+    await refresh(`/projects/${projectId}`);
+  });
+}
+
+/** Completes a project or one of its workstreams past an unmet completion
+ *  gate. Only offered to holders of `workflow:override_gate`; the API checks
+ *  that again and records the reason with what was unmet. */
+export async function completeWithOverride(_state: FormState, form: FormData): Promise<FormState> {
+  const projectId = String(form.get('projectId'));
+  const workstreamId = await text(form, 'workstreamId');
+  const reason = (await text(form, 'reason')) ?? '';
+  const version = Number(form.get('version'));
+
+  const result = await runAction(async () => {
+    if (workstreamId) {
+      await api.post(`/projects/${projectId}/workstreams/${workstreamId}/status`, {
+        to: 'COMPLETED',
+        version,
+        override: { reason },
+      });
+    } else {
+      await api.post(`/projects/${projectId}/complete`, { version, override: { reason } });
+    }
+  });
+  if (result.error) return result;
+
   await refresh(`/projects/${projectId}`);
+  redirect(`/projects/${projectId}`);
 }

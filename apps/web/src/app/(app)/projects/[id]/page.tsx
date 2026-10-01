@@ -4,11 +4,14 @@ import {
   canTransitionWorkstream,
   type HandoverStatus,
   type ProjectAction,
+  type ProjectReadiness,
   type ProjectStatus,
 } from '@ecms/contracts';
 import Link from 'next/link';
+import { Fragment } from 'react';
 
 import { ActionButton, ActionForm, Select } from '@/components/form';
+import { OverrideForm, ReadinessList } from '@/components/readiness';
 import {
   Badge,
   Breadcrumb,
@@ -36,6 +39,7 @@ import type {
 
 import {
   addMember,
+  completeWithOverride,
   markHandoverItem,
   removeMember,
   transitionProject,
@@ -131,7 +135,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
   const isPastActive = project.status === 'COMPLETED' || project.status === 'CLOSED';
 
-  const [client, property, users, currentAgreement, handover] = await Promise.all([
+  const [client, property, users, currentAgreement, handover, readiness] = await Promise.all([
     session.can('client:view')
       ? api.get<Client>(`/clients/${project.clientId}`).catch(() => null)
       : null,
@@ -151,6 +155,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     isPastActive && session.can('project:view', id)
       ? api.get<HandoverStatus>(`/projects/${id}/handover`).catch(() => null)
       : null,
+    // The completion gates — the same checks the API enforces on "Mark
+    // complete" and on completing each workstream — so what is outstanding
+    // is visible before anyone presses either. Nothing to gate once closed.
+    project.status !== 'CLOSED'
+      ? api.get<ProjectReadiness>(`/projects/${id}/readiness`).catch(() => null)
+      : null,
   ]);
 
   const userName = new Map((users?.items ?? []).map((u) => [u.id, u.displayName]));
@@ -160,6 +170,20 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   const mayEdit = session.can('project:edit', id) && !closed;
   const mayClose = session.can('project:close', id) && !closed;
   const mayManageMembers = session.can('project:manage_members', id) && !closed;
+  const mayOverride = session.can('workflow:override_gate');
+
+  // Where each unmet completion check can be dealt with.
+  const gateLinks: Record<string, string> = {
+    submissions: `/projects/${id}/planning`,
+    milestones: `/projects/${id}/planning`,
+    activities: `/projects/${id}/planning`,
+    issues: `/projects/${id}/issues`,
+    drawings: `/projects/${id}/drawings`,
+    modifications: `/projects/${id}/modifications`,
+    workstreams: `/projects/${id}#workstreams`,
+  };
+  const gateFor = (workstreamId: string) =>
+    readiness?.workstreams.find((w) => w.workstreamId === workstreamId)?.readiness;
 
   const legal = PROJECT_TRANSITIONS[project.status];
   const available = ACTIONS.filter(
@@ -167,6 +191,16 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       (legal as readonly ProjectStatus[]).includes(candidate.to) &&
       (candidate.action === 'close' ? mayClose : mayEdit),
   );
+
+  const offersComplete = available.some((candidate) => candidate.action === 'complete');
+  // A Director holds the override but not `project:edit`: they get the
+  // checklist and the override, without the ordinary status buttons.
+  const overrideOnly =
+    !mayEdit &&
+    mayOverride &&
+    project.status === 'ACTIVE' &&
+    readiness !== null &&
+    !readiness.project.ready;
 
   const onProject = new Set(members.map((m) => m.userId));
   const addable = (users?.items ?? []).filter(
@@ -228,11 +262,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
       <div className="grid-2">
         <div className="stack">
-          {available.length > 0 ? (
+          {available.length > 0 || overrideOnly ? (
             <Card>
               <CardHead title="Status" />
               <CardBody>
-                <div className="row">
+                <div className="row" hidden={available.length === 0}>
                   {available.map((candidate) => (
                     <ActionButton
                       key={candidate.action}
@@ -246,9 +280,28 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                               'Close all issues, upload every required document and complete the handover checklist first.',
                           }
                         : {})}
+                      {...(candidate.action === 'complete' && readiness && !readiness.project.ready
+                        ? { disabledReason: 'Complete every workstream first.' }
+                        : {})}
                     />
                   ))}
                 </div>
+                {(offersComplete || overrideOnly) && readiness ? (
+                  <div style={{ marginTop: 'var(--space-3)' }}>
+                    <ReadinessList
+                      readiness={readiness.project}
+                      title="Before marking complete"
+                      links={gateLinks}
+                    />
+                    {!readiness.project.ready && mayOverride ? (
+                      <OverrideForm
+                        id="override-project"
+                        action={completeWithOverride}
+                        hidden={{ projectId: id, version: project.version }}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
                 <p className="hint" style={{ marginTop: 'var(--space-3)' }}>
                   Only the moves that are legal from{' '}
                   <strong>{project.status.toLowerCase().replace('_', ' ')}</strong> are offered. The
@@ -300,7 +353,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             </Card>
           ) : null}
 
-          <Card>
+          <section className="card" id="workstreams">
             <CardHead title="Workstreams" />
             {workstreams.length === 0 ? (
               <Empty title="No workstreams">Unusual — a project opens with at least one.</Empty>
@@ -314,44 +367,84 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                   </tr>
                 </thead>
                 <tbody>
-                  {workstreams.map((workstream) => (
-                    <tr key={workstream.id}>
-                      <td>{workstream.name}</td>
-                      <td>
-                        <Badge>{WORKSTREAM_LABEL[workstream.status] ?? workstream.status}</Badge>
-                      </td>
-                      <td className="right">
-                        <div className="row" style={{ justifyContent: 'flex-end' }}>
-                          {mayEdit
-                            ? (WORKSTREAM_NEXT[workstream.status] ?? [])
-                                .filter((next) =>
-                                  canTransitionWorkstream(
-                                    workstream.status,
-                                    next.to as Workstream['status'],
-                                  ),
-                                )
-                                .map((next) => (
-                                  <ActionButton
-                                    key={next.to}
-                                    action={transitionWorkstream.bind(
-                                      null,
-                                      id,
-                                      workstream.id,
-                                      next.to,
-                                      workstream.version,
-                                    )}
-                                    label={next.label}
-                                  />
-                                ))
-                            : null}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {workstreams.map((workstream) => {
+                    const gate = gateFor(workstream.id);
+                    const gated =
+                      (mayEdit || mayOverride) &&
+                      !closed &&
+                      workstream.status === 'IN_PROGRESS' &&
+                      gate;
+                    return (
+                      <Fragment key={workstream.id}>
+                        <tr>
+                          <td>{workstream.name}</td>
+                          <td>
+                            <Badge>
+                              {WORKSTREAM_LABEL[workstream.status] ?? workstream.status}
+                            </Badge>
+                          </td>
+                          <td className="right">
+                            <div className="row" style={{ justifyContent: 'flex-end' }}>
+                              {mayEdit
+                                ? (WORKSTREAM_NEXT[workstream.status] ?? [])
+                                    .filter((next) =>
+                                      canTransitionWorkstream(
+                                        workstream.status,
+                                        next.to as Workstream['status'],
+                                      ),
+                                    )
+                                    .map((next) => (
+                                      <ActionButton
+                                        key={next.to}
+                                        action={transitionWorkstream.bind(
+                                          null,
+                                          id,
+                                          workstream.id,
+                                          next.to,
+                                          workstream.version,
+                                        )}
+                                        label={next.label}
+                                        {...(next.to === 'COMPLETED' && gate && !gate.ready
+                                          ? {
+                                              disabledReason:
+                                                'Finish the outstanding work listed below first.',
+                                            }
+                                          : {})}
+                                      />
+                                    ))
+                                : null}
+                            </div>
+                          </td>
+                        </tr>
+                        {gated ? (
+                          <tr className="readiness-row">
+                            <td colSpan={3}>
+                              <ReadinessList
+                                readiness={gate}
+                                title={`Before completing ${workstream.name.toLowerCase()}`}
+                                links={gateLinks}
+                              />
+                              {!gate.ready && mayOverride ? (
+                                <OverrideForm
+                                  id={`override-${workstream.id}`}
+                                  action={completeWithOverride}
+                                  hidden={{
+                                    projectId: id,
+                                    workstreamId: workstream.id,
+                                    version: workstream.version,
+                                  }}
+                                />
+                              ) : null}
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
-          </Card>
+          </section>
 
           {isSupervised && session.can('supervision:view', id) ? (
             <Card>

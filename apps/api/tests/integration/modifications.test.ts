@@ -9,12 +9,14 @@ import { DrawingRevisionService } from '../../src/modules/drawings/drawing-revis
 import { DrawingService } from '../../src/modules/drawings/drawing.service';
 import { HandoverService } from '../../src/modules/handover';
 import { ModificationService } from '../../src/modules/modifications/modification.service';
+import { CompletionGateService } from '../../src/modules/projects/completion-gate.service';
 import { ProjectService } from '../../src/modules/projects/project.service';
 import { SequenceService } from '../../src/modules/sequence';
 import { ObservationService } from '../../src/modules/supervision/observation.service';
 import { SiteVisitService } from '../../src/modules/supervision/site-visit.service';
 import { runInRequestContext } from '../../src/shared/context/request-context';
 import type { PrismaService } from '../../src/shared/database/prisma.service';
+import { finishWorkstreams } from '../fixtures/workstreams';
 
 /**
  * Modifications — client-requested mid-construction changes
@@ -38,6 +40,7 @@ describe('modifications', () => {
     authorization,
     new SequenceService(),
     handover,
+    new CompletionGateService(prisma),
   );
   const drawings = new DrawingService(prisma, audit);
   const drawingRevisions = new DrawingRevisionService(prisma, audit);
@@ -381,6 +384,7 @@ describe('modifications', () => {
     let current = await inContext(() =>
       projects.transition(closingProject.id, 'activate', { version: 1 }, admin),
     );
+    await finishWorkstreams(prisma, closingProject.id);
     current = await inContext(() =>
       projects.transition(closingProject.id, 'complete', { version: current.version }, admin),
     );
