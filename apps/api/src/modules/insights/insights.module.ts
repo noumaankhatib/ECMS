@@ -14,6 +14,7 @@ import { ExportService } from './export.service';
 import { ExportController, InsightsController } from './insights.controller';
 import { NotificationsService } from './notifications.service';
 import { SearchService } from './search.service';
+import { UserWorkService } from './user-work.service';
 import { WorkstreamStatsService } from './workstream-stats.service';
 
 @Module({
@@ -33,6 +34,7 @@ import { WorkstreamStatsService } from './workstream-stats.service';
     NotificationsService,
     SearchService,
     ExportService,
+    UserWorkService,
     WorkstreamStatsService,
   ],
 })

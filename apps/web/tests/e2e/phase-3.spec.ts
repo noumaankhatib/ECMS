@@ -88,6 +88,7 @@ test.describe('Phase 3 through the browser', () => {
     await page.waitForURL(/\/drawings\/[0-9a-f-]{36}$/);
 
     await page.getByLabel('Revision code').fill('P1');
+    await page.setInputFiles('input[name="file"]', fixturePath);
     await page.getByRole('button', { name: 'Upload revision' }).click();
     const row = page.getByRole('row', { name: /P1/ });
     await expect(page.getByRole('cell', { name: 'P1' })).toBeVisible();
@@ -102,6 +103,23 @@ test.describe('Phase 3 through the browser', () => {
 
     await row.getByRole('button', { name: 'Approve' }).click();
     await expect(row.getByText('Approved', { exact: true })).toBeVisible();
+  });
+
+  test('a revision with no file cannot be approved', async ({ page }) => {
+    await signIn(page, ADMIN);
+    await page.goto(`/projects/${projectId}/drawings`);
+    await page.getByRole('link', { name: 'A-101' }).click();
+
+    await page.getByLabel('Revision code').fill('NF1');
+    await page.getByRole('button', { name: 'Upload revision' }).click();
+    const row = page.getByRole('row', { name: /NF1/ });
+    await row.getByRole('button', { name: 'Submit' }).click();
+    await expect(row.getByText('Submitted', { exact: true })).toBeVisible();
+    await row.getByRole('button', { name: 'Start review' }).click();
+    await expect(row.getByText('Under review', { exact: true })).toBeVisible();
+
+    // Offered, but disabled with the reason, since there is nothing to approve.
+    await expect(row.getByRole('button', { name: 'Approve' })).toBeDisabled();
   });
 
   test('a second revision supersedes the first', async ({ page }) => {

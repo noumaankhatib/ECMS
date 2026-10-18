@@ -2255,3 +2255,27 @@ export const adminHardDeleteSchema = z
   })
   .strict();
 export type AdminHardDelete = z.infer<typeof adminHardDeleteSchema>;
+
+// ---------------------------------------------------------------------------
+// What a person is carrying (the "Work assigned" section on a user's page)
+// ---------------------------------------------------------------------------
+
+/** One open piece of work assigned to someone, with the project it sits on. */
+export interface UserWorkItem {
+  id: string;
+  title: string;
+  projectId: string;
+  projectCode: string;
+  projectName: string;
+  /** ISO date, or null when none was set. */
+  dueDate: string | null;
+  /** The issue's status; absent for activities. */
+  status?: string;
+}
+
+/** Open activities and issues assigned to one person, limited to the projects
+ *  the person asking may see. */
+export interface UserWork {
+  activities: UserWorkItem[];
+  issues: UserWorkItem[];
+}

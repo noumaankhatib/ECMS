@@ -170,6 +170,13 @@ export default async function DrawingPage({
                                 )}
                                 label={candidate.label}
                                 variant={candidate.variant ?? 'secondary'}
+                                {...(candidate.action === 'approve' &&
+                                (!revision.fileId || revision.uploadStatus !== 'ACTIVE')
+                                  ? {
+                                      disabledReason:
+                                        'No drawing file on this revision, and one cannot be added later. Upload a new revision with the file.',
+                                    }
+                                  : {})}
                               />
                             ))}
                           </div>
@@ -195,7 +202,7 @@ export default async function DrawingPage({
                     <FileField
                       label="File"
                       name="file"
-                      hint="Upload the drawing file from your computer, or leave blank to register the revision now and upload it later."
+                      hint="Upload the drawing file from your computer. A revision without a file can be registered, but it cannot be approved, and a file cannot be added to it afterwards — upload a new revision instead."
                     />
                   </div>
                   <TextArea label="Notes" name="notes" />

@@ -6,22 +6,24 @@ import {
   type NotificationItem,
   type SearchQuery,
   type SearchResult,
+  type UserWork,
   type WorkstreamStats,
   type WorkstreamType,
 } from '@ecms/contracts';
-import { Controller, Get, Query, Req, Res } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Query, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 
 import { appError } from '../../shared/errors/app-error';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
-import { RequirePermissionAnywhere } from '../access';
+import { RequirePermission, RequirePermissionAnywhere } from '../access';
 
 import { ApprovalsInboxService } from './approvals-inbox.service';
 import { DashboardService } from './dashboard.service';
 import { ExportService } from './export.service';
 import { NotificationsService } from './notifications.service';
 import { SearchService } from './search.service';
+import { UserWorkService } from './user-work.service';
 import { WorkstreamStatsService } from './workstream-stats.service';
 
 const workstreamStatsQuerySchema = z.object({ type: z.enum(WORKSTREAM_TYPES) }).strict();
@@ -52,7 +54,21 @@ export class InsightsController {
     private readonly search: SearchService,
     private readonly workstreamStats: WorkstreamStatsService,
     private readonly approvalsInbox: ApprovalsInboxService,
+    private readonly userWork: UserWorkService,
   ) {}
+
+  /**
+   * What one person is carrying. Viewing a user's page needs `user:view`; what
+   * is returned is further limited to projects the caller may see.
+   */
+  @Get('users/:userId/work')
+  @RequirePermission('user:view')
+  getUserWork(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Req() req: Request,
+  ): Promise<UserWork> {
+    return this.userWork.forUser(actorOf(req), userId);
+  }
 
   @Get('dashboard')
   getDashboard(@Req() req: Request): Promise<DashboardSummary> {

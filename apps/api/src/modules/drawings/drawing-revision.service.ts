@@ -227,7 +227,7 @@ export class DrawingRevisionService {
 
     const current = await this.prisma.drawingRevision.findUnique({
       where: { id },
-      select: { id: true, drawingId: true, status: true },
+      select: { id: true, drawingId: true, status: true, fileId: true, uploadStatus: true },
     });
     if (!current || current.drawingId !== drawingId) throw appError('NOT_FOUND');
 
@@ -248,6 +248,32 @@ export class DrawingRevisionService {
       throw appError('ILLEGAL_TRANSITION', {
         fields: [
           { field: 'status', reason: `A drawing revision cannot go from ${from} to ${target}.` },
+        ],
+      });
+    }
+
+    // An approved drawing nobody can open is a hole in the record, so approval
+    // waits until the file itself is on file. (Approval is final — the database
+    // trigger stops it being undone — so this is checked before, not after.)
+    if (target === 'APPROVED' && (!current.fileId || current.uploadStatus !== 'ACTIVE')) {
+      await this.prisma.$transaction((tx) =>
+        this.audit.record(tx, {
+          action: 'STATUS_CHANGED',
+          entityType: 'DrawingRevision',
+          entityId: id,
+          projectId,
+          outcome: 'REJECTED',
+          before: { status: from },
+          after: { status: target },
+        }),
+      );
+      throw appError('CONFLICT', {
+        fields: [
+          {
+            field: 'file',
+            reason:
+              'This revision has no drawing file, and a file cannot be added afterwards. Upload a new revision with the file, then approve that one.',
+          },
         ],
       });
     }

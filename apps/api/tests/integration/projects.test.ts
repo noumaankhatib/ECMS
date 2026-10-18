@@ -6,6 +6,7 @@ import { AuditService } from '../../src/modules/audit/audit.service';
 import { ClientService } from '../../src/modules/directory/client.service';
 import { PropertyService } from '../../src/modules/directory/property.service';
 import { HandoverService } from '../../src/modules/handover';
+import { UserWorkService } from '../../src/modules/insights/user-work.service';
 import { CompletionGateService } from '../../src/modules/projects/completion-gate.service';
 import { MembershipService } from '../../src/modules/projects/membership.service';
 import { ProjectService } from '../../src/modules/projects/project.service';
@@ -264,6 +265,41 @@ describe('projects', () => {
       memberPlanner,
     );
     expect(plannerPage.items.find((p) => p.id === project.id)?.managerName).toBeNull();
+  });
+
+  it('lists the open work assigned to someone, only on projects the viewer may see', async () => {
+    const projectId = await newProject('PLANNING');
+    const userWork = new UserWorkService(prisma, authorization);
+
+    await prisma.planningActivity.createMany({
+      data: [
+        { projectId, name: 'Open activity', assigneeId: otherManager },
+        { projectId, name: 'Finished activity', assigneeId: otherManager, done: true },
+        { projectId, name: 'Archived activity', assigneeId: otherManager, archivedAt: new Date() },
+      ],
+    });
+    await prisma.issue.createMany({
+      data: [
+        { projectId, title: 'Open issue', status: 'OPEN', ownerId: otherManager },
+        { projectId, title: 'Closed issue', status: 'CLOSED', ownerId: otherManager },
+      ],
+    });
+
+    // A director sees everything assigned to them: only the open items.
+    const asDirector = await userWork.forUser(director, otherManager);
+    expect(asDirector.activities.map((a) => a.title)).toContain('Open activity');
+    expect(asDirector.activities.map((a) => a.title)).not.toContain('Finished activity');
+    expect(asDirector.activities.map((a) => a.title)).not.toContain('Archived activity');
+    expect(asDirector.issues.map((i) => i.title)).toContain('Open issue');
+    expect(asDirector.issues.map((i) => i.title)).not.toContain('Closed issue');
+    const row = asDirector.activities.find((a) => a.title === 'Open activity');
+    expect(row?.projectId).toBe(projectId);
+
+    // A manager who is not on this project cannot see work on it, even though
+    // the work is assigned to them.
+    const asOutsider = await userWork.forUser(otherManager, otherManager);
+    expect(asOutsider.activities.map((a) => a.title)).not.toContain('Open activity');
+    expect(asOutsider.issues.map((i) => i.title)).not.toContain('Open issue');
   });
 
   it('gives a planner an empty page rather than everyone else’s work', async () => {

@@ -18,7 +18,7 @@ const PROJECT_CONTEXT = {
   },
 } as const;
 
-type ProjectContext = {
+interface ProjectContext {
   code: string;
   name: string;
   client: {
@@ -27,7 +27,7 @@ type ProjectContext = {
     grandfatherName: string | null;
     surname: string | null;
   };
-};
+}
 
 function contextOf(project: ProjectContext): {
   projectCode: string;

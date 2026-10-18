@@ -2,6 +2,7 @@ import { ROLE_DEFINITIONS, type Role } from '@ecms/contracts';
 
 import { ActionButton, ActionForm, Field, Select } from '@/components/form';
 import { Badge, Breadcrumb, Card, CardBody, CardHead, DateText, DetailGroup, DetailItem, PageHead } from '@/components/ui';
+import { UserWorkSections } from '@/components/user-work';
 import { api } from '@/lib/api';
 import { requirePermission } from '@/lib/session';
 import type { UserRow } from '@/lib/types';
@@ -42,6 +43,8 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
           )
         ) : null}
       </PageHead>
+
+      <UserWorkSections userId={id} session={session} />
 
       <div className="grid-2">
         <div className="stack">

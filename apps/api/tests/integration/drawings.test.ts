@@ -13,7 +13,18 @@ import { ProjectService } from '../../src/modules/projects/project.service';
 import { SequenceService } from '../../src/modules/sequence';
 import { runInRequestContext } from '../../src/shared/context/request-context';
 import type { PrismaService } from '../../src/shared/database/prisma.service';
+import { LocalDriveAdapter } from '../../src/shared/drive/local-drive-adapter';
 import { finishWorkstreams } from '../fixtures/workstreams';
+
+function fakeFile(content: string): {
+  buffer: Buffer;
+  originalname: string;
+  mimetype: string;
+  size: number;
+} {
+  const buffer = Buffer.from(content, 'utf8');
+  return { buffer, originalname: 'plan.pdf', mimetype: 'application/pdf', size: buffer.length };
+}
 
 /**
  * Drawings — the strictest invariant in the system
@@ -42,7 +53,7 @@ describe('drawings', () => {
     new CompletionGateService(prisma),
   );
   const drawings = new DrawingService(prisma, audit);
-  const revisions = new DrawingRevisionService(prisma, audit);
+  const revisions = new DrawingRevisionService(prisma, audit, new LocalDriveAdapter());
 
   const requestId = '66666666-2222-4111-8000-999999999999';
   const inContext = <T>(fn: () => Promise<T>): Promise<T> => runInRequestContext({ requestId }, fn);
@@ -252,11 +263,19 @@ describe('drawings', () => {
       drawings.create(projectId, { number: 'A-500', title: 'Foundation plan' }, owningPlanner),
     );
     const revision = await inContext(() =>
-      revisions.create(projectId, drawing.id, { revisionCode: 'C1' }, owningPlanner),
+      revisions.create(
+        projectId,
+        drawing.id,
+        { revisionCode: 'C1' },
+        owningPlanner,
+        fakeFile('%PDF-1.4 approved drawing bytes'),
+      ),
     );
 
     let current = await inContext(() =>
-      revisions.transition(projectId, drawing.id, revision.id, 'submit', { version: 1 }),
+      revisions.transition(projectId, drawing.id, revision.id, 'submit', {
+        version: revision.version,
+      }),
     );
     current = await inContext(() =>
       revisions.transition(projectId, drawing.id, revision.id, 'review', {
@@ -291,6 +310,63 @@ describe('drawings', () => {
     const afterSuperseded = await revisions.byId(projectId, drawing.id, revision.id);
     expect(afterSuperseded.supersededAt).not.toBeNull();
     expect(afterSuperseded.status).toBe('APPROVED');
+  });
+
+  it('refuses to approve a revision that has no file, and approves it once it has one', async () => {
+    const drawing = await inContext(() =>
+      drawings.create(projectId, { number: 'A-590', title: 'Section A-A' }, owningPlanner),
+    );
+    const noFile = await inContext(() =>
+      revisions.create(projectId, drawing.id, { revisionCode: 'N1' }, owningPlanner),
+    );
+    let current = await inContext(() =>
+      revisions.transition(projectId, drawing.id, noFile.id, 'submit', { version: 1 }),
+    );
+    current = await inContext(() =>
+      revisions.transition(projectId, drawing.id, noFile.id, 'review', {
+        version: current.version,
+      }),
+    );
+
+    // Nothing to open, so nothing to approve — and the refusal says why.
+    await expect(
+      inContext(() =>
+        revisions.transition(projectId, drawing.id, noFile.id, 'approve', {
+          version: current.version,
+        }),
+      ),
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      fields: [expect.objectContaining({ reason: expect.stringContaining('no drawing file') })],
+    });
+    expect((await revisions.byId(projectId, drawing.id, noFile.id)).status).toBe('UNDER_REVIEW');
+
+    // The same walk with a file attached goes through.
+    const withFile = await inContext(() =>
+      revisions.create(
+        projectId,
+        drawing.id,
+        { revisionCode: 'N2' },
+        owningPlanner,
+        fakeFile('%PDF-1.4 section bytes'),
+      ),
+    );
+    let walk = await inContext(() =>
+      revisions.transition(projectId, drawing.id, withFile.id, 'submit', {
+        version: withFile.version,
+      }),
+    );
+    walk = await inContext(() =>
+      revisions.transition(projectId, drawing.id, withFile.id, 'review', {
+        version: walk.version,
+      }),
+    );
+    walk = await inContext(() =>
+      revisions.transition(projectId, drawing.id, withFile.id, 'approve', {
+        version: walk.version,
+      }),
+    );
+    expect(walk.status).toBe('APPROVED');
   });
 
   it('refuses to skip straight from Draft to Approved', async () => {
