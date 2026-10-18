@@ -1,6 +1,7 @@
 import {
   createMilestoneSchema,
   createPlanningActivitySchema,
+  createPlanningTemplateItemSchema,
   createSubmissionMeetingSchema,
   createSubmissionReviewSchema,
   createSubmissionSchema,
@@ -11,11 +12,13 @@ import {
   submissionTransitionSchema,
   updateMilestoneSchema,
   updatePlanningActivitySchema,
+  updatePlanningTemplateItemSchema,
   updateSubmissionMeetingSchema,
   updateSubmissionReviewSchema,
   updateSubmissionSchema,
   type CreateMilestone,
   type CreatePlanningActivity,
+  type CreatePlanningTemplateItem,
   type CreateSubmission,
   type CreateSubmissionMeeting,
   type CreateSubmissionReview,
@@ -27,6 +30,9 @@ import {
   type SubmissionTransition,
   type UpdateMilestone,
   type UpdatePlanningActivity,
+  type UpdatePlanningTemplateItem,
+  PLANNING_TEMPLATE_KINDS,
+  type PlanningTemplateKind,
   type UpdateSubmission,
   type UpdateSubmissionMeeting,
   type UpdateSubmissionReview,
@@ -47,6 +53,7 @@ import {
 import type {
   Milestone,
   PlanningActivity,
+  PlanningTemplateItem,
   Submission,
   SubmissionMeeting,
   SubmissionReview,
@@ -55,10 +62,11 @@ import type { Request } from 'express';
 
 import { appError } from '../../shared/errors/app-error';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
-import { RequirePermission } from '../access';
+import { RequirePermission, RequirePermissionAnywhere } from '../access';
 
 import { ActivityService } from './activity.service';
 import { MilestoneService } from './milestone.service';
+import { PlanningTemplateService } from './planning-template.service';
 import { SubmissionMeetingService } from './submission-meeting.service';
 import { SubmissionReviewService } from './submission-review.service';
 import { SubmissionService } from './submission.service';
@@ -461,5 +469,47 @@ export class SubmissionMeetingController {
     @Req() req: Request,
   ): Promise<SubmissionMeeting> {
     return this.meetings.update(projectId, submissionId, id, body, actorOf(req));
+  }
+}
+
+/**
+ * The standard activities and milestones offered on the Planning page.
+ *
+ * Not tied to one project, so listing uses the "anywhere" layer (a project
+ * member can list it); changing it needs the dedicated global permission.
+ */
+@Controller('planning-templates')
+export class PlanningTemplateController {
+  constructor(private readonly templates: PlanningTemplateService) {}
+
+  @Get()
+  @RequirePermissionAnywhere('planning:view')
+  list(@Query('kind') kind?: string): Promise<PlanningTemplateItem[]> {
+    const known = PLANNING_TEMPLATE_KINDS.find((k) => k === kind);
+    return this.templates.list(known as PlanningTemplateKind | undefined);
+  }
+
+  @Post()
+  @RequirePermission('work_template:admin')
+  create(
+    @Body(new ZodValidationPipe(createPlanningTemplateItemSchema)) body: CreatePlanningTemplateItem,
+  ): Promise<PlanningTemplateItem> {
+    return this.templates.create(body);
+  }
+
+  @Patch(':id')
+  @RequirePermission('work_template:admin')
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(updatePlanningTemplateItemSchema)) body: UpdatePlanningTemplateItem,
+  ): Promise<PlanningTemplateItem> {
+    return this.templates.update(id, body);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  @RequirePermission('work_template:admin')
+  archive(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
+    return this.templates.archive(id);
   }
 }

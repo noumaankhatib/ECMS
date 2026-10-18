@@ -43,7 +43,7 @@ import { AuthorizationService, RequirePermission, RequirePermissionAnywhere } fr
 
 import { CompletionGateService } from './completion-gate.service';
 import { MembershipService } from './membership.service';
-import { ProjectService } from './project.service';
+import { ProjectService, type ProjectListItem } from './project.service';
 import { WorkstreamService } from './workstream.service';
 
 /** The signed-in user. The guard guarantees it; this keeps the assertion in one place. */
@@ -106,7 +106,7 @@ export class ProjectController {
   list(
     @Query(new ZodValidationPipe(projectListQuerySchema)) query: ProjectListQuery,
     @Req() req: Request,
-  ): Promise<Page<Project>> {
+  ): Promise<Page<ProjectListItem>> {
     return this.projects.list(query, actorOf(req));
   }
 

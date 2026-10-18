@@ -21,6 +21,7 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
+import { normalizePhone } from '@ecms/contracts';
 import { PrismaClient } from '@prisma/client';
 
 import { LocalDriveAdapter } from '../shared/drive/local-drive-adapter';
@@ -173,7 +174,9 @@ async function main(): Promise<void> {
   // --- 2. Client, contact, property -------------------------------------------------
   const client = await prisma.client.create({
     data: {
-      name: 'Al Falaj Trading LLC',
+      firstName: 'Al Falaj Trading LLC',
+      mobileNumber: '+968 9123 4567',
+      mobileNumberNormalized: normalizePhone('+968 9123 4567'),
       reference: 'CL-DEMO-001',
       notes: 'Seeded for manual testing.',
       createdBy: keepUser.id,
@@ -191,8 +194,12 @@ async function main(): Promise<void> {
       clientId: client.id,
       name: 'Salim Al Balushi',
       position: 'Managing Director',
+      designation: 'General Manager',
+      placeOfWork: 'Al Falaj Trading LLC, Muscat',
+      idNumber: '12345678',
       email: 'salim.albalushi@example.com',
       phone: '+968 9123 4567',
+      phoneNormalized: normalizePhone('+968 9123 4567'),
       isPrimary: true,
     },
   });
@@ -218,6 +225,12 @@ async function main(): Promise<void> {
       village: 'Al Khoud',
       surveyReference: '1-35-055-01-585',
       titleDeedReference: '2015/19618',
+      blockNumber: '14',
+      plotArea: 450.5,
+      landUseType: 'RESIDENTIAL',
+      easting: 596250.125,
+      northing: 2588430.75,
+      projectionType: 'CLARKE_1880_ZONE_40',
       ownerName: 'Salim Al Balushi',
       ownerNationalId: '12345678',
       createdBy: keepUser.id,
@@ -243,6 +256,9 @@ async function main(): Promise<void> {
       status: 'ACTIVE',
       startDate: new Date('2026-01-15'),
       targetEndDate: new Date('2026-12-31'),
+      mulkiyaReceived: true,
+      idCardReceived: true,
+      agreementReceived: true,
       createdBy: keepUser.id,
     },
   });
@@ -265,6 +281,9 @@ async function main(): Promise<void> {
         type: 'SUPERVISION',
         name: 'Supervision',
         status: 'IN_PROGRESS',
+        krookieReceived: true,
+        approvedDrawingsReceived: false,
+        siteEngineerId: keepUser.id,
       },
     }),
   ]);
@@ -611,6 +630,12 @@ async function main(): Promise<void> {
       sketchTypeId: sketchTypes[0]?.id ?? null,
       projectType: 'BOTH',
       approxAreaSqm: 450.5,
+      surveyReference: property.surveyReference,
+      titleDeedReference: property.titleDeedReference,
+      requirements: 'Two-storey villa, 4 bedrooms, majlis, maid room and a boundary wall.',
+      submissionType: 'OTHER',
+      submittedBy: 'Khalid Al Balushi',
+      submitterRelationship: 'Brother of the client contact',
       source: 'referral',
       assignedArchitectId: keepUser.id,
       status: 'NEW',

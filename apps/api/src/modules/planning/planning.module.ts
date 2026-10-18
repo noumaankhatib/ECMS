@@ -7,10 +7,12 @@ import { MilestoneService } from './milestone.service';
 import {
   ActivityController,
   MilestoneController,
+  PlanningTemplateController,
   SubmissionController,
   SubmissionMeetingController,
   SubmissionReviewController,
 } from './planning.controller';
+import { PlanningTemplateService } from './planning-template.service';
 import { SubmissionMeetingService } from './submission-meeting.service';
 import { SubmissionReviewService } from './submission-review.service';
 import { SubmissionService } from './submission.service';
@@ -20,6 +22,7 @@ import { SubmissionService } from './submission.service';
   controllers: [
     ActivityController,
     MilestoneController,
+    PlanningTemplateController,
     SubmissionController,
     SubmissionReviewController,
     SubmissionMeetingController,
@@ -27,6 +30,7 @@ import { SubmissionService } from './submission.service';
   providers: [
     ActivityService,
     MilestoneService,
+    PlanningTemplateService,
     SubmissionService,
     SubmissionReviewService,
     SubmissionMeetingService,

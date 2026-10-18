@@ -1,10 +1,19 @@
-import type { CreateClient, DuplicateMatch, ListQuery, Page, UpdateClient } from '@ecms/contracts';
+import {
+  type CreateClient,
+  type DuplicateMatch,
+  formatClientName,
+  type ListQuery,
+  normalizePhone,
+  type Page,
+  type UpdateClient,
+} from '@ecms/contracts';
 import { Injectable } from '@nestjs/common';
 import type { Client, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../shared/database/prisma.service';
 import { appError } from '../../shared/errors/app-error';
 import { AuditService } from '../audit';
+import { SequenceService } from '../sequence';
 
 import { findClientDuplicates, refuseUnlessOverridden } from './duplicates';
 
@@ -13,16 +22,33 @@ export class ClientService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly sequence: SequenceService,
   ) {}
 
   async list(query: ListQuery): Promise<Page<Client>> {
+    // Digits-only fragment of the search term, for matching against the
+    // normalized phone column regardless of how the stored or typed number is
+    // formatted (spaces, dashes, country code). Not run through
+    // `normalizePhone` itself — that requires a full 8+ digit number and
+    // would reject a partial, mid-typing search like "9989".
+    const phoneFragment = query.search?.replace(/\D+/g, '') ?? '';
+
     const where: Prisma.ClientWhereInput = {
       ...(query.includeArchived ? {} : { archivedAt: null }),
       ...(query.search
         ? {
             OR: [
-              { name: { contains: query.search, mode: 'insensitive' } },
+              { firstName: { contains: query.search, mode: 'insensitive' } },
+              { fatherName: { contains: query.search, mode: 'insensitive' } },
+              { grandfatherName: { contains: query.search, mode: 'insensitive' } },
+              { surname: { contains: query.search, mode: 'insensitive' } },
               { reference: { contains: query.search, mode: 'insensitive' } },
+              { crNumber: { contains: query.search, mode: 'insensitive' } },
+              { civilId: { contains: query.search, mode: 'insensitive' } },
+              { mobileNumber: { contains: query.search, mode: 'insensitive' } },
+              ...(phoneFragment.length >= 3
+                ? [{ mobileNumberNormalized: { contains: phoneFragment } }]
+                : []),
             ],
           }
         : {}),
@@ -32,7 +58,7 @@ export class ClientService {
     const [items, total] = await this.prisma.$transaction([
       this.prisma.client.findMany({
         where,
-        orderBy: { name: 'asc' },
+        orderBy: [{ firstName: 'asc' }, { surname: 'asc' }],
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
       }),
@@ -63,15 +89,26 @@ export class ClientService {
         describeMatch,
       );
 
+      // Left blank, a reference is minted from the CLIENT series
+      // (docs/phase-4-plan.md §4's pattern, same as Project.code) — reserved
+      // inside this same transaction, so the number and the client it names
+      // commit together or not at all.
+      const reference = input.reference ?? (await this.sequence.next(tx, 'CLIENT')).code;
+
       const client = await tx.client
         .create({
           data: {
-            name: input.name,
-            reference: input.reference ?? null,
+            firstName: input.firstName,
+            fatherName: input.fatherName ?? null,
+            grandfatherName: input.grandfatherName ?? null,
+            surname: input.surname ?? null,
+            reference,
             notes: input.notes ?? null,
             clientType: input.clientType ?? null,
             crNumber: input.crNumber ?? null,
             civilId: input.civilId ?? null,
+            mobileNumber: input.mobileNumber ?? null,
+            mobileNumberNormalized: input.mobileNumber ? normalizePhone(input.mobileNumber) : null,
             createdBy: actorId,
           },
         })
@@ -82,10 +119,11 @@ export class ClientService {
         entityType: 'Client',
         entityId: client.id,
         after: {
-          name: client.name,
+          name: formatClientName(client),
           reference: client.reference,
           crNumber: client.crNumber,
           civilId: client.civilId,
+          mobileNumber: client.mobileNumber,
           ...(overridden ? { duplicateOverride: overridden } : {}),
         },
       });
@@ -132,12 +170,25 @@ export class ClientService {
       const { count } = await tx.client.updateMany({
         where: { id, version: input.version },
         data: {
-          ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(input.firstName !== undefined ? { firstName: input.firstName } : {}),
+          ...(input.fatherName !== undefined ? { fatherName: input.fatherName } : {}),
+          ...(input.grandfatherName !== undefined
+            ? { grandfatherName: input.grandfatherName }
+            : {}),
+          ...(input.surname !== undefined ? { surname: input.surname } : {}),
           ...(input.reference !== undefined ? { reference: input.reference } : {}),
           ...(input.notes !== undefined ? { notes: input.notes } : {}),
           ...(input.clientType !== undefined ? { clientType: input.clientType } : {}),
           ...(input.crNumber !== undefined ? { crNumber: input.crNumber } : {}),
           ...(input.civilId !== undefined ? { civilId: input.civilId } : {}),
+          ...(input.mobileNumber !== undefined
+            ? {
+                mobileNumber: input.mobileNumber,
+                mobileNumberNormalized: input.mobileNumber
+                  ? normalizePhone(input.mobileNumber)
+                  : null,
+              }
+            : {}),
           version: { increment: 1 },
         },
       });
@@ -151,20 +202,22 @@ export class ClientService {
         entityType: 'Client',
         entityId: id,
         before: {
-          name: before.name,
+          name: formatClientName(before),
           reference: before.reference,
           notes: before.notes,
           clientType: before.clientType,
           crNumber: before.crNumber,
           civilId: before.civilId,
+          mobileNumber: before.mobileNumber,
         },
         after: {
-          name: after.name,
+          name: formatClientName(after),
           reference: after.reference,
           notes: after.notes,
           clientType: after.clientType,
           crNumber: after.crNumber,
           civilId: after.civilId,
+          mobileNumber: after.mobileNumber,
           ...(overridden ? { duplicateOverride: overridden } : {}),
         },
       });

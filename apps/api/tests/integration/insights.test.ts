@@ -37,8 +37,8 @@ describe('insights', () => {
 
   const audit = new AuditService();
   const authorization = new AuthorizationService(prisma);
-  const clients = new ClientService(prisma, audit);
-  const properties = new PropertyService(prisma, audit);
+  const clients = new ClientService(prisma, audit, new SequenceService());
+  const properties = new PropertyService(prisma, audit, new SequenceService());
   const handover = new HandoverService(prisma, audit);
   const projects = new ProjectService(
     prisma,
@@ -99,7 +99,7 @@ describe('insights', () => {
     nobody = await userWithRole(null);
 
     const client = await inContext(() =>
-      clients.create({ name: `Insights Client ${codeSuffix}` }, admin),
+      clients.create({ firstName: `Insights Client ${codeSuffix}` }, admin),
     );
     clientId = client.id;
 

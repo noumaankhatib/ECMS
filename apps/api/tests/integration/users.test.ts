@@ -229,7 +229,14 @@ describe('users', () => {
 
     // Still listed. Disabling is not deletion — their history must stay
     // attributable to a name.
-    const page = await users.list({ page: 1, pageSize: 100, includeArchived: false });
+    // Searched by username: the shared test database accumulates users across
+    // runs, so an unfiltered first page eventually stops including this one.
+    const page = await users.list({
+      page: 1,
+      pageSize: 100,
+      includeArchived: false,
+      search: after.username,
+    });
     expect(page.items.map((u) => u.id)).toContain(subject);
   });
 });

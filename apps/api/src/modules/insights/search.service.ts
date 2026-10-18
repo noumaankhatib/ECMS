@@ -1,4 +1,4 @@
-import type { SearchResult } from '@ecms/contracts';
+import { formatClientName, type SearchResult } from '@ecms/contracts';
 import { Injectable } from '@nestjs/common';
 
 import { AuthorizationService } from '../access';
@@ -40,7 +40,7 @@ export class SearchService {
         ...page.items.map((c) => ({
           type: 'CLIENT' as const,
           id: c.id,
-          label: c.name,
+          label: formatClientName(c),
           sublabel: c.reference,
           projectId: null,
         })),

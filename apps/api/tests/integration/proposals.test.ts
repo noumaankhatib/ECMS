@@ -1,3 +1,4 @@
+import { createProposalSchema } from '@ecms/contracts';
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -23,8 +24,8 @@ describe('proposals', () => {
 
   const audit = new AuditService();
   const authorization = new AuthorizationService(prisma);
-  const clients = new ClientService(prisma, audit);
-  const properties = new PropertyService(prisma, audit);
+  const clients = new ClientService(prisma, audit, new SequenceService());
+  const properties = new PropertyService(prisma, audit, new SequenceService());
   const proposals = new ProposalService(prisma, audit, new SequenceService());
 
   const requestId = '55555555-3333-4111-8000-999999999999';
@@ -58,13 +59,22 @@ describe('proposals', () => {
    *  needs. */
   async function wonProposalWithProperty(contactName: string) {
     const client = await inContext(() =>
-      clients.create({ name: `Convert Client ${crypto.randomUUID()}` }, admin),
+      clients.create({ firstName: `Convert Client ${crypto.randomUUID()}` }, admin),
     );
     const property = await inContext(() =>
       properties.create({ clientId: client.id, name: 'Convert House' }, admin),
     );
     const proposal = await inContext(() =>
-      proposals.create({ contactName, clientId: client.id, propertyId: property.id }, planner),
+      proposals.create(
+        {
+          contactName,
+          clientId: client.id,
+          propertyId: property.id,
+          surveyReference: `1-35-055-01-${crypto.randomUUID().slice(0, 6)}`,
+          requirements: 'A 3-bedroom villa with a detached majlis.',
+        },
+        planner,
+      ),
     );
     const concept = await proposals.transition(proposal.id, 'startConcept', {
       version: proposal.version,
@@ -111,6 +121,69 @@ describe('proposals', () => {
     expect(proposal.status).toBe('NEW');
     expect(proposal.sketchNumber).toMatch(/^\d{2}-SB-\d+$/);
     expect(proposal.clientId).toBeNull();
+  });
+
+  it('requires naming who submitted when someone else is submitting on the client’s behalf', () => {
+    const missingName = createProposalSchema.safeParse({
+      contactName: 'Proxy submission',
+      submissionType: 'OTHER',
+    });
+    expect(missingName.success).toBe(false);
+
+    const named = createProposalSchema.safeParse({
+      contactName: 'Proxy submission',
+      submissionType: 'OTHER',
+      submittedBy: 'Khalid Al Rawahi',
+      submitterRelationship: 'Agent',
+      surveyReference: '1-35-055-01-100',
+      requirements: 'Proxy submission requirements.',
+    });
+    expect(named.success).toBe(true);
+
+    const self = createProposalSchema.safeParse({
+      contactName: 'Direct submission',
+      submissionType: 'SELF',
+      surveyReference: '1-35-055-01-101',
+      requirements: 'Direct submission requirements.',
+    });
+    expect(self.success).toBe(true);
+  });
+
+  it('finds a proposal by survey reference, requirements words, or its architect', async () => {
+    const tag = crypto.randomUUID().slice(0, 8);
+    const architect = await prisma.user.create({
+      data: {
+        username: `architect-${crypto.randomUUID()}`,
+        email: `architect-${crypto.randomUUID()}@example.com`,
+        displayName: `Architect${tag} Planner`,
+        passwordHash: 'not-used-in-this-test',
+      },
+    });
+    const proposal = await inContext(() =>
+      proposals.create(
+        {
+          contactName: `Contact ${tag}`,
+          surveyReference: `SR-${tag}`,
+          requirements: `Boundary wall ${tag} and gate`,
+          assignedArchitectId: architect.id,
+        },
+        planner,
+      ),
+    );
+
+    const found = async (search: string, searchPeople: boolean): Promise<boolean> => {
+      const page = await proposals.list(
+        { page: 1, pageSize: 100, search },
+        { searchPeople },
+      );
+      return page.items.some((p) => p.id === proposal.id);
+    };
+
+    expect(await found(`SR-${tag}`, false)).toBe(true);
+    expect(await found(`boundary gate ${tag}`, false)).toBe(true);
+    // By architect only for a caller who may see people.
+    expect(await found(`Architect${tag}`, true)).toBe(true);
+    expect(await found(`Architect${tag}`, false)).toBe(false);
   });
 
   // ---------------------------------------------------------------------------
@@ -245,7 +318,9 @@ describe('proposals', () => {
     expect(project.clientId).toBe(client.id);
     expect(project.propertyId).toBe(property.id);
     expect(project.code).toMatch(/^\d{2}\.P\.\d+$/);
-    expect(project.name).toBe('Convert success');
+    // Named for the work (client and plot), not the inquiry's contact person.
+    expect(project.name).toBe(`${client.firstName} – ${property.name}`);
+    expect(project.description).toBe('A 3-bedroom villa with a detached majlis.');
 
     const workstreams = await prisma.workstream.findMany({ where: { projectId: project.id } });
     expect(workstreams.map((w) => w.type)).toEqual(['PLANNING']);
@@ -254,6 +329,76 @@ describe('proposals', () => {
       where: { projectId: project.id, userId: admin },
     });
     expect(membership?.roleCode).toBe('PROJECT_MANAGER');
+  });
+
+  it('refuses to convert a WON proposal with no Krookie survey reference', async () => {
+    const client = await inContext(() =>
+      clients.create({ firstName: `No Krookie Client ${crypto.randomUUID()}` }, admin),
+    );
+    const property = await inContext(() =>
+      properties.create({ clientId: client.id, name: 'No Krookie House' }, admin),
+    );
+    const proposal = await inContext(() =>
+      proposals.create(
+        {
+          contactName: 'No Krookie yet',
+          clientId: client.id,
+          propertyId: property.id,
+          requirements: 'Something, at least.',
+        },
+        planner,
+      ),
+    );
+    const concept = await proposals.transition(proposal.id, 'startConcept', {
+      version: proposal.version,
+    });
+    const review = await proposals.transition(proposal.id, 'sendForClientReview', {
+      version: concept.version,
+    });
+    const approved = await proposals.transition(proposal.id, 'approve', {
+      version: review.version,
+    });
+    const won = await proposals.transition(proposal.id, 'win', { version: approved.version });
+
+    await expect(proposals.convert(won.id, { version: won.version }, admin)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      fields: [expect.objectContaining({ field: 'surveyReference' })],
+    });
+  });
+
+  it('refuses to convert a WON proposal with no requirements recorded', async () => {
+    const client = await inContext(() =>
+      clients.create({ firstName: `No Requirements Client ${crypto.randomUUID()}` }, admin),
+    );
+    const property = await inContext(() =>
+      properties.create({ clientId: client.id, name: 'No Requirements House' }, admin),
+    );
+    const proposal = await inContext(() =>
+      proposals.create(
+        {
+          contactName: 'No requirements yet',
+          clientId: client.id,
+          propertyId: property.id,
+          surveyReference: `1-35-055-01-${crypto.randomUUID().slice(0, 6)}`,
+        },
+        planner,
+      ),
+    );
+    const concept = await proposals.transition(proposal.id, 'startConcept', {
+      version: proposal.version,
+    });
+    const review = await proposals.transition(proposal.id, 'sendForClientReview', {
+      version: concept.version,
+    });
+    const approved = await proposals.transition(proposal.id, 'approve', {
+      version: review.version,
+    });
+    const won = await proposals.transition(proposal.id, 'win', { version: approved.version });
+
+    await expect(proposals.convert(won.id, { version: won.version }, admin)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      fields: [expect.objectContaining({ field: 'requirements' })],
+    });
   });
 
   it('refuses to convert a WON proposal with no property attached', async () => {

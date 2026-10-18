@@ -1,3 +1,4 @@
+import { formatClientName } from '@ecms/contracts';
 import { Injectable } from '@nestjs/common';
 
 import { toCsv } from '../../shared/csv/to-csv';
@@ -35,7 +36,12 @@ export class ExportService {
     });
     return toCsv(
       ['id', 'name', 'reference', 'archivedAt'],
-      page.items.map((c) => [c.id, c.name, c.reference, c.archivedAt?.toISOString() ?? '']),
+      page.items.map((c) => [
+        c.id,
+        formatClientName(c),
+        c.reference,
+        c.archivedAt?.toISOString() ?? '',
+      ]),
     );
   }
 

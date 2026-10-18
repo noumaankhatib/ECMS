@@ -1,4 +1,5 @@
 import {
+  formatClientName,
   canTransitionProposal,
   PROPOSAL_ACTIONS,
   WORKSTREAMS_FOR_TYPE,
@@ -16,6 +17,7 @@ import type { Prisma, Proposal } from '@prisma/client';
 
 import { PrismaService } from '../../shared/database/prisma.service';
 import { appError } from '../../shared/errors/app-error';
+import { clientMatchesTerm, propertyMatchesTerm, searchTerms } from '../../shared/search/terms';
 import { AuditService } from '../audit';
 import { SequenceService, type SequenceType } from '../sequence';
 
@@ -32,6 +34,13 @@ const SEQUENCE_FOR_TYPE: Record<ProjectType, SequenceType> = {
   BOTH: 'PLANNING_PROJECT',
 };
 
+/** A proposal as the list shows it: the row plus the names its ids point at. */
+export type ProposalListItem = Proposal & {
+  clientName: string | null;
+  propertyName: string | null;
+  propertyLocation: string | null;
+};
+
 @Injectable()
 export class ProposalService {
   constructor(
@@ -40,16 +49,50 @@ export class ProposalService {
     private readonly sequence: SequenceService,
   ) {}
 
-  async list(query: ProposalListQuery): Promise<Page<Proposal>> {
+  async list(
+    query: ProposalListQuery,
+    options: { searchPeople: boolean } = { searchPeople: false },
+  ): Promise<Page<ProposalListItem>> {
+    const terms = searchTerms(query.search);
+    // The architect is stored as a bare id, so each word is first turned into the
+    // ids of the people it names. Only for callers who may see people at all.
+    const architectIds: string[][] = options.searchPeople
+      ? await Promise.all(
+          terms.map(async (term) =>
+            (
+              await this.prisma.user.findMany({
+                where: { displayName: { contains: term, mode: 'insensitive' } },
+                select: { id: true },
+                take: 50,
+              })
+            ).map((u) => u.id),
+          ),
+        )
+      : [];
     const where: Prisma.ProposalWhereInput = {
       ...(query.status ? { status: query.status } : {}),
       ...(query.clientId ? { clientId: query.clientId } : {}),
-      ...(query.search
+      ...(query.convertedProjectId ? { convertedProjectId: query.convertedProjectId } : {}),
+      ...(query.assignedArchitectId ? { assignedArchitectId: query.assignedArchitectId } : {}),
+      ...(query.propertyId ? { propertyId: query.propertyId } : {}),
+      ...(terms.length > 0
         ? {
-            OR: [
-              { contactName: { contains: query.search, mode: 'insensitive' } },
-              { sketchNumber: { contains: query.search, mode: 'insensitive' } },
-            ],
+            // Every word must match somewhere on the proposal, its client or
+            // plot — and, where the caller may see people, its architect.
+            AND: terms.map((term, index) => ({
+              OR: [
+                { contactName: { contains: term, mode: 'insensitive' as const } },
+                { sketchNumber: { contains: term, mode: 'insensitive' as const } },
+                { surveyReference: { contains: term, mode: 'insensitive' as const } },
+                { titleDeedReference: { contains: term, mode: 'insensitive' as const } },
+                { requirements: { contains: term, mode: 'insensitive' as const } },
+                { client: { is: clientMatchesTerm(term) } },
+                { property: { is: propertyMatchesTerm(term) } },
+                ...(architectIds[index]?.length
+                  ? [{ assignedArchitectId: { in: architectIds[index] } }]
+                  : []),
+              ],
+            })),
           }
         : {}),
     };
@@ -60,13 +103,32 @@ export class ProposalService {
         orderBy: { sketchNumber: 'desc' },
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
+        include: {
+          client: {
+            select: { firstName: true, fatherName: true, grandfatherName: true, surname: true },
+          },
+          property: { select: { name: true, wilayat: true, village: true } },
+        },
       }),
       this.prisma.proposal.count({ where }),
     ]);
 
-    return { items, total, page: query.page, pageSize: query.pageSize };
+    return {
+      items: items.map(({ client, property, ...proposal }) => ({
+        ...proposal,
+        clientName: client ? formatClientName(client) : null,
+        propertyName: property?.name ?? null,
+        propertyLocation: property
+          ? [property.village, property.wilayat].filter(Boolean).join(', ') || null
+          : null,
+      })),
+      total,
+      page: query.page,
+      pageSize: query.pageSize,
+    };
   }
 
+  /** A search term matches a client if it is in any of the 4 name parts. */
   async byId(id: string): Promise<Proposal> {
     const proposal = await this.prisma.proposal.findUnique({ where: { id } });
     if (!proposal) throw appError('NOT_FOUND');
@@ -147,6 +209,12 @@ export class ProposalService {
           approxAreaSqm: input.approxAreaSqm ?? null,
           source: input.source ?? null,
           assignedArchitectId: input.assignedArchitectId ?? null,
+          surveyReference: input.surveyReference ?? null,
+          titleDeedReference: input.titleDeedReference ?? null,
+          requirements: input.requirements ?? null,
+          submissionType: input.submissionType ?? null,
+          submittedBy: input.submittedBy ?? null,
+          submitterRelationship: input.submitterRelationship ?? null,
           receivedAt: input.receivedAt ?? null,
           dueAt: input.dueAt ?? null,
           notes: input.notes ?? null,
@@ -297,9 +365,34 @@ export class ProposalService {
         });
       }
 
+      // Krookie reference and requirements are optional at intake (a proposal
+      // may be logged before either is known) but must be filled in before
+      // the work becomes a project — the same "optional now, required at
+      // conversion" rule propertyId already follows above.
+      if (!proposal.surveyReference) {
+        throw appError('CONFLICT', {
+          fields: [
+            {
+              field: 'surveyReference',
+              reason: 'Add the Krookie survey reference before converting this proposal.',
+            },
+          ],
+        });
+      }
+      if (!proposal.requirements) {
+        throw appError('CONFLICT', {
+          fields: [
+            {
+              field: 'requirements',
+              reason: 'Record the requirements before converting this proposal.',
+            },
+          ],
+        });
+      }
+
       const property = await tx.property.findUnique({
         where: { id: proposal.propertyId },
-        select: { id: true, clientId: true, archivedAt: true },
+        select: { id: true, clientId: true, name: true, archivedAt: true },
       });
       if (!property) {
         throw appError('NOT_FOUND', { context: { property_id: proposal.propertyId } });
@@ -322,7 +415,13 @@ export class ProposalService {
 
       const client = await tx.client.findUnique({
         where: { id: property.clientId },
-        select: { archivedAt: true },
+        select: {
+          archivedAt: true,
+          firstName: true,
+          fatherName: true,
+          grandfatherName: true,
+          surname: true,
+        },
       });
       if (!client) throw appError('NOT_FOUND', { context: { client_id: property.clientId } });
       if (client.archivedAt) {
@@ -339,7 +438,11 @@ export class ProposalService {
           clientId: property.clientId,
           propertyId: property.id,
           code,
-          name: proposal.contactName,
+          // Identifies the work (client and plot), not the person who happened
+          // to make the inquiry — that is kept on the proposal as the contact.
+          name: `${formatClientName(client)} – ${property.name}`.slice(0, 200),
+          description: proposal.requirements,
+          targetEndDate: proposal.dueAt,
           type,
           createdBy: actorId,
           members: { create: { userId: actorId, roleCode: 'PROJECT_MANAGER' } },

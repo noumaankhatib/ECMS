@@ -128,6 +128,10 @@ export const PERMISSIONS = [
    *  into `proposal:create`/`proposal:edit` rather than checked separately. */
   'sketch_type:admin',
 
+  /** Managing the standard planning activities and milestones offered on the
+   *  Planning page. Seeing the list is bundled into `planning:view`. */
+  'work_template:admin',
+
   'planning:view',
   'planning:create',
   'planning:edit',
@@ -236,11 +240,15 @@ export const ROLE_DEFINITIONS = [
 // ---------------------------------------------------------------------------
 
 /** Trims, and turns an empty string into "not provided". */
+const NO_CONTROL_CHARS = /^[^\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]*$/;
+const noControlChars = 'Contains characters that are not allowed';
+
 const optionalText = (max: number) =>
   z
     .string()
     .trim()
     .max(max)
+    .regex(NO_CONTROL_CHARS, noControlChars)
     .transform((v) => (v === '' ? null : v))
     .nullish();
 
@@ -295,11 +303,29 @@ export function normalizePhone(value: string): string | null {
   return digits.length >= 8 ? `+${digits}` : null;
 }
 
+/** A phone number as typed: digits with an optional leading "+", and the
+ *  usual separators. Needs at least 8 digits, same floor as `normalizePhone`. */
+const optionalPhone = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .refine(
+      (v) => v === '' || (/^\+?[\d\s\-().]+$/.test(v) && v.replace(/\D/g, '').length >= 8),
+      'Enter a valid phone number (digits only, at least 8)',
+    )
+    .transform((v) => (v === '' ? null : v))
+    .nullish();
+
 const optionalIdentifier = (max: number) =>
   z
     .string()
     .trim()
     .max(max)
+    .refine(
+      (v) => v === '' || /^[\p{L}\p{N}\s\-/.]+$/u.test(v),
+      'Use letters, numbers, dashes or slashes only',
+    )
     .transform((v) => (v === '' ? null : normalizeIdentifier(v)))
     .nullish();
 
@@ -318,7 +344,20 @@ export type DuplicateOverride = z.infer<typeof duplicateOverrideSchema>;
 
 export const createClientSchema = z
   .object({
-    name: z.string().trim().min(1, 'A name is required').max(200),
+    /**
+     * An individual's name as 4 parts (first/father/grandfather/surname),
+     * per local naming convention. A company client puts its registered
+     * name in `firstName` and leaves the other 3 blank.
+     */
+    firstName: z
+      .string()
+      .trim()
+      .min(1, 'A name is required')
+      .max(100)
+      .regex(NO_CONTROL_CHARS, noControlChars),
+    fatherName: optionalText(100),
+    grandfatherName: optionalText(100),
+    surname: optionalText(100),
     reference: optionalText(50),
     notes: optionalText(5000),
     clientType: z.enum(CLIENT_TYPES).nullish(),
@@ -326,11 +365,24 @@ export const createClientSchema = z
     crNumber: optionalIdentifier(50),
     /** Civil ID (or passport number) — individuals. */
     civilId: optionalIdentifier(50),
+    mobileNumber: optionalPhone(50),
     duplicateOverride: duplicateOverrideSchema.optional(),
   })
   .strict();
 
 export type CreateClient = z.infer<typeof createClientSchema>;
+
+/** Joins the 4 name parts the same way everywhere they're displayed. */
+export function formatClientName(client: {
+  firstName?: string | null | undefined;
+  fatherName?: string | null | undefined;
+  grandfatherName?: string | null | undefined;
+  surname?: string | null | undefined;
+}): string {
+  return [client.firstName, client.fatherName, client.grandfatherName, client.surname]
+    .filter((part): part is string => Boolean(part && part.trim()))
+    .join(' ');
+}
 
 export const updateClientSchema = createClientSchema.partial().extend({
   /**
@@ -342,10 +394,49 @@ export const updateClientSchema = createClientSchema.partial().extend({
 
 export type UpdateClient = z.infer<typeof updateClientSchema>;
 
+/**
+ * Oman land-registry use categories. Proposed from the client's example
+ * documents — confirm this list matches what their Krookies actually show
+ * before relying on it as exhaustive.
+ */
+export const LAND_USE_TYPES = [
+  'RESIDENTIAL',
+  'COMMERCIAL',
+  'AGRICULTURAL',
+  'INDUSTRIAL',
+  'MIXED_USE',
+  'GOVERNMENT',
+] as const;
+export type LandUseType = (typeof LAND_USE_TYPES)[number];
+
+/**
+ * Coordinate systems used on Omani survey documents (Krookies). Proposed
+ * from the one example label the client showed ("Old projection - Clarke
+ * 1880 Zone 40") — confirm the full list with the client's surveyors before
+ * relying on it as exhaustive.
+ */
+export const PROJECTION_TYPES = [
+  'CLARKE_1880_ZONE_39',
+  'CLARKE_1880_ZONE_40',
+  'UTM_ZONE_39N',
+  'UTM_ZONE_40N',
+] as const;
+export type ProjectionType = (typeof PROJECTION_TYPES)[number];
+
 export const createContactSchema = z
   .object({
-    name: z.string().trim().min(1, 'A name is required').max(200),
+    name: z
+      .string()
+      .trim()
+      .min(1, 'A name is required')
+      .max(200)
+      .regex(NO_CONTROL_CHARS, noControlChars),
     position: optionalText(150),
+    /** Their formal job title at their employer — distinct from `position`. */
+    designation: optionalText(150),
+    placeOfWork: optionalText(200),
+    /** National ID / Civil ID. Unique across all contacts while live. */
+    idNumber: optionalIdentifier(50),
     email: z
       .string()
       .trim()
@@ -353,7 +444,7 @@ export const createContactSchema = z
       .email('Must be a valid email address')
       .max(320)
       .nullish(),
-    phone: optionalText(50),
+    phone: optionalPhone(50),
     isPrimary: z.boolean().default(false),
   })
   .strict();
@@ -369,7 +460,12 @@ export type UpdateContact = z.infer<typeof updateContactSchema>;
 export const createPropertySchema = z
   .object({
     clientId: z.string().uuid('Must reference a client'),
-    name: z.string().trim().min(1, 'A name is required').max(200),
+    name: z
+      .string()
+      .trim()
+      .min(1, 'A name is required')
+      .max(200)
+      .regex(NO_CONTROL_CHARS, noControlChars),
     reference: optionalText(50),
     addressLine1: optionalText(200),
     addressLine2: optionalText(200),
@@ -381,13 +477,25 @@ export const createPropertySchema = z
     plotNumber: optionalText(50),
     wilayat: optionalText(100),
     village: optionalText(100),
-    /** The Krookie's own serial — e.g. "1-35-055-01-585". */
+    /** The Krookie's own serial, e.g. "01-05-014-01-132" — also the
+     *  government's land-registry number ("Land ID"). Stored as typed (the
+     *  dashes are formatting, not content — comparison for uniqueness
+     *  normalizes them away at the database layer instead, see the
+     *  migration, same as `ecms_normalize_identifier` does for crNumber).
+     *  Unique while live — see the partial index in the migration. */
     surveyReference: optionalText(100),
     /** The Mulkia's deed/gift reference — e.g. "2015/19618". */
     titleDeedReference: optionalText(100),
     /** The registered owner per the title deed — may differ from the client. */
     ownerName: optionalText(200),
     ownerNationalId: optionalText(50),
+    blockNumber: optionalText(50),
+    plotArea: z.coerce.number().positive().nullish(),
+    landUseType: z.enum(LAND_USE_TYPES).nullish(),
+    /** Raw survey coordinates, stored as given — see `projectionType`. */
+    easting: z.coerce.number().nullish(),
+    northing: z.coerce.number().nullish(),
+    projectionType: z.enum(PROJECTION_TYPES).nullish(),
     duplicateOverride: duplicateOverrideSchema.optional(),
   })
   .strict();
@@ -448,7 +556,6 @@ export const propertyDuplicateQuerySchema = z
     clientId: z.string().uuid().optional(),
     plotNumber: z.string().trim().max(50).optional(),
     wilayat: z.string().trim().max(100).optional(),
-    surveyReference: z.string().trim().max(100).optional(),
     excludeId: z.string().uuid().optional(),
   })
   .strict();
@@ -565,7 +672,12 @@ export const createProjectSchema = z
      * migrated historical projects that won't fit the generated pattern).
      */
     code: optionalText(50),
-    name: z.string().trim().min(1, 'A name is required').max(200),
+    name: z
+      .string()
+      .trim()
+      .min(1, 'A name is required')
+      .max(200)
+      .regex(NO_CONTROL_CHARS, noControlChars),
     description: optionalText(5000),
     type: z.enum(PROJECT_TYPES),
     startDate: optionalDate,
@@ -577,6 +689,16 @@ export const createProjectSchema = z
      * resolved against a real Project row.
      */
     externalPlanningReference: optionalText(50),
+    /** Document-received checklist — captured now, or left for later if not
+     *  collected earlier at the proposal stage. */
+    mulkiyaReceived: z.boolean().default(false),
+    idCardReceived: z.boolean().default(false),
+    agreementReceived: z.boolean().default(false),
+    /** Meaningful only when `type` opens a SUPERVISION workstream (SUPERVISION
+     *  or BOTH) — ignored for a PLANNING-only project. */
+    krookieReceived: z.boolean().default(false),
+    approvedDrawingsReceived: z.boolean().default(false),
+    siteEngineerId: z.string().uuid().nullish(),
   })
   .strict()
   .superRefine((value, ctx) => {
@@ -607,6 +729,9 @@ export const updateProjectSchema = z
     type: z.enum(PROJECT_TYPES).optional(),
     startDate: optionalDate,
     targetEndDate: optionalDate,
+    mulkiyaReceived: z.boolean().optional(),
+    idCardReceived: z.boolean().optional(),
+    agreementReceived: z.boolean().optional(),
     version: z.number().int().min(1),
   })
   .strict();
@@ -621,6 +746,8 @@ export const projectListQuerySchema = z
     status: z.enum(PROJECT_STATUSES).optional(),
     clientId: z.string().uuid().optional(),
     propertyId: z.string().uuid().optional(),
+    /** Only projects this person is a member of ("assigned to me"). */
+    memberId: z.string().uuid().optional(),
     /**
      * Filters to projects that run this workstream. PLANNING and SUPERVISION
      * each also match BOTH-type projects (a BOTH project runs both
@@ -666,6 +793,14 @@ export const upgradeProjectToBothSchema = z
   .object({
     version: z.number().int().min(1),
     reason: optionalText(1000),
+    /** Same document-received checklist as `createProjectSchema`, filled in
+     *  now if it wasn't captured when the project was first created. */
+    mulkiyaReceived: z.boolean().optional(),
+    idCardReceived: z.boolean().optional(),
+    agreementReceived: z.boolean().optional(),
+    krookieReceived: z.boolean().optional(),
+    approvedDrawingsReceived: z.boolean().optional(),
+    siteEngineerId: z.string().uuid().nullish(),
   })
   .strict();
 
@@ -674,7 +809,12 @@ export type UpgradeProjectToBoth = z.infer<typeof upgradeProjectToBothSchema>;
 export const createWorkstreamSchema = z
   .object({
     type: z.enum(WORKSTREAM_TYPES),
-    name: z.string().trim().min(1, 'A name is required').max(200),
+    name: z
+      .string()
+      .trim()
+      .min(1, 'A name is required')
+      .max(200)
+      .regex(NO_CONTROL_CHARS, noControlChars),
     notes: optionalText(5000),
   })
   .strict();
@@ -837,30 +977,93 @@ export const updateProposalSketchTypeSchema = z
 
 export type UpdateProposalSketchType = z.infer<typeof updateProposalSketchTypeSchema>;
 
-export const createProposalSchema = z
+/** The standard activities and milestones offered on the Planning page. */
+export const PLANNING_TEMPLATE_KINDS = ['ACTIVITY', 'MILESTONE'] as const;
+export type PlanningTemplateKind = (typeof PLANNING_TEMPLATE_KINDS)[number];
+
+export const createPlanningTemplateItemSchema = z
   .object({
-    contactName: z.string().trim().min(1, 'A contact name is required').max(200),
-    contactPhone: optionalText(50),
-    clientId: z.string().uuid().nullish(),
-    propertyId: z.string().uuid().nullish(),
-    sketchTypeId: z.string().uuid().nullish(),
-    projectType: z.enum(PROJECT_TYPES).nullish(),
-    approxAreaSqm: z.coerce.number().positive().nullish(),
-    source: optionalText(100),
-    assignedArchitectId: z.string().uuid().nullish(),
-    receivedAt: optionalDate,
-    dueAt: optionalDate,
-    notes: optionalText(5000),
+    kind: z.enum(PLANNING_TEMPLATE_KINDS),
+    name: z.string().trim().min(1, 'A name is required').max(200),
+    sortOrder: z.number().int().default(0),
   })
   .strict();
+
+export type CreatePlanningTemplateItem = z.infer<typeof createPlanningTemplateItemSchema>;
+
+/** `kind` is not editable — move an entry by retiring it and adding it again. */
+export const updatePlanningTemplateItemSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200).optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .strict();
+
+export type UpdatePlanningTemplateItem = z.infer<typeof updatePlanningTemplateItemSchema>;
+
+/**
+ * SELF — the client deals with the consultancy directly. OTHER — somebody
+ * else submits on the client's behalf, named in `submittedBy` with
+ * `submitterRelationship` recording how they relate to the client.
+ */
+export const PROPOSAL_SUBMISSION_TYPES = ['SELF', 'OTHER'] as const;
+export type ProposalSubmissionType = (typeof PROPOSAL_SUBMISSION_TYPES)[number];
+
+const proposalFields = {
+  contactName: z.string().trim().min(1, 'A contact name is required').max(200),
+  contactPhone: optionalPhone(50),
+  clientId: z.string().uuid().nullish(),
+  propertyId: z.string().uuid().nullish(),
+  sketchTypeId: z.string().uuid().nullish(),
+  projectType: z.enum(PROJECT_TYPES).nullish(),
+  approxAreaSqm: z.coerce.number().positive().nullish(),
+  source: optionalText(100),
+  assignedArchitectId: z.string().uuid().nullish(),
+  /** The Krookie's own serial. Required at creation; `convert()` in
+   *  `proposal.service.ts` also checks it, as a harmless safety net for any
+   *  proposal created before this field became mandatory. */
+  surveyReference: z.string().trim().min(1, 'A Krookie (survey reference) is required').max(100),
+  /** The Mulkia's deed/gift reference. Always optional, never checked at
+   *  conversion. */
+  titleDeedReference: optionalText(100),
+  /** What the client actually wants. Required at creation, same as
+   *  `surveyReference`. */
+  requirements: z.string().trim().min(1, 'Requirements are required').max(5000),
+  submissionType: z.enum(PROPOSAL_SUBMISSION_TYPES).nullish(),
+  submittedBy: optionalText(200),
+  submitterRelationship: optionalText(200),
+  receivedAt: optionalDate,
+  dueAt: optionalDate,
+  notes: optionalText(5000),
+};
+
+function requireSubmittedByWhenOther(
+  value: { submissionType?: string | null | undefined; submittedBy?: string | null | undefined },
+  ctx: z.RefinementCtx,
+): void {
+  if (value.submissionType === 'OTHER' && !value.submittedBy) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['submittedBy'],
+      message: 'Name who submitted this proposal.',
+    });
+  }
+}
+
+export const createProposalSchema = z
+  .object(proposalFields)
+  .strict()
+  .superRefine(requireSubmittedByWhenOther);
 
 export type CreateProposal = z.infer<typeof createProposalSchema>;
 
 /** Status is absent on purpose — see PROPOSAL_ACTIONS above. `sketchNumber` is
  *  always server-generated and never appears in either schema. */
-export const updateProposalSchema = createProposalSchema.partial().extend({
-  version: z.number().int().min(1),
-});
+export const updateProposalSchema = z
+  .object(proposalFields)
+  .partial()
+  .extend({ version: z.number().int().min(1) })
+  .superRefine(requireSubmittedByWhenOther);
 
 export type UpdateProposal = z.infer<typeof updateProposalSchema>;
 
@@ -871,6 +1074,11 @@ export const proposalListQuerySchema = z
     pageSize: z.coerce.number().int().min(1).max(100).default(25),
     status: z.enum(PROPOSAL_STATUSES).optional(),
     clientId: z.string().uuid().optional(),
+    /** The proposal that was converted into this project (at most one). */
+    convertedProjectId: z.string().uuid().optional(),
+    /** Only proposals this person is the assigned architect on. */
+    assignedArchitectId: z.string().uuid().optional(),
+    propertyId: z.string().uuid().optional(),
   })
   .strict();
 
@@ -923,7 +1131,12 @@ export const createUserSchema = z
       .email('Must be a valid email address')
       .max(320)
       .nullish(),
-    displayName: z.string().trim().min(1, 'A name is required').max(200),
+    displayName: z
+      .string()
+      .trim()
+      .min(1, 'A name is required')
+      .max(200)
+      .regex(NO_CONTROL_CHARS, noControlChars),
     password: passwordSchema,
     roleCode: z.enum(ROLES),
   })
@@ -1104,7 +1317,12 @@ export const SUBMISSION_ACTION_NAMES = Object.keys(
 
 export const createPlanningActivitySchema = z
   .object({
-    name: z.string().trim().min(1, 'A name is required').max(200),
+    name: z
+      .string()
+      .trim()
+      .min(1, 'A name is required')
+      .max(200)
+      .regex(NO_CONTROL_CHARS, noControlChars),
     description: optionalText(5000),
     assigneeId: z.string().uuid().nullish(),
     dueDate: optionalDate,
@@ -1124,7 +1342,12 @@ export type UpdatePlanningActivity = z.infer<typeof updatePlanningActivitySchema
 
 export const createMilestoneSchema = z
   .object({
-    name: z.string().trim().min(1, 'A name is required').max(200),
+    name: z
+      .string()
+      .trim()
+      .min(1, 'A name is required')
+      .max(200)
+      .regex(NO_CONTROL_CHARS, noControlChars),
     targetDate: optionalDate,
   })
   .strict();
@@ -1938,6 +2161,16 @@ export interface ApprovalInboxItem {
   submittedAt: string;
   /** Where the web app should send the person to act on it. */
   link: string;
+  /** Where it sits in its own workflow: SUBMITTED or UNDER_REVIEW, or
+   *  CLIENT_REVISION for a proposal. */
+  status: string;
+  /** What lets the list be grouped and searched by project and client. Null
+   *  for a proposal (no project yet) or when the record has no such link. */
+  projectCode: string | null;
+  projectName: string | null;
+  clientName: string | null;
+  /** The submitter's display name, resolved server-side. */
+  submittedByName: string | null;
 }
 
 export const SEARCH_RESULT_TYPES = ['CLIENT', 'PROPERTY', 'PROJECT', 'PROPOSAL'] as const;

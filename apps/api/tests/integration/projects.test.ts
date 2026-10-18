@@ -30,8 +30,8 @@ describe('projects', () => {
 
   const audit = new AuditService();
   const authorization = new AuthorizationService(prisma);
-  const clients = new ClientService(prisma, audit);
-  const properties = new PropertyService(prisma, audit);
+  const clients = new ClientService(prisma, audit, new SequenceService());
+  const properties = new PropertyService(prisma, audit, new SequenceService());
   const handover = new HandoverService(prisma, audit);
   const projects = new ProjectService(
     prisma,
@@ -118,7 +118,7 @@ describe('projects', () => {
     planner = await userWithRole('PLANNING');
 
     const client = await inContext(() =>
-      clients.create({ name: `Projects Client ${crypto.randomUUID()}` }, admin),
+      clients.create({ firstName: `Projects Client ${crypto.randomUUID()}` }, admin),
     );
     clientId = client.id;
 
@@ -194,6 +194,76 @@ describe('projects', () => {
 
     // Seeing everything is not the same as touching anything.
     expect(await authorization.can(director, 'project:edit', projectId)).toBe(false);
+  });
+
+  it('finds a project by its client, plot or manager, and shows where it is and who runs it', async () => {
+    const tag = crypto.randomUUID().slice(0, 8);
+    const client = await inContext(() =>
+      clients.create({ firstName: `Zaynab${tag}`, surname: 'Linkable' }, admin),
+    );
+    const property = await inContext(() =>
+      properties.create(
+        { clientId: client.id, name: 'Linked House', plotNumber: `PL${tag}`, wilayat: 'Seeb' },
+        admin,
+      ),
+    );
+    const project = await inContext(() =>
+      projects.create(
+        {
+          clientId: client.id,
+          propertyId: property.id,
+          code: uniqueCode(),
+          name: 'Plain name',
+          type: 'PLANNING',
+        },
+        owningManager,
+      ),
+    );
+    await prisma.user.update({
+      where: { id: owningManager },
+      data: { displayName: `Manager${tag} Runner` },
+    });
+
+    const found = async (search: string, userId = director): Promise<boolean> => {
+      const page = await projects.list({ page: 1, pageSize: 100, search }, userId);
+      return page.items.some((p) => p.id === project.id);
+    };
+
+    // By client name — a single word, and words that span name parts.
+    expect(await found(`Zaynab${tag}`)).toBe(true);
+    expect(await found(`zaynab${tag} linkable`)).toBe(true);
+    // By the plot's number and its wilayat, together.
+    expect(await found(`PL${tag} seeb`)).toBe(true);
+    // By the person who manages it.
+    expect(await found(`Manager${tag}`)).toBe(true);
+    // Every word must match: one that matches nothing excludes it.
+    expect(await found(`Zaynab${tag} nowhere-at-all`)).toBe(false);
+
+    // The list says where it is and who runs it.
+    const page = await projects.list({ page: 1, pageSize: 100, search: `Zaynab${tag}` }, director);
+    const row = page.items.find((p) => p.id === project.id);
+    expect(row).toMatchObject({
+      clientName: `Zaynab${tag} Linkable`,
+      propertyName: 'Linked House',
+      managerId: owningManager,
+      managerName: `Manager${tag} Runner`,
+    });
+    expect(row?.propertyLocation).toContain(`Plot PL${tag}`);
+
+    // A planner on the project may see its client but not its people: searching
+    // by the manager finds nothing, and the manager is not named.
+    // (A planner of their own: the next test relies on `planner` belonging to nothing.)
+    const memberPlanner = await userWithRole('PLANNING');
+    await inContext(() =>
+      members.add(project.id, { userId: memberPlanner, roleCode: 'PLANNING' }, owningManager),
+    );
+    expect(await found(`Zaynab${tag}`, memberPlanner)).toBe(true);
+    expect(await found(`Manager${tag}`, memberPlanner)).toBe(false);
+    const plannerPage = await projects.list(
+      { page: 1, pageSize: 100, search: `Zaynab${tag}` },
+      memberPlanner,
+    );
+    expect(plannerPage.items.find((p) => p.id === project.id)?.managerName).toBeNull();
   });
 
   it('gives a planner an empty page rather than everyone else’s work', async () => {
@@ -293,6 +363,37 @@ describe('projects', () => {
 
     const list = await workstreams.listForProject(projectId);
     expect(list.map((w) => w.type).sort()).toEqual(['PLANNING', 'SUPERVISION']);
+  });
+
+  it('carries the document checklist and site engineer through an upgrade', async () => {
+    const projectId = await newProject('PLANNING');
+    const siteEngineerId = crypto.randomUUID();
+
+    await inContext(() =>
+      projects.upgradeToSupervision(
+        projectId,
+        {
+          version: 1,
+          mulkiyaReceived: true,
+          idCardReceived: true,
+          krookieReceived: true,
+          approvedDrawingsReceived: true,
+          siteEngineerId,
+        },
+        admin,
+      ),
+    );
+
+    const project = await projects.byId(projectId, admin);
+    expect(project.mulkiyaReceived).toBe(true);
+    expect(project.idCardReceived).toBe(true);
+    expect(project.agreementReceived).toBe(false);
+
+    const list = await workstreams.listForProject(projectId);
+    const supervision = list.find((w) => w.type === 'SUPERVISION');
+    expect(supervision?.krookieReceived).toBe(true);
+    expect(supervision?.approvedDrawingsReceived).toBe(true);
+    expect(supervision?.siteEngineerId).toBe(siteEngineerId);
   });
 
   it('is safe to call again if a supervision workstream already exists somehow', async () => {
@@ -427,7 +528,7 @@ describe('projects', () => {
 
   it('refuses a property that belongs to a different client', async () => {
     const otherClient = await inContext(() =>
-      clients.create({ name: `Other ${crypto.randomUUID()}` }, admin),
+      clients.create({ firstName: `Other ${crypto.randomUUID()}` }, admin),
     );
 
     await expect(

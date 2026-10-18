@@ -10,6 +10,7 @@ import {
   findPropertyDuplicates,
 } from '../../src/modules/directory/duplicates';
 import { PropertyService } from '../../src/modules/directory/property.service';
+import { SequenceService } from '../../src/modules/sequence';
 import { runInRequestContext } from '../../src/shared/context/request-context';
 import type { PrismaService } from '../../src/shared/database/prisma.service';
 
@@ -29,9 +30,9 @@ describe('duplicate detection', () => {
   }) as unknown as PrismaService;
 
   const audit = new AuditService();
-  const clients = new ClientService(prisma, audit);
+  const clients = new ClientService(prisma, audit, new SequenceService());
   const contacts = new ContactService(prisma, audit);
-  const properties = new PropertyService(prisma, audit);
+  const properties = new PropertyService(prisma, audit, new SequenceService());
 
   const actor = crypto.randomUUID();
   const requestId = '88888888-6666-4555-8444-333333333333';
@@ -63,13 +64,13 @@ describe('duplicate detection', () => {
   describe('clients', () => {
     it('refuses a second live client with the same CR number, however it is typed', async () => {
       const cr = digits(7);
-      await inContext(() => clients.create({ name: `First ${token()}`, crNumber: cr }, actor));
+      await inContext(() => clients.create({ firstName: `First ${token()}`, crNumber: cr }, actor));
 
       // What the API receives after the contract has normalised the input.
       const retyped = normalizeIdentifier(`${cr.slice(0, 4)} ${cr.slice(4)}`);
 
       await expect(
-        inContext(() => clients.create({ name: `Second ${token()}`, crNumber: retyped }, actor)),
+        inContext(() => clients.create({ firstName: `Second ${token()}`, crNumber: retyped }, actor)),
       ).rejects.toMatchObject({
         code: 'DUPLICATE_SUSPECTED',
         fields: [expect.objectContaining({ field: 'crNumber' })],
@@ -80,7 +81,7 @@ describe('duplicate detection', () => {
       const cr = digits(7);
       const results = await Promise.allSettled(
         [1, 2].map(() =>
-          inContext(() => clients.create({ name: `Racer ${token()}`, crNumber: cr }, actor)),
+          inContext(() => clients.create({ firstName: `Racer ${token()}`, crNumber: cr }, actor)),
         ),
       );
 
@@ -93,13 +94,13 @@ describe('duplicate detection', () => {
     it('saves over an identity match when overridden, and audits the reason', async () => {
       const civilId = digits(8);
       const first = await inContext(() =>
-        clients.create({ name: `Original ${token()}`, civilId }, actor),
+        clients.create({ firstName: `Original ${token()}`, civilId }, actor),
       );
 
       const second = await inContext(() =>
         clients.create(
           {
-            name: `Override ${token()}`,
+            firstName: `Override ${token()}`,
             civilId,
             duplicateOverride: { reason: 'Father and son share the old ID card on file.' },
           },
@@ -121,19 +122,19 @@ describe('duplicate detection', () => {
     it('ignores archived clients', async () => {
       const cr = digits(7);
       const old = await inContext(() =>
-        clients.create({ name: `Old ${token()}`, crNumber: cr }, actor),
+        clients.create({ firstName: `Old ${token()}`, crNumber: cr }, actor),
       );
       await inContext(() => clients.archive(old.id, actor));
 
       await expect(
-        inContext(() => clients.create({ name: `New ${token()}`, crNumber: cr }, actor)),
+        inContext(() => clients.create({ firstName: `New ${token()}`, crNumber: cr }, actor)),
       ).resolves.toMatchObject({ crNumber: cr });
     });
 
     it('refuses an edit that changes the CR number to one already in use', async () => {
       const cr = digits(7);
-      await inContext(() => clients.create({ name: `Holder ${token()}`, crNumber: cr }, actor));
-      const other = await inContext(() => clients.create({ name: `Other ${token()}` }, actor));
+      await inContext(() => clients.create({ firstName: `Holder ${token()}`, crNumber: cr }, actor));
+      const other = await inContext(() => clients.create({ firstName: `Other ${token()}` }, actor));
 
       await expect(
         inContext(() => clients.update(other.id, { crNumber: cr, version: other.version }, actor)),
@@ -142,11 +143,11 @@ describe('duplicate detection', () => {
 
     it('does not re-check an identifier the edit leaves unchanged', async () => {
       const cr = digits(7);
-      await inContext(() => clients.create({ name: `A ${token()}`, crNumber: cr }, actor));
+      await inContext(() => clients.create({ firstName: `A ${token()}`, crNumber: cr }, actor));
       const b = await inContext(() =>
         clients.create(
           {
-            name: `B ${token()}`,
+            firstName: `B ${token()}`,
             crNumber: cr,
             duplicateOverride: { reason: 'Known group company.' },
           },
@@ -157,7 +158,7 @@ describe('duplicate detection', () => {
       // Renaming B must not demand the override again.
       await expect(
         inContext(() =>
-          clients.update(b.id, { name: `B renamed ${token()}`, crNumber: cr, version: 1 }, actor),
+          clients.update(b.id, { firstName: `B renamed ${token()}`, crNumber: cr, version: 1 }, actor),
         ),
       ).resolves.toBeDefined();
     });
@@ -165,7 +166,7 @@ describe('duplicate detection', () => {
     it('reports a transliterated spelling of the same name as likely', async () => {
       const t = token();
       const original = await inContext(() =>
-        clients.create({ name: `Mohammed Al Rawahi ${t}` }, actor),
+        clients.create({ firstName: `Mohammed Al Rawahi ${t}` }, actor),
       );
 
       const matches = await findClientDuplicates(prisma, { name: `Muhammad Al-Rawahi ${t}` });
@@ -177,7 +178,7 @@ describe('duplicate detection', () => {
 
     it('does not report a different person who shares only the family name', async () => {
       const salim = await inContext(() =>
-        clients.create({ name: `Salim Al Balushi ${token()}` }, actor),
+        clients.create({ firstName: `Salim Al Balushi ${token()}` }, actor),
       );
 
       const matches = await findClientDuplicates(prisma, { name: `Ahmed Al Balushi ${token()}` });
@@ -187,13 +188,13 @@ describe('duplicate detection', () => {
 
     it('never refuses a create over a name-only likeness', async () => {
       const name = `Al Noor ${token()}`;
-      await inContext(() => clients.create({ name }, actor));
-      await expect(inContext(() => clients.create({ name }, actor))).resolves.toBeDefined();
+      await inContext(() => clients.create({ firstName: name }, actor));
+      await expect(inContext(() => clients.create({ firstName: name }, actor))).resolves.toBeDefined();
     });
 
     it('reports a client whose contact has the same phone, typed differently', async () => {
       const local = `9${digits(7)}`;
-      const client = await inContext(() => clients.create({ name: `Phone ${token()}` }, actor));
+      const client = await inContext(() => clients.create({ firstName: `Phone ${token()}` }, actor));
       await inContext(() =>
         contacts.create(client.id, {
           name: 'Reception',
@@ -213,8 +214,8 @@ describe('duplicate detection', () => {
   describe('properties', () => {
     it('refuses the same plot in the same wilayat, even under another client', async () => {
       const plot = `${digits(3)}/${digits(1)}`;
-      const a = await inContext(() => clients.create({ name: `Plot owner ${token()}` }, actor));
-      const b = await inContext(() => clients.create({ name: `Plot buyer ${token()}` }, actor));
+      const a = await inContext(() => clients.create({ firstName: `Plot owner ${token()}` }, actor));
+      const b = await inContext(() => clients.create({ firstName: `Plot buyer ${token()}` }, actor));
 
       await inContext(() =>
         properties.create(
@@ -235,7 +236,7 @@ describe('duplicate detection', () => {
 
     it('treats the slash in a plot number as significant', async () => {
       const [x, y] = [digits(3), digits(1)];
-      const client = await inContext(() => clients.create({ name: `Slash ${token()}` }, actor));
+      const client = await inContext(() => clients.create({ firstName: `Slash ${token()}` }, actor));
       await inContext(() =>
         properties.create(
           { clientId: client.id, name: 'P1', plotNumber: `${x}/${y}`, wilayat: 'Bawshar' },
@@ -254,9 +255,15 @@ describe('duplicate detection', () => {
       ).toEqual([]);
     });
 
-    it('refuses the same Krookie serial', async () => {
+    it('refuses the same Krookie serial outright — hard-unique, not a judgement call', async () => {
+      // Unlike the soft warn-and-override fields above, the Krookie serial
+      // (also the government's "Land ID") is a true unique identifier per
+      // the client, enforced by a database constraint — see the migration.
+      // Differently formatted (dashes vs spaces) still collides, since the
+      // constraint's index normalises the same way `ecms_normalize_identifier`
+      // does everywhere else.
       const serial = `1-35-${digits(3)}-01-${digits(3)}`;
-      const client = await inContext(() => clients.create({ name: `Krookie ${token()}` }, actor));
+      const client = await inContext(() => clients.create({ firstName: `Krookie ${token()}` }, actor));
       await inContext(() =>
         properties.create({ clientId: client.id, name: 'Plot', surveyReference: serial }, actor),
       );
@@ -272,7 +279,7 @@ describe('duplicate detection', () => {
             actor,
           ),
         ),
-      ).rejects.toMatchObject({ code: 'DUPLICATE_SUSPECTED' });
+      ).rejects.toMatchObject({ code: 'CONFLICT' });
     });
   });
 

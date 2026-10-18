@@ -113,33 +113,39 @@ export async function findClientDuplicates(
     ]);
   }
 
+  // The client's display name is now 4 parts; every query below reads them
+  // joined via the same SQL function the indexes use (see the migration) —
+  // not `concat_ws` directly, since that's merely STABLE and would silently
+  // stop matching the GIN index's IMMUTABLE expression.
+  const fullName = Prisma.sql`ecms_client_full_name(first_name, father_name, grandfather_name, surname)`;
+
   if (query.crNumber) {
     parts.push(Prisma.sql`
-      SELECT id, name, reference, 'crNumber' AS field, NULL::float4 AS similarity
+      SELECT id, ${fullName} AS name, reference, 'crNumber' AS field, NULL::float4 AS similarity
       FROM "client" WHERE archived_at IS NULL AND cr_number = ${query.crNumber} ${skip}`);
   }
   if (query.civilId) {
     parts.push(Prisma.sql`
-      SELECT id, name, reference, 'civilId' AS field, NULL::float4 AS similarity
+      SELECT id, ${fullName} AS name, reference, 'civilId' AS field, NULL::float4 AS similarity
       FROM "client" WHERE archived_at IS NULL AND civil_id = ${query.civilId} ${skip}`);
   }
   if (query.name) {
     // `%` lets the trigram index find candidates; the explicit threshold then
     // applies the measured cut-off rather than pg_trgm's default of 0.3.
     parts.push(Prisma.sql`
-      SELECT id, name, reference, 'name' AS field,
-             similarity(ecms_normalize_name(name), ecms_normalize_name(${query.name})) AS similarity
+      SELECT id, ${fullName} AS name, reference, 'name' AS field,
+             similarity(ecms_normalize_name(${fullName}), ecms_normalize_name(${query.name})) AS similarity
       FROM "client"
       WHERE archived_at IS NULL
-        AND ecms_normalize_name(name) % ecms_normalize_name(${query.name})
-        AND similarity(ecms_normalize_name(name), ecms_normalize_name(${query.name}))
+        AND ecms_normalize_name(${fullName}) % ecms_normalize_name(${query.name})
+        AND similarity(ecms_normalize_name(${fullName}), ecms_normalize_name(${query.name}))
             >= ${NAME_SIMILARITY_THRESHOLD}
         ${skip}`);
   }
   const phone = query.phone ? normalizePhone(query.phone) : null;
   if (phone) {
     parts.push(Prisma.sql`
-      SELECT c.id, c.name, c.reference, 'phone' AS field, NULL::float4 AS similarity
+      SELECT c.id, ${fullName} AS name, c.reference, 'phone' AS field, NULL::float4 AS similarity
       FROM "client" c JOIN contact k ON k.client_id = c.id
       WHERE c.archived_at IS NULL AND k.archived_at IS NULL AND k.phone_normalized = ${phone}
         ${query.excludeId ? Prisma.sql`AND c.id <> ${query.excludeId}::uuid` : Prisma.empty}`);
@@ -150,7 +156,11 @@ export async function findClientDuplicates(
   return merge(rows, CLIENT_EXACT_FIELDS);
 }
 
-const PROPERTY_EXACT_FIELDS = new Set(['plotNumber', 'surveyReference']);
+const PROPERTY_EXACT_FIELDS = new Set(['plotNumber']);
+// surveyReference is NOT part of this soft warn-and-override system — like
+// Client.reference, it's a hard DB-unique field (see property.service.ts's
+// rethrowDuplicateReference-style handling), because the client identified
+// the Krookie's serial as a true unique identifier, not a judgement call.
 
 /**
  * A plot is one piece of land whoever the client is, so identity matches are
@@ -174,9 +184,6 @@ export async function findPropertyDuplicates(
             Prisma.sql`'property:plot:' || ecms_normalize_plot(${query.plotNumber}) || '|' || ecms_normalize_place(${query.wilayat})`,
           ]
         : []),
-      ...(query.surveyReference
-        ? [Prisma.sql`'property:survey:' || ecms_normalize_identifier(${query.surveyReference})`]
-        : []),
     ]);
   }
 
@@ -187,15 +194,6 @@ export async function findPropertyDuplicates(
       WHERE archived_at IS NULL AND plot_number IS NOT NULL AND wilayat IS NOT NULL
         AND ecms_normalize_plot(plot_number) = ecms_normalize_plot(${query.plotNumber})
         AND ecms_normalize_place(wilayat) = ecms_normalize_place(${query.wilayat})
-        ${skip}`);
-  }
-  if (query.surveyReference) {
-    parts.push(Prisma.sql`
-      SELECT id, name, reference, client_id, 'surveyReference' AS field, NULL::float4 AS similarity
-      FROM property
-      WHERE archived_at IS NULL AND survey_reference IS NOT NULL
-        AND ecms_normalize_identifier(survey_reference)
-            = ecms_normalize_identifier(${query.surveyReference})
         ${skip}`);
   }
   if (query.name && query.clientId) {

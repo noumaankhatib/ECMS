@@ -8,10 +8,12 @@ import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './shared/http/all-exceptions.filter';
 import type { Logger } from './shared/logging/logger';
 import { LOGGER } from './shared/logging/logger.token';
+import { NestPinoLogger } from './shared/logging/nest-logger';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   const logger = app.get<Logger>(LOGGER);
+  app.useLogger(new NestPinoLogger(logger));
 
   // Security headers and CORS are wired from the first commit rather than
   // retrofitted. The reference codebase had neither, which is defensible for a

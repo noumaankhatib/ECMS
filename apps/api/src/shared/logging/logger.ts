@@ -21,6 +21,15 @@ export type Logger = pino.Logger;
 export function createLogger(): Logger {
   return pino({
     level: process.env['LOG_LEVEL'] ?? 'info',
+    // Replaces pino's default pid/hostname, which are noise in a container, and
+    // identifies the emitting service once several share one log view.
+    base: {
+      service: 'ecms-api',
+      env: process.env['NODE_ENV'] ?? 'development',
+      version: process.env['APP_VERSION'] ?? 'dev',
+    },
+    timestamp: pino.stdTimeFunctions.isoTime,
+    serializers: { err: pino.stdSerializers.err },
     // Stamped on every line, on every channel, automatically.
     mixin() {
       const ctx = getRequestContext();

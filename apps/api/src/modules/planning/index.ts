@@ -12,4 +12,5 @@
 export { PlanningModule } from './planning.module';
 export { ActivityService } from './activity.service';
 export { MilestoneService } from './milestone.service';
+export { PlanningTemplateService } from './planning-template.service';
 export { SubmissionService } from './submission.service';

@@ -1,5 +1,6 @@
 import {
   PROJECT_ACTIONS,
+  formatClientName,
   WORKSTREAMS_FOR_TYPE,
   canTransitionProject,
   isProjectReadOnly,
@@ -18,6 +19,7 @@ import type { Prisma, Project } from '@prisma/client';
 import { PrismaService } from '../../shared/database/prisma.service';
 import type { Tx } from '../../shared/database/transaction';
 import { appError } from '../../shared/errors/app-error';
+import { clientMatchesTerm, propertyMatchesTerm, searchTerms } from '../../shared/search/terms';
 import { AuthorizationService } from '../access';
 import { AuditService } from '../audit';
 import { HandoverService } from '../handover';
@@ -59,17 +61,29 @@ export class ProjectService {
    * `visibleProjectIds` returning `null` means "no restriction" — a Director or
    * an Administrator holds `project:view` across the portfolio.
    */
-  async list(query: ProjectListQuery, userId: string): Promise<Page<Project>> {
+  async list(query: ProjectListQuery, userId: string): Promise<Page<ProjectListItem>> {
     const visible = await this.authorization.visibleProjectIds(userId, 'project:view');
     if (visible !== null && visible.length === 0) {
       return { items: [], total: 0, page: query.page, pageSize: query.pageSize };
     }
+
+    // What this caller may learn about a project's client, property and people.
+    // Searching by them is held to the same permission as reading them, or the
+    // search box would reveal what the lists deliberately hide.
+    const [seesClient, seesProperty, seesPeople] = await Promise.all([
+      this.authorization.canAnywhere(userId, 'client:view'),
+      this.authorization.canAnywhere(userId, 'property:view'),
+      this.authorization.canAnywhere(userId, 'user:view'),
+    ]);
+    const sees = { client: seesClient, property: seesProperty, people: seesPeople };
+    const terms = searchTerms(query.search);
 
     const where: Prisma.ProjectWhereInput = {
       ...(visible === null ? {} : { id: { in: visible } }),
       ...(query.status ? { status: query.status } : {}),
       ...(query.clientId ? { clientId: query.clientId } : {}),
       ...(query.propertyId ? { propertyId: query.propertyId } : {}),
+      ...(query.memberId ? { members: { some: { userId: query.memberId } } } : {}),
       // A BOTH project runs both workstreams at once (WORKSTREAMS_FOR_TYPE's
       // own rule), so filtering to PLANNING must also surface BOTH projects,
       // and likewise for SUPERVISION — only `type=BOTH` itself means
@@ -77,12 +91,31 @@ export class ProjectService {
       ...(query.type
         ? { type: query.type === 'BOTH' ? 'BOTH' : { in: [query.type, 'BOTH'] } }
         : {}),
-      ...(query.search
+      ...(terms.length > 0
         ? {
-            OR: [
-              { name: { contains: query.search, mode: 'insensitive' } },
-              { code: { contains: query.search, mode: 'insensitive' } },
-            ],
+            // Every word must match somewhere: the project itself, and — only
+            // where the caller may see them — its client, property or team.
+            AND: terms.map((term) => ({
+              OR: [
+                { name: { contains: term, mode: 'insensitive' as const } },
+                { code: { contains: term, mode: 'insensitive' as const } },
+                ...(sees.client ? [{ client: { is: clientMatchesTerm(term) } }] : []),
+                ...(sees.property ? [{ property: { is: propertyMatchesTerm(term) } }] : []),
+                ...(sees.people
+                  ? [
+                      {
+                        members: {
+                          some: {
+                            user: {
+                              is: { displayName: { contains: term, mode: 'insensitive' as const } },
+                            },
+                          },
+                        },
+                      },
+                    ]
+                  : []),
+              ],
+            })),
           }
         : {}),
     };
@@ -93,11 +126,34 @@ export class ProjectService {
         orderBy: { code: 'asc' },
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
+        include: {
+          client: {
+            select: {
+              firstName: true,
+              fatherName: true,
+              grandfatherName: true,
+              surname: true,
+              mobileNumber: true,
+            },
+          },
+          property: { select: { name: true, wilayat: true, village: true, plotNumber: true } },
+          members: {
+            where: { roleCode: 'PROJECT_MANAGER' },
+            orderBy: { grantedAt: 'asc' },
+            take: 5,
+            select: { userId: true, user: { select: { displayName: true } } },
+          },
+        },
       }),
       this.prisma.project.count({ where }),
     ]);
 
-    return { items, total, page: query.page, pageSize: query.pageSize };
+    return {
+      items: items.map((row) => withContext(row, sees)),
+      total,
+      page: query.page,
+      pageSize: query.pageSize,
+    };
   }
 
   /**
@@ -187,12 +243,24 @@ export class ProjectService {
             startDate: input.startDate ?? null,
             targetEndDate: input.targetEndDate ?? null,
             externalPlanningReference: input.externalPlanningReference ?? null,
+            mulkiyaReceived: input.mulkiyaReceived,
+            idCardReceived: input.idCardReceived,
+            agreementReceived: input.agreementReceived,
             createdBy: actorId,
             members: { create: { userId: actorId, roleCode: 'PROJECT_MANAGER' } },
             workstreams: {
               create: WORKSTREAMS_FOR_TYPE[input.type].map((type) => ({
                 type,
                 name: type === 'PLANNING' ? 'Planning' : 'Supervision',
+                // Krookie/Approved Drawings/Site Engineer are specific to the
+                // supervision workstream, not the project as a whole.
+                ...(type === 'SUPERVISION'
+                  ? {
+                      krookieReceived: input.krookieReceived,
+                      approvedDrawingsReceived: input.approvedDrawingsReceived,
+                      siteEngineerId: input.siteEngineerId ?? null,
+                    }
+                  : {}),
               })),
             },
           },
@@ -313,7 +381,21 @@ export class ProjectService {
 
       const { count } = await tx.project.updateMany({
         where: { id, version: input.version },
-        data: { type: 'BOTH', version: { increment: 1 } },
+        data: {
+          type: 'BOTH',
+          version: { increment: 1 },
+          // Filled in now if not already captured at project creation —
+          // never clobbers a value already set (only a bare checkbox isn't
+          // given here means "leave it alone", same convention as any other
+          // optional field update).
+          ...(input.mulkiyaReceived !== undefined
+            ? { mulkiyaReceived: input.mulkiyaReceived }
+            : {}),
+          ...(input.idCardReceived !== undefined ? { idCardReceived: input.idCardReceived } : {}),
+          ...(input.agreementReceived !== undefined
+            ? { agreementReceived: input.agreementReceived }
+            : {}),
+        },
       });
       if (count === 0) throw appError('STALE_RECORD', { context: { project_id: id } });
 
@@ -322,8 +404,23 @@ export class ProjectService {
       // the Project/Workstream inconsistency this action exists to prevent.
       await tx.workstream.upsert({
         where: { projectId_type: { projectId: id, type: 'SUPERVISION' } },
-        create: { projectId: id, type: 'SUPERVISION', name: 'Supervision' },
-        update: {},
+        create: {
+          projectId: id,
+          type: 'SUPERVISION',
+          name: 'Supervision',
+          krookieReceived: input.krookieReceived ?? false,
+          approvedDrawingsReceived: input.approvedDrawingsReceived ?? false,
+          siteEngineerId: input.siteEngineerId ?? null,
+        },
+        update: {
+          ...(input.krookieReceived !== undefined
+            ? { krookieReceived: input.krookieReceived }
+            : {}),
+          ...(input.approvedDrawingsReceived !== undefined
+            ? { approvedDrawingsReceived: input.approvedDrawingsReceived }
+            : {}),
+          ...(input.siteEngineerId !== undefined ? { siteEngineerId: input.siteEngineerId } : {}),
+        },
       });
 
       await this.audit.record(tx, {
@@ -480,4 +577,66 @@ function rethrowDuplicateCode(error: unknown): never {
     });
   }
   throw error;
+}
+
+/** A project as the list returns it: the row plus where it is and who runs it.
+ *  The extra fields are null when the caller may not see the thing they name. */
+export type ProjectListItem = Project & {
+  clientName: string | null;
+  clientPhone: string | null;
+  propertyName: string | null;
+  propertyLocation: string | null;
+  managerId: string | null;
+  managerName: string | null;
+  /** Everyone holding the manager role, earliest first (a project can have several). */
+  managers: { id: string; name: string }[];
+};
+
+type ProjectWithContext = Project & {
+  client?: {
+    firstName: string;
+    fatherName: string | null;
+    grandfatherName: string | null;
+    surname: string | null;
+    mobileNumber: string | null;
+  };
+  property?: {
+    name: string;
+    wilayat: string | null;
+    village: string | null;
+    plotNumber: string | null;
+  };
+  members?: { userId: string; user: { displayName: string } }[];
+};
+
+/**
+ * Flattens the included client, property and manager into plain fields, and
+ * drops the nested objects. Anything the caller may not see comes out as null,
+ * never as a value, whatever was loaded to compute the page.
+ */
+function withContext(
+  row: ProjectWithContext,
+  sees: { client: boolean; property: boolean; people: boolean },
+): ProjectListItem {
+  const { client: loadedClient, property: loadedProperty, members, ...project } = row;
+  const client = sees.client ? loadedClient : undefined;
+  const property = sees.property ? loadedProperty : undefined;
+  const managers = sees.people
+    ? (members ?? []).map((m) => ({ id: m.userId, name: m.user.displayName }))
+    : [];
+  const manager = managers[0];
+  return {
+    ...project,
+    clientName: client ? formatClientName(client) : null,
+    clientPhone: client?.mobileNumber ?? null,
+    propertyName: property?.name ?? null,
+    propertyLocation: property
+      ? [property.plotNumber ? `Plot ${property.plotNumber}` : null, property.village, property.wilayat]
+          .filter(Boolean)
+          .join(', ') || null
+      : null,
+    managerId: manager?.id ?? null,
+    managerName: manager?.name ?? null,
+    managers,
+  };
 }

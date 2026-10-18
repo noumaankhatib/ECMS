@@ -15,6 +15,6 @@
  * other's behaviour.
  */
 export { ProjectsModule } from './projects.module';
-export { ProjectService } from './project.service';
+export { ProjectService, type ProjectListItem } from './project.service';
 export { MembershipService } from './membership.service';
 export { WorkstreamService } from './workstream.service';

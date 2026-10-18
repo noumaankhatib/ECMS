@@ -39,17 +39,22 @@ export class ContactService {
         });
       }
 
-      const contact = await tx.contact.create({
-        data: {
-          clientId,
-          name: input.name,
-          position: input.position ?? null,
-          email: input.email ?? null,
-          phone: input.phone ?? null,
-          phoneNormalized: input.phone ? normalizePhone(input.phone) : null,
-          isPrimary: input.isPrimary,
-        },
-      });
+      const contact = await tx.contact
+        .create({
+          data: {
+            clientId,
+            name: input.name,
+            position: input.position ?? null,
+            designation: input.designation ?? null,
+            placeOfWork: input.placeOfWork ?? null,
+            idNumber: input.idNumber ?? null,
+            email: input.email ?? null,
+            phone: input.phone ?? null,
+            phoneNormalized: input.phone ? normalizePhone(input.phone) : null,
+            isPrimary: input.isPrimary,
+          },
+        })
+        .catch(rethrowDuplicateContact);
 
       await this.audit.record(tx, {
         action: 'CREATED',
@@ -75,22 +80,27 @@ export class ContactService {
         });
       }
 
-      const { count } = await tx.contact.updateMany({
-        where: { id, version: input.version },
-        data: {
-          ...(input.name !== undefined ? { name: input.name } : {}),
-          ...(input.position !== undefined ? { position: input.position } : {}),
-          ...(input.email !== undefined ? { email: input.email } : {}),
-          ...(input.phone !== undefined
-            ? {
-                phone: input.phone,
-                phoneNormalized: input.phone ? normalizePhone(input.phone) : null,
-              }
-            : {}),
-          ...(input.isPrimary !== undefined ? { isPrimary: input.isPrimary } : {}),
-          version: { increment: 1 },
-        },
-      });
+      const { count } = await tx.contact
+        .updateMany({
+          where: { id, version: input.version },
+          data: {
+            ...(input.name !== undefined ? { name: input.name } : {}),
+            ...(input.position !== undefined ? { position: input.position } : {}),
+            ...(input.designation !== undefined ? { designation: input.designation } : {}),
+            ...(input.placeOfWork !== undefined ? { placeOfWork: input.placeOfWork } : {}),
+            ...(input.idNumber !== undefined ? { idNumber: input.idNumber } : {}),
+            ...(input.email !== undefined ? { email: input.email } : {}),
+            ...(input.phone !== undefined
+              ? {
+                  phone: input.phone,
+                  phoneNormalized: input.phone ? normalizePhone(input.phone) : null,
+                }
+              : {}),
+            ...(input.isPrimary !== undefined ? { isPrimary: input.isPrimary } : {}),
+            version: { increment: 1 },
+          },
+        })
+        .catch(rethrowDuplicateContact);
       if (count === 0) throw appError('STALE_RECORD');
 
       const after = await tx.contact.findUniqueOrThrow({ where: { id } });
@@ -125,4 +135,26 @@ export class ContactService {
       });
     });
   }
+}
+
+/**
+ * Distinguishes which of this entity's two hard-unique constraints fired.
+ * Both are genuine duplicates the client asked to block outright — not the
+ * warn-and-override pattern used for Client.crNumber/civilId — so there is no
+ * override path here, just a clear field-level error.
+ */
+function rethrowDuplicateContact(error: unknown): never {
+  const err = error as { code?: string; meta?: { target?: unknown }; message?: string };
+  if (err.code === 'P2002') {
+    const detail = `${JSON.stringify(err.meta?.target ?? '')}${err.message ?? ''}`;
+    if (detail.includes('id_number')) {
+      throw appError('CONFLICT', {
+        fields: [{ field: 'idNumber', reason: 'Another contact already uses this ID number.' }],
+      });
+    }
+    throw appError('CONFLICT', {
+      fields: [{ field: 'name', reason: 'This client already has a contact with that name.' }],
+    });
+  }
+  throw error;
 }

@@ -185,10 +185,14 @@ export class PropertyController {
 
   @Get()
   @RequirePermission('property:view')
-  list(
+  async list(
     @Query(new ZodValidationPipe(propertyListQuerySchema)) query: PropertyListQuery,
+    @Req() req: Request,
   ): Promise<Page<Property>> {
-    return this.properties.list(query, query.clientId);
+    // Searching by the client's name is held to the same permission as reading
+    // clients, so the property search cannot reveal what the client list hides.
+    const searchClients = await this.authorization.can(actorOf(req), 'client:view');
+    return this.properties.list(query, query.clientId, { searchClients });
   }
 
   /**

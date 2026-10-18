@@ -1,4 +1,4 @@
-import type { ImpactNode, ImpactTree } from '@ecms/contracts';
+import { formatClientName, type ImpactNode, type ImpactTree } from '@ecms/contracts';
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../shared/database/prisma.service';
@@ -72,7 +72,7 @@ export class ImpactService {
     return {
       id,
       type: 'client',
-      label: c.name,
+      label: formatClientName(c),
       archivedAt: c.archivedAt?.toISOString() ?? null,
       children: [
         ...c.contacts.map((ct) => ({

@@ -39,8 +39,8 @@ describe('required documents', () => {
 
   const audit = new AuditService();
   const authorization = new AuthorizationService(prisma);
-  const clients = new ClientService(prisma, audit);
-  const properties = new PropertyService(prisma, audit);
+  const clients = new ClientService(prisma, audit, new SequenceService());
+  const properties = new PropertyService(prisma, audit, new SequenceService());
   const projects = new ProjectService(
     prisma,
     audit,
@@ -80,7 +80,7 @@ describe('required documents', () => {
     planner = await userWithRole('PLANNING');
 
     const client = await inContext(() =>
-      clients.create({ name: `Required Document Client ${crypto.randomUUID()}` }, admin),
+      clients.create({ firstName: `Required Document Client ${crypto.randomUUID()}` }, admin),
     );
     clientId = client.id;
 

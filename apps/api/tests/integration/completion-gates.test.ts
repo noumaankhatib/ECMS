@@ -38,8 +38,8 @@ describe('completion gates', () => {
   const audit = new AuditService();
   const authorization = new AuthorizationService(prisma);
   const gates = new CompletionGateService(prisma);
-  const clients = new ClientService(prisma, audit);
-  const properties = new PropertyService(prisma, audit);
+  const clients = new ClientService(prisma, audit, new SequenceService());
+  const properties = new PropertyService(prisma, audit, new SequenceService());
   const projects = new ProjectService(
     prisma,
     audit,
@@ -73,7 +73,7 @@ describe('completion gates', () => {
   beforeAll(async () => {
     admin = await userWithRole('SYSTEM_ADMINISTRATOR');
     const client = await inContext(() =>
-      clients.create({ name: `Gates Client ${crypto.randomUUID()}` }, admin),
+      clients.create({ firstName: `Gates Client ${crypto.randomUUID()}` }, admin),
     );
     clientId = client.id;
     const property = await inContext(() =>

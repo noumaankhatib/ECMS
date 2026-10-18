@@ -31,7 +31,7 @@ import type { Request } from 'express';
 
 import { appError } from '../../shared/errors/app-error';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
-import { RequirePermission } from '../access';
+import { AuthorizationService, RequirePermission } from '../access';
 
 import { ProposalSketchTypeService } from './proposal-sketch-type.service';
 import { ProposalService } from './proposal.service';
@@ -45,14 +45,20 @@ function actorOf(req: Request): string {
 
 @Controller('proposals')
 export class ProposalController {
-  constructor(private readonly proposals: ProposalService) {}
+  constructor(
+    private readonly proposals: ProposalService,
+    private readonly authorization: AuthorizationService,
+  ) {}
 
   @Get()
   @RequirePermission('proposal:view')
-  list(
+  async list(
     @Query(new ZodValidationPipe(proposalListQuerySchema)) query: ProposalListQuery,
+    @Req() req: Request,
   ): Promise<Page<Proposal>> {
-    return this.proposals.list(query);
+    // Searching by the architect's name is held to the permission for seeing people.
+    const searchPeople = await this.authorization.can(actorOf(req), 'user:view');
+    return this.proposals.list(query, { searchPeople });
   }
 
   @Get(':id')

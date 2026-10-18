@@ -191,7 +191,14 @@ model Session {
 model Client {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  name      String  @db.VarChar(200)
+  /// An individual client's name is recorded as 4 parts (first/father/
+  /// grandfather/surname) rather than one free-text field, per local naming
+  /// convention. A company client puts its registered name in `firstName`
+  /// and leaves the other 3 parts blank — see `formatClientName`.
+  firstName        String  @map("first_name") @db.VarChar(100)
+  fatherName       String? @map("father_name") @db.VarChar(100)
+  grandfatherName  String? @map("grandfather_name") @db.VarChar(100)
+  surname          String? @db.VarChar(100)
   /// The consultancy's own reference for this client. Optional, but unique
   /// among live clients when present — see the partial index in the migration.
   reference String? @db.VarChar(50)
@@ -205,6 +212,9 @@ model Client {
   /// override with a reason, not a hard refusal — see the migration.
   crNumber   String? @map("cr_number") @db.VarChar(50)
   civilId    String? @map("civil_id") @db.VarChar(50)
+  /// Stored alongside a normalised form, same pattern as Contact.phone.
+  mobileNumber           String? @map("mobile_number") @db.VarChar(50)
+  mobileNumberNormalized String? @map("mobile_number_normalized") @db.VarChar(20)
 
   /// Incremented on every change. A caller sends the version it read; if the
   /// record has moved on since, the write is refused rather than silently
@@ -226,7 +236,7 @@ model Client {
   proposals  Proposal[]
 
   @@index([archivedAt])
-  @@index([name])
+  @@index([firstName])
   @@map("client")
 }
 
@@ -239,6 +249,15 @@ model Contact {
 
   name      String  @db.VarChar(200)
   position  String? @db.VarChar(150)
+  /// Distinct from `position` — e.g. "position" is their role on this
+  /// client's work (Client/Site Manager/...), "designation" is their formal
+  /// job title at their employer.
+  designation  String? @db.VarChar(150)
+  placeOfWork  String? @map("place_of_work") @db.VarChar(200)
+  /// National ID / Civil ID number for this person. Unique across all
+  /// contacts (not just this client) while live — see the partial index in
+  /// the migration.
+  idNumber     String? @map("id_number") @db.VarChar(50)
   email     String? @db.VarChar(320)
   phone     String? @db.VarChar(50)
   /// `phone` reduced to "+" and digits (see `normalizePhone`), so the same
@@ -283,7 +302,13 @@ model Property {
   plotNumber String? @map("plot_number") @db.VarChar(50)
   wilayat    String? @db.VarChar(100)
   village    String? @db.VarChar(100)
-  /// The Krookie's own serial (e.g. "1-35-055-01-585").
+  /// The Krookie's own serial (e.g. "01-05-014-01-132") — also the
+  /// government's land-registry number ("Land ID"). The client identified
+  /// this one as a true unique identifier, unlike the other land-registry
+  /// fields here — enforced by a partial unique index, see the migration,
+  /// same pattern as Client.reference. (Previously duplicated as a separate
+  /// `landId` column; merged back into this pre-existing field since both
+  /// named the same number.)
   surveyReference String? @map("survey_reference") @db.VarChar(100)
   /// The Mulkia's deed/gift reference (e.g. "2015/19618").
   titleDeedReference String? @map("title_deed_reference") @db.VarChar(100)
@@ -292,6 +317,19 @@ model Property {
   /// the consultancy's actual contracting customer.
   ownerName       String? @map("owner_name") @db.VarChar(200)
   ownerNationalId String? @map("owner_national_id") @db.VarChar(50)
+
+  blockNumber String?  @map("block_number") @db.VarChar(50)
+  plotArea    Decimal? @map("plot_area") @db.Decimal(12, 2)
+  /// One of LAND_USE_TYPES in @ecms/contracts.
+  landUseType String?  @map("land_use_type") @db.VarChar(30)
+
+  /// Raw survey coordinates, stored as given rather than converted to
+  /// lat/lng — the projection determines how they'd be converted, and we
+  /// don't do that conversion yet (see plan notes).
+  easting        Decimal? @db.Decimal(12, 3)
+  northing       Decimal? @db.Decimal(12, 3)
+  /// One of PROJECTION_TYPES in @ecms/contracts.
+  projectionType String?  @map("projection_type") @db.VarChar(40)
 
   version Int @default(1)
 
@@ -910,6 +948,27 @@ model RequiredDocument {
   @@map("required_document")
 }
 
+/// A standard activity or milestone offered when a project's planning is
+/// being set up (the "Add standard activities" checklist on the Planning page).
+/// Reference data an administrator maintains — offered, never created
+/// automatically, and copied (by name) into a project, so retiring or renaming
+/// an entry here never changes a project that already used it.
+model PlanningTemplateItem {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// ACTIVITY or MILESTONE.
+  kind String @db.VarChar(20)
+  name String @db.VarChar(200)
+
+  sortOrder Int @default(0) @map("sort_order")
+
+  /// Retired, never deleted — same treatment as `ProposalSketchType`.
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+
+  @@unique([kind, name])
+  @@map("planning_template_item")
+}
+
 /// A piece of work for a client, at a property (PRD §4).
 ///
 /// The project is the unit of authorization for the whole system. Every
@@ -957,6 +1016,14 @@ model Project {
   /// in the system, the correct path is upgrading it in place
   /// (ProjectService.upgradeToSupervision), not this field.
   externalPlanningReference String? @map("external_planning_reference") @db.VarChar(50)
+
+  /// Document-received checklist, captured at project creation or (for a
+  /// supervision upgrade) filled in afterwards if not collected earlier at
+  /// the proposal stage. Plain booleans, not an upload — this tracks a
+  /// physical/administrative handover, not a file in the Documents tab.
+  mulkiyaReceived   Boolean @default(false) @map("mulkiya_received")
+  idCardReceived    Boolean @default(false) @map("id_card_received")
+  agreementReceived Boolean @default(false) @map("agreement_received")
 
   version Int @default(1)
 
@@ -1034,6 +1101,15 @@ model Workstream {
   /// NOT_STARTED, IN_PROGRESS, ON_HOLD or COMPLETED. As with the project, this
   /// moves only through a checked transition.
   status String @default("NOT_STARTED") @db.VarChar(20)
+
+  /// Meaningful only on a SUPERVISION-row — harmless and unused on a PLANNING
+  /// one, the same way Project.externalPlanningReference is conceptually
+  /// supervision-only but lives on the shared Project row.
+  krookieReceived          Boolean @default(false) @map("krookie_received")
+  approvedDrawingsReceived Boolean @default(false) @map("approved_drawings_received")
+  /// Who runs this supervision engagement. No foreign key to User,
+  /// deliberately — same reasoning as PlanningActivity.assigneeId.
+  siteEngineerId String? @map("site_engineer_id") @db.Uuid
 
   version Int @default(1)
 
@@ -1120,6 +1196,27 @@ model Proposal {
   /// reasoning `PlanningActivity.assigneeId` already documents: an archived
   /// person must not damage a proposal's record of who worked it.
   assignedArchitectId String? @map("assigned_architect_id") @db.Uuid
+
+  /// The Krookie's own serial, e.g. "1-35-055-01-585" — set directly on the
+  /// proposal rather than requiring a Property, since a proposal may not have
+  /// one yet. Required before `convert()` will let this proposal through,
+  /// same enforcement point as `propertyId` above.
+  surveyReference String? @map("survey_reference") @db.VarChar(100)
+  /// The Mulkia's deed/gift reference. Always optional — unlike
+  /// `surveyReference`, `convert()` never checks this.
+  titleDeedReference String? @map("title_deed_reference") @db.VarChar(100)
+  /// What the client actually wants built/done. Required before `convert()`,
+  /// same reasoning as `surveyReference`.
+  requirements String? @db.Text
+
+  /// SELF — the client is dealing with the consultancy directly. OTHER —
+  /// somebody else is submitting on the client's behalf (`submittedBy`), with
+  /// `submitterRelationship` recording how they relate to the client (agent,
+  /// relative, contractor, ...). Free text, not a Contact FK, because a
+  /// proposal may have no Client/Contact attached yet.
+  submissionType        String? @map("submission_type") @db.VarChar(10)
+  submittedBy           String? @map("submitted_by") @db.VarChar(200)
+  submitterRelationship String? @map("submitter_relationship") @db.VarChar(200)
 
   /// NEW, CONCEPT, CLIENT_REVISION, APPROVED, WON, LOST, ON_HOLD or
   /// CONVERTED (spec §5). Never written directly — moved only through a named

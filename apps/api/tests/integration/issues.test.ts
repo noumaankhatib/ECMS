@@ -31,8 +31,8 @@ describe('issues', () => {
 
   const audit = new AuditService();
   const authorization = new AuthorizationService(prisma);
-  const clients = new ClientService(prisma, audit);
-  const properties = new PropertyService(prisma, audit);
+  const clients = new ClientService(prisma, audit, new SequenceService());
+  const properties = new PropertyService(prisma, audit, new SequenceService());
   const handover = new HandoverService(prisma, audit);
   const projects = new ProjectService(
     prisma,
@@ -123,7 +123,7 @@ describe('issues', () => {
     director = await userWithRole('DIRECTOR');
 
     const client = await inContext(() =>
-      clients.create({ name: `Issue Client ${crypto.randomUUID()}` }, admin),
+      clients.create({ firstName: `Issue Client ${crypto.randomUUID()}` }, admin),
     );
     clientId = client.id;
 

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { AccessModule } from '../access';
+import { SequenceModule } from '../sequence';
 
 import { ClientService } from './client.service';
 import { ContactService } from './contact.service';
@@ -9,7 +10,7 @@ import { DuplicateService } from './duplicates';
 import { PropertyService } from './property.service';
 
 @Module({
-  imports: [AccessModule],
+  imports: [AccessModule, SequenceModule],
   controllers: [ClientController, ContactController, PropertyController],
   providers: [ClientService, ContactService, DuplicateService, PropertyService],
   exports: [ClientService, DuplicateService, PropertyService],

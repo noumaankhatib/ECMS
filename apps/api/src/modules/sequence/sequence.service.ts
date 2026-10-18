@@ -18,6 +18,12 @@ const FORMATTERS: Record<SequenceType, (year: number, value: number) => string> 
   // e.g. "26-SB-118" — a different separator/order than the two above
   // because it is a pre-existing, already-in-use format, not a new one.
   SKETCH: (year, value) => `${twoDigitYear(year)}-SB-${pad(value)}`,
+  // Client/Property references use the FULL year, not the 2-digit year the
+  // project/sketch series use — matches the client's own example exactly
+  // ("CL-2026-014"), a different convention because it's a different,
+  // separately-requested series, not an extension of the ones above.
+  CLIENT: (year, value) => `CL-${String(year)}-${pad(value)}`,
+  PROPERTY: (year, value) => `PR-${String(year)}-${pad(value)}`,
 };
 
 function twoDigitYear(year: number): string {

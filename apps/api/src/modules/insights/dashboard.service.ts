@@ -1,4 +1,5 @@
 import {
+  formatClientName,
   PROJECT_STATUSES,
   PROPOSAL_STATUSES,
   type ActivityAction,
@@ -383,12 +384,12 @@ export class DashboardService {
       clientIds.length > 0
         ? await this.prisma.client.findMany({
             where: { id: { in: clientIds } },
-            select: { id: true, name: true },
+            select: { id: true, firstName: true, fatherName: true, grandfatherName: true, surname: true },
           })
         : [];
 
     const actorName = new Map(actors.map((a) => [a.id, a.displayName]));
-    const clientName = new Map(clients.map((c) => [c.id, c.name]));
+    const clientName = new Map(clients.map((c) => [c.id, formatClientName(c)]));
     const project = new Map(projects.map((p) => [p.id, p]));
 
     return entries.map((e) => {
