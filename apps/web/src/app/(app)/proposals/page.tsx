@@ -1,9 +1,10 @@
 import { PROPOSAL_STATUSES } from '@ecms/contracts';
 import Link from 'next/link';
 
-import { Card, CodeTag, DateText, Empty, PageHead, Pagination } from '@/components/ui';
+import { Badge, Card, CodeTag, DateText, Empty, PageHead, Pagination } from '@/components/ui';
 import { api } from '@/lib/api';
 import { loadProjectCodes } from '@/lib/project-codes';
+import { isProposalOverdue } from '@/lib/proposal-overdue';
 import { requirePermission } from '@/lib/session';
 import type { Page as ApiPage, ProposalListItem } from '@/lib/types';
 import { loadUserNames } from '@/lib/user-names';
@@ -167,6 +168,12 @@ export default async function ProposalsPage({
                       <span className="badge">
                         {STATUS_LABEL[proposal.status] ?? proposal.status}
                       </span>
+                      {isProposalOverdue(proposal) ? (
+                        <>
+                          {' '}
+                          <Badge variant="critical">Overdue</Badge>
+                        </>
+                      ) : null}
                     </td>
                     <td data-label="Project" className="mono">
                       {proposal.convertedProjectId && projectCode.get(proposal.convertedProjectId) ? (

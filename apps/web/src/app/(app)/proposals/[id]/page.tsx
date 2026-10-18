@@ -24,6 +24,7 @@ import {
   Value,
 } from '@/components/ui';
 import { api } from '@/lib/api';
+import { isProposalOverdue } from '@/lib/proposal-overdue';
 import { requireSession } from '@/lib/session';
 import type { Client, Project, Property, Proposal, ProposalSketchType, UserRow } from '@/lib/types';
 
@@ -326,6 +327,12 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
               </DetailItem>
               <DetailItem label="Due">
                 <DateText value={proposal.dueAt} />
+                {isProposalOverdue(proposal) ? (
+                  <>
+                    {' '}
+                    <Badge variant="critical">Overdue</Badge>
+                  </>
+                ) : null}
               </DetailItem>
               {convertedProject ? (
                 <DetailItem label="Converted project">

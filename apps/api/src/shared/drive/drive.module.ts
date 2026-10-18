@@ -27,7 +27,15 @@ import { R2DriveAdapter } from './r2-drive-adapter';
         const backend = process.env['DRIVE_BACKEND'];
         if (backend === 'postgres') return new PostgresDriveAdapter(prisma);
         if (backend === 'r2') return new R2DriveAdapter();
-        return new LocalDriveAdapter();
+        if (backend === undefined || backend === '' || backend === 'local') {
+          return new LocalDriveAdapter();
+        }
+        // A misspelling must stop the server, not quietly fall back to local
+        // disk — in a container that disk is thrown away on every redeploy, so
+        // uploaded files would simply vanish.
+        throw new Error(
+          `Unknown DRIVE_BACKEND "${backend}". Use "local", "postgres" or "r2" (or leave it unset for local).`,
+        );
       },
       inject: [PrismaService],
     },

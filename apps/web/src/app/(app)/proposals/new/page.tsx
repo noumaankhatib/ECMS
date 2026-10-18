@@ -1,5 +1,6 @@
 import { PROJECT_TYPES, PROPOSAL_SUBMISSION_TYPES } from '@ecms/contracts';
 
+import { ContactPicker } from '@/components/contact-picker';
 import { EntityCombobox } from '@/components/entity-combobox';
 import { ActionForm, DateField, Field, Select, TextArea } from '@/components/form';
 import { FormAutofill } from '@/components/form-autofill';
@@ -55,6 +56,7 @@ export default async function NewProposalPage() {
                 placeholder="Search by name, reference, CR/Civil ID or phone"
                 hint="Attach now if known, or leave blank and add it later."
               />
+              <ContactPicker />
               <Field
                 label="Contact name"
                 name="contactName"
