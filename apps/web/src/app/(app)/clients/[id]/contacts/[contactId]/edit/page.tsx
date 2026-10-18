@@ -1,3 +1,5 @@
+import { formatClientName } from '@ecms/contracts';
+
 import { ActionForm, Field } from '@/components/form';
 import { Breadcrumb, Card, CardBody, PageHead } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -28,7 +30,7 @@ export default async function EditContactPage({
       <Breadcrumb
         items={[
           { href: '/clients', label: 'Clients' },
-          { href: `/clients/${id}`, label: client.name },
+          { href: `/clients/${id}`, label: formatClientName(client) },
           { label: `Edit ${contact.name}` },
         ]}
       />
@@ -50,6 +52,13 @@ export default async function EditContactPage({
             <div className="form-grid">
               <Field label="Name" name="name" defaultValue={contact.name} required />
               <Field label="Position" name="position" defaultValue={contact.position} />
+              <Field label="Designation" name="designation" defaultValue={contact.designation} />
+              <Field
+                label="Place of work"
+                name="placeOfWork"
+                defaultValue={contact.placeOfWork}
+              />
+              <Field label="ID #" name="idNumber" defaultValue={contact.idNumber} />
               <Field label="Email" name="email" type="email" defaultValue={contact.email} />
               <Field label="Phone" name="phone" defaultValue={contact.phone} />
             </div>

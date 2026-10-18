@@ -5,17 +5,8 @@ import {
 } from '@ecms/contracts';
 
 import { ActionButton, ActionForm, DateField, Field, TextArea } from '@/components/form';
-import {
-  Badge,
-  Breadcrumb,
-  Card,
-  CardBody,
-  CardHead,
-  DateText,
-  Empty,
-  PageHead,
-  Value,
-} from '@/components/ui';
+import { SuggestField } from '@/components/suggest-field';
+import { Badge, Breadcrumb, Card, CardBody, CardHead, DateText, DetailGroup, DetailItem, Empty, PageHead, Value } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
 import type {
@@ -25,6 +16,7 @@ import type {
   SubmissionMeeting,
   SubmissionReview,
 } from '@/lib/types';
+import { loadStaffNames } from '@/lib/user-names';
 
 import {
   approveSubmission,
@@ -109,6 +101,7 @@ export default async function SubmissionPage({
 
   const closed = project.status === 'CLOSED';
   const mayCreate = session.can('planning:create', id) && !closed;
+  const staff = mayCreate ? await loadStaffNames() : [];
   const mayEdit = session.can('planning:edit', id) && !closed;
   // Self-approval is refused by the server; exclude it here so the form is
   // never shown to someone who created the submission.
@@ -287,7 +280,11 @@ export default async function SubmissionPage({
                   <input type="hidden" name="submissionId" value={submissionId} />
                   <div className="form-grid">
                     <DateField label="Review date" name="reviewDate" required />
-                    <Field label="Reviewer" name="reviewerName" />
+                    <SuggestField
+                      label="Reviewer"
+                      name="reviewerName"
+                      suggestions={[...reviews.items.flatMap((r) => (r.reviewerName ? [r.reviewerName] : [])), ...staff]}
+                    />
                     <DateField label="Response due" name="responseDueAt" />
                   </div>
                   <TextArea label="Comments" name="comments" />
@@ -364,30 +361,16 @@ export default async function SubmissionPage({
         <Card>
           <CardHead title="Details" />
           <CardBody>
-            <dl className="definition">
-              <dt>Reference</dt>
-              <dd className="mono">{submission.reference}</dd>
-              <dt>Authority</dt>
-              <dd>{submission.authorityName}</dd>
-              <dt>Department</dt>
-              <dd>
-                <Value>{DEPARTMENT_LABEL[submission.department] ?? submission.department}</Value>
-              </dd>
-              <dt>Pending with</dt>
-              <dd>
-                <Value>{submission.pendingWith}</Value>
-              </dd>
-              <dt>Permit reference</dt>
-              <dd>
-                <Value>{submission.permitReference}</Value>
-              </dd>
+            <DetailGroup>
+              <DetailItem label="Reference" mono>{submission.reference}</DetailItem>
+              <DetailItem label="Authority">{submission.authorityName}</DetailItem>
+              <DetailItem label="Department"><Value>{DEPARTMENT_LABEL[submission.department] ?? submission.department}</Value></DetailItem>
+              <DetailItem label="Pending with"><Value>{submission.pendingWith}</Value></DetailItem>
+              <DetailItem label="Permit reference"><Value>{submission.permitReference}</Value></DetailItem>
               {submission.notes ? (
-                <>
-                  <dt>Notes</dt>
-                  <dd style={{ whiteSpace: 'pre-wrap' }}>{submission.notes}</dd>
-                </>
+                <DetailItem label="Notes" wide><span style={{ whiteSpace: 'pre-wrap' }}>{submission.notes}</span></DetailItem>
               ) : null}
-            </dl>
+            </DetailGroup>
           </CardBody>
         </Card>
       </div>

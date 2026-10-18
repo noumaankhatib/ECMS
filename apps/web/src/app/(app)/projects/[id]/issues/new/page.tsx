@@ -1,10 +1,11 @@
 import { ISSUE_PRIORITIES, ISSUE_SEVERITIES, WORKSTREAM_TYPES } from '@ecms/contracts';
 
+import { EntityCombobox } from '@/components/entity-combobox';
 import { ActionForm, DateField, Field, Select, TextArea } from '@/components/form';
 import { Breadcrumb, Card, CardBody, PageHead } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
-import type { Page as ApiPage, Project, ProjectMember, UserRow } from '@/lib/types';
+import type { Project } from '@/lib/types';
 
 import { createIssue } from '../actions';
 
@@ -17,19 +18,12 @@ export default async function NewIssuePage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ observationId?: string }>;
 }) {
-  const session = await requireSession();
+  await requireSession();
   const { id } = await params;
   const { observationId } = await searchParams;
 
-  const [project, members] = await Promise.all([
-    api.get<Project>(`/projects/${id}`),
-    api.get<ProjectMember[]>(`/projects/${id}/members`),
-  ]);
+  const project = await api.get<Project>(`/projects/${id}`);
 
-  const users = session.can('user:view')
-    ? await api.get<ApiPage<UserRow>>('/users?pageSize=100').catch(() => null)
-    : null;
-  const userName = new Map((users?.items ?? []).map((u) => [u.id, u.displayName]));
 
   return (
     <>
@@ -86,13 +80,12 @@ export default async function NewIssuePage({
                 defaultValue="MEDIUM"
                 options={ISSUE_PRIORITIES.map((p) => ({ value: p, label: p }))}
               />
-              <Select
+              <EntityCombobox
                 label="Owner"
                 name="ownerId"
-                options={members.map((m) => ({
-                  value: m.userId,
-                  label: userName.get(m.userId) ?? m.userId,
-                }))}
+                searchUrl="/lookup/users/search?browse=true&activeOnly=true"
+                browseOnFocus
+                placeholder="Select or search a person"
               />
               <DateField label="Due date" name="dueDate" />
             </div>

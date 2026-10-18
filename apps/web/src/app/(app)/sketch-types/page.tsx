@@ -1,5 +1,5 @@
 import { ActionButton, ActionForm, Field } from '@/components/form';
-import { Card, CardBody, CardHead, Empty, PageHead } from '@/components/ui';
+import { Card, CardHead, Empty, PageHead } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requirePermission } from '@/lib/session';
 import type { ProposalSketchType } from '@/lib/types';
@@ -35,46 +35,47 @@ export default async function SketchTypesPage() {
         description="The fixed list proposals pick a sketch type from. Retiring one keeps it on any proposal already using it."
       />
 
-      <Card>
-        <CardHead title="Active types" />
+      <Card accent="blue">
+        <CardHead title="Active types">
+          <span className="count-pill">{sorted.length}</span>
+        </CardHead>
         {sorted.length === 0 ? (
           <Empty title="No sketch types">Add the first one below.</Empty>
         ) : (
-          <table>
+          <table className="ref-table">
             <thead>
               <tr>
                 <th>Code</th>
-                <th>Label</th>
-                <th>Sort order</th>
+                <th>Label and sort order</th>
                 <th />
               </tr>
             </thead>
             <tbody>
               {sorted.map((sketchType) => (
                 <tr key={sketchType.id}>
-                  <td className="mono">{sketchType.code}</td>
                   <td>
-                    <ActionForm action={updateSketchType} submitLabel="Save">
+                    <span className="ref-code">{sketchType.code}</span>
+                  </td>
+                  <td className="ref-edit">
+                    <ActionForm action={updateSketchType} submitLabel="Save" layout="compact">
                       <input type="hidden" name="id" value={sketchType.id} />
-                      <div className="row">
-                        <Field
-                          label="Label"
-                          name="label"
-                          id={`label-${sketchType.id}`}
-                          defaultValue={sketchType.label}
-                        />
-                        <Field
-                          label="Sort order"
-                          name="sortOrder"
-                          id={`sortOrder-${sketchType.id}`}
-                          type="number"
-                          defaultValue={String(sketchType.sortOrder)}
-                        />
-                      </div>
+                      <Field
+                        label="Label"
+                        name="label"
+                        id={`label-${sketchType.id}`}
+                        defaultValue={sketchType.label}
+                      />
+                      <Field
+                        label="Sort order"
+                        name="sortOrder"
+                        id={`sortOrder-${sketchType.id}`}
+                        type="number"
+                        narrow
+                        defaultValue={String(sketchType.sortOrder)}
+                      />
                     </ActionForm>
                   </td>
-                  <td>{sketchType.sortOrder}</td>
-                  <td className="right">
+                  <td className="ref-actions">
                     <ActionButton
                       action={archiveSketchType.bind(null, sketchType.id)}
                       label="Retire"
@@ -89,23 +90,23 @@ export default async function SketchTypesPage() {
         )}
       </Card>
 
-      <Card>
-        <CardHead title="Add a sketch type" />
-        <CardBody>
-          <ActionForm action={createSketchType} submitLabel="Add">
-            <div className="form-grid">
-              <Field
-                label="Code"
-                name="code"
-                required
-                hint="Upper-case letters, digits and underscores only, e.g. TWIN_VILLA. Never editable afterwards."
-              />
-              <Field label="Label" name="label" required hint="What staff see and pick." />
-              <Field label="Sort order" name="sortOrder" type="number" defaultValue="0" />
-            </div>
+      <div className="ref-add card card--accent card--green">
+        <header className="card__head">
+          <h2>Add a sketch type</h2>
+        </header>
+        <div className="card__body">
+          <ActionForm action={createSketchType} submitLabel="Add" layout="inline">
+            <Field
+              label="Code"
+              name="code"
+              required
+              hint="Upper-case letters, digits and underscores, e.g. TWIN_VILLA. Never editable afterwards."
+            />
+            <Field label="Label" name="label" required hint="What staff see and pick." />
+            <Field label="Sort order" name="sortOrder" type="number" narrow defaultValue="0" />
           </ActionForm>
-        </CardBody>
-      </Card>
+        </div>
+      </div>
     </>
   );
 }

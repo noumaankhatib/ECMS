@@ -35,9 +35,13 @@ export function Field({
   hint,
   wide,
   autoComplete,
+  disabled,
+  narrow,
 }: {
   label: string;
   name: string;
+  /** A short field (a sort order, a count) that should not stretch. */
+  narrow?: boolean;
   /** Overrides the element's `id` (and its label/hint association) without
    *  changing `name` — needed wherever the same field repeats once per row
    *  (a table of per-row edit forms plus an "Add" form below it), since
@@ -50,10 +54,11 @@ export function Field({
   hint?: string;
   wide?: boolean;
   autoComplete?: string;
+  disabled?: boolean;
 }) {
   const fieldId = id ?? name;
   return (
-    <div className={`field${wide ? ' field--wide' : ''}`}>
+    <div className={`field${wide ? ' field--wide' : ''}${narrow ? ' field--narrow' : ''}`}>
       <label htmlFor={fieldId}>
         {label}
         {required ? <span aria-hidden="true"> *</span> : null}
@@ -64,6 +69,7 @@ export function Field({
         type={type}
         defaultValue={defaultValue ?? ''}
         required={required ?? false}
+        disabled={disabled ?? false}
         {...(hint ? { 'aria-describedby': `${fieldId}-hint` } : {})}
         {...(autoComplete ? { autoComplete } : {})}
       />
@@ -449,17 +455,27 @@ export function TextArea({
   label,
   name,
   defaultValue,
+  required,
   hint,
 }: {
   label: string;
   name: string;
   defaultValue?: string | null | undefined;
+  required?: boolean;
   hint?: string;
 }) {
   return (
     <div className="field field--wide">
-      <label htmlFor={name}>{label}</label>
-      <textarea id={name} name={name} defaultValue={defaultValue ?? ''} />
+      <label htmlFor={name}>
+        {label}
+        {required ? <span aria-hidden="true"> *</span> : null}
+      </label>
+      <textarea
+        id={name}
+        name={name}
+        defaultValue={defaultValue ?? ''}
+        required={required ?? false}
+      />
       {hint ? <span className="hint">{hint}</span> : null}
     </div>
   );
@@ -474,6 +490,7 @@ export function Select({
   required,
   hint,
   wide,
+  onChange,
 }: {
   label: string;
   name: string;
@@ -486,6 +503,7 @@ export function Select({
   required?: boolean;
   hint?: string;
   wide?: boolean;
+  onChange?: (value: string) => void;
 }) {
   const fieldId = id ?? name;
   return (
@@ -499,6 +517,7 @@ export function Select({
         name={name}
         defaultValue={defaultValue ?? ''}
         required={required ?? false}
+        {...(onChange ? { onChange: (e) => onChange(e.target.value) } : {})}
       >
         {required ? null : <option value="">—</option>}
         {options.map((option) => (
@@ -643,17 +662,27 @@ export function ActionForm({
   action,
   submitLabel,
   cancelHref,
+  layout,
   children,
 }: {
   action: (state: FormState, formData: FormData) => Promise<FormState>;
   submitLabel: string;
   cancelHref?: string;
+  /** `inline` lays the fields and the button out on one line (labels shown);
+   *  `compact` does the same with the labels visually hidden, for an editable
+   *  row in a list whose column headings already name each field. */
+  layout?: 'inline' | 'compact';
   children: ReactNode;
 }) {
   const [state, formAction] = useActionState<FormState, FormData>(action, {});
 
   return (
-    <form action={formAction} className="stack">
+    <form
+      action={formAction}
+      className={
+        layout === 'inline' ? 'form--inline' : layout === 'compact' ? 'form--inline form--compact' : 'stack'
+      }
+    >
       <ErrorBanner state={state} />
       {children}
       <div className="form-actions">

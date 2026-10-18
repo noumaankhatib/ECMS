@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { ProjectContext } from '@/components/context-strip';
 import {
   ActionButton,
   ActionForm,
@@ -86,6 +87,8 @@ export default async function DocumentsPage({
         ]}
       />
       <PageHead title="Documents" description={project.name} />
+
+      <ProjectContext project={project} session={session} />
 
       <div className="stack">
         {completeness.items.length > 0 ? (

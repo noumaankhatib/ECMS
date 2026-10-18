@@ -1,6 +1,7 @@
 import { ISSUE_STATUSES, WORKSTREAM_TYPES } from '@ecms/contracts';
 import Link from 'next/link';
 
+import { ProjectContext } from '@/components/context-strip';
 import {
   Badge,
   Breadcrumb,
@@ -85,12 +86,13 @@ export default async function IssuesPage({
         ) : null}
       </PageHead>
 
-      <form className="row" style={{ marginBottom: 'var(--space-4)' }}>
+      <ProjectContext project={project} session={session} />
+
+      <form className="filter-bar">
         <select
           name="status"
           defaultValue={status ?? ''}
           aria-label="Filter by status"
-          style={{ width: 'auto' }}
         >
           <option value="">Any status</option>
           {ISSUE_STATUSES.map((s) => (
@@ -104,7 +106,6 @@ export default async function IssuesPage({
             name="workstreamType"
             defaultValue={workstreamType ?? ''}
             aria-label="Filter by workstream"
-            style={{ width: 'auto' }}
           >
             <option value="">Any workstream</option>
             {WORKSTREAM_TYPES.map((w) => (

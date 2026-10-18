@@ -1,3 +1,4 @@
+import { formatClientName } from '@ecms/contracts';
 import Link from 'next/link';
 
 import { Card, DateText, Empty, PageHead, Pagination, StatusBadge } from '@/components/ui';
@@ -72,7 +73,7 @@ export default async function AdminDataPage({
     total = result.total;
     items = result.items.map((c) => ({
       id: c.id,
-      label: c.name,
+      label: formatClientName(c),
       sublabel: c.reference ?? null,
       status: null,
       createdAt: c.createdAt,
@@ -137,7 +138,7 @@ export default async function AdminDataPage({
             {TABS.find((t) => t.key === tab)?.label ?? ''}
           </span>
         </div>
-        <p style={{ color: 'var(--color-danger, #c0392b)', fontWeight: 500 }}>
+        <p style={{ color: 'var(--danger)', fontWeight: 500 }}>
           Hard delete is permanent and cannot be undone. Review the impact tree carefully.
         </p>
       </div>

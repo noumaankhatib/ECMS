@@ -1,14 +1,5 @@
 import { ActionForm, Field, TextArea } from '@/components/form';
-import {
-  Badge,
-  Breadcrumb,
-  Card,
-  CardBody,
-  CardHead,
-  Empty,
-  PageHead,
-  Value,
-} from '@/components/ui';
+import { Badge, Breadcrumb, Card, CardBody, CardHead, DetailGroup, DetailItem, Empty, PageHead, Value } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
 import type { Document, Project } from '@/lib/types';
@@ -53,12 +44,9 @@ export default async function DocumentPage({
     <Card>
       <CardHead title="Details" />
       <CardBody>
-        <dl className="definition">
-          <dt>Category</dt>
-          <dd>{document.category}</dd>
-          <dt>File</dt>
-          <dd>
-            {document.uploadStatus === 'ACTIVE' ? (
+        <DetailGroup>
+          <DetailItem label="Category">{document.category}</DetailItem>
+          <DetailItem label="File">{document.uploadStatus === 'ACTIVE' ? (
               // PDFs/images render inline (API sets Content-Disposition
               // accordingly) — opened in a new tab so viewing one never
               // navigates away from this page. Anything else the browser
@@ -68,21 +56,14 @@ export default async function DocumentPage({
               </a>
             ) : (
               <Value>{null}</Value>
-            )}
-          </dd>
+            )}</DetailItem>
           {document.archivedAt ? (
-            <>
-              <dt>Archived</dt>
-              <dd>This document is archived. The file is kept, only hidden from ordinary lists.</dd>
-            </>
+            <DetailItem label="Archived">This document is archived. The file is kept, only hidden from ordinary lists.</DetailItem>
           ) : null}
           {document.description ? (
-            <>
-              <dt>Description</dt>
-              <dd style={{ whiteSpace: 'pre-wrap' }}>{document.description}</dd>
-            </>
+            <DetailItem label="Description" wide><span style={{ whiteSpace: 'pre-wrap' }}>{document.description}</span></DetailItem>
           ) : null}
-        </dl>
+        </DetailGroup>
       </CardBody>
     </Card>
   );

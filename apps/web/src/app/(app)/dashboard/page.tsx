@@ -132,7 +132,7 @@ function KpiCard({
 }) {
   return (
     <Details
-      className="kpi-card"
+      className={`kpi-card kpi-card--${accent ?? 'blue'}`}
       content={details}
       triggerLabel={`Breakdown of ${label.toLowerCase()}`}
       triggerClassName="kpi-card__details-trigger"
@@ -559,8 +559,8 @@ export default async function DashboardPage() {
             </div>
           </section>
 
-          <div className="grid-2">
-            <Card>
+          <div className="grid-2 grid-2--fill">
+            <Card accent="orange">
               <CardHead title="Needs attention">
                 {attentionRows.length > 0 ? (
                   <span className="count-pill">{attentionRows.length}</span>
@@ -622,7 +622,7 @@ export default async function DashboardPage() {
               )}
             </Card>
 
-            <Card>
+            <Card accent="blue">
               <CardHead title="Quick actions" />
               <CardBody>
                 {primaryActions.length > 0 ? (
@@ -775,9 +775,9 @@ export default async function DashboardPage() {
           </div>
 
           {summary.projects || summary.proposals ? (
-            <div className="grid-2 grid-2--even">
+            <div className="grid-2 grid-2--even grid-2--fill">
               {summary.projects ? (
-                <Card>
+                <Card accent="blue">
                   <CardHead title="Project status">
                     <Link href="/projects" className="button button--secondary button--small">
                       View all
@@ -832,7 +832,7 @@ export default async function DashboardPage() {
               ) : null}
 
               {summary.proposals ? (
-                <Card>
+                <Card accent="purple">
                   <CardHead title="Proposal funnel">
                     <Link href="/proposals" className="button button--secondary button--small">
                       View all
@@ -879,10 +879,10 @@ export default async function DashboardPage() {
               for a shorter utility rail (calendar/notifications/deadlines) — kept
               close in height on purpose so neither column trails off into a long
               empty gap below the other. */}
-          <div className="grid-2">
+          <div className="grid-2 grid-2--fill">
             <div className="stack">
               {summary.issues ? (
-                <Card>
+                <Card accent="red">
                   <CardHead title="Issues overview" />
                   <CardBody>
                     <div className="stat-grid">
@@ -915,17 +915,18 @@ export default async function DashboardPage() {
                 </Card>
               ) : null}
 
+              <div className="pair">
               {summary.supervisionAgreements ? (
-                <Card>
+                <Card accent="green">
                   <CardHead title="Supervision agreements" />
                   <CardBody>
                     <div className="stat-grid">
                       <div className="stat">
-                        <span className="stat__value">{summary.supervisionAgreements.active}</span>
+                        <span className="stat__value stat__value--green">{summary.supervisionAgreements.active}</span>
                         <span className="stat__label">Active</span>
                       </div>
                       <div className="stat">
-                        <span className="stat__value">
+                        <span className="stat__value stat__value--orange">
                           {summary.supervisionAgreements.nearingQuota}
                         </span>
                         <span className="stat__label">Nearing quota</span>
@@ -936,17 +937,65 @@ export default async function DashboardPage() {
               ) : null}
 
               {summary.handover ? (
-                <Card>
+                <Card accent="orange">
                   <CardHead title="Handover" />
                   <CardBody>
                     <div className="stat-grid">
                       <div className="stat">
-                        <span className="stat__value">{summary.handover.completedNotClosed}</span>
+                        <span className="stat__value stat__value--purple">{summary.handover.completedNotClosed}</span>
                         <span className="stat__label">Completed, not closed</span>
                       </div>
                       <div className="stat">
-                        <span className="stat__value">{summary.handover.ready}</span>
+                        <span className="stat__value stat__value--green">{summary.handover.ready}</span>
                         <span className="stat__label">Ready to close</span>
+                      </div>
+                    </div>
+                  </CardBody>
+                </Card>
+              ) : null}
+              </div>
+
+              {summary.recentActivity && summary.recentActivity.length > 0 ? (
+                <Card>
+                  <CardHead title="Recent activity" />
+                  <CardBody>
+                    <div className="activity-columns">
+                      <div className="activity-column">
+                        <h3 className="activity-column__head">Delivery (projects &amp; issues)</h3>
+                        {deliveryActivity.length > 0 ? (
+                          <ul className="activity-list">
+                            {deliveryActivity.map((item, index) => (
+                              <li key={index}>
+                                <ActivityIcon entityType={item.entityType} />
+                                <span className="activity-list__text">{activityLabel(item)}</span>
+                                <span className="activity-list__time">{timeAgo(item.occurredAt)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="muted" style={{ fontSize: 13 }}>
+                            Nothing yet.
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="activity-column">
+                        <h3 className="activity-column__head">Clients &amp; proposals</h3>
+                        {clientActivity.length > 0 ? (
+                          <ul className="activity-list">
+                            {clientActivity.map((item, index) => (
+                              <li key={index}>
+                                <ActivityIcon entityType={item.entityType} />
+                                <span className="activity-list__text">{activityLabel(item)}</span>
+                                <span className="activity-list__time">{timeAgo(item.occurredAt)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="muted" style={{ fontSize: 13 }}>
+                            Nothing yet.
+                          </p>
+                        )}
                       </div>
                     </div>
                   </CardBody>
@@ -956,7 +1005,7 @@ export default async function DashboardPage() {
 
             <div className="stack">
               {summary.upcomingDeadlines && summary.upcomingDeadlines.length > 0 ? (
-                <Card>
+                <Card accent="blue">
                   <CardHead title="This month" />
                   <CardBody>
                     <MiniCalendar dates={summary.upcomingDeadlines} />
@@ -979,7 +1028,7 @@ export default async function DashboardPage() {
               ) : null}
 
               {notifications.length > 0 ? (
-                <Card>
+                <Card accent="purple">
                   <CardHead title="Notifications">
                     <Link href="/notifications" className="button button--secondary button--small">
                       View all
@@ -1005,7 +1054,7 @@ export default async function DashboardPage() {
               ) : null}
 
               {summary.upcomingDeadlines && summary.upcomingDeadlines.length > 0 ? (
-                <Card>
+                <Card accent="orange">
                   <CardHead title="Upcoming deadlines" />
                   <CardBody>
                     <ul className="deadline-list">
@@ -1029,52 +1078,6 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          {summary.recentActivity && summary.recentActivity.length > 0 ? (
-            <Card>
-              <CardHead title="Recent activity" />
-              <CardBody>
-                <div className="activity-columns">
-                  <div className="activity-column">
-                    <h3 className="activity-column__head">Delivery (projects &amp; issues)</h3>
-                    {deliveryActivity.length > 0 ? (
-                      <ul className="activity-list">
-                        {deliveryActivity.map((item, index) => (
-                          <li key={index}>
-                            <ActivityIcon entityType={item.entityType} />
-                            <span className="activity-list__text">{activityLabel(item)}</span>
-                            <span className="activity-list__time">{timeAgo(item.occurredAt)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="muted" style={{ fontSize: 13 }}>
-                        Nothing yet.
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="activity-column">
-                    <h3 className="activity-column__head">Clients &amp; proposals</h3>
-                    {clientActivity.length > 0 ? (
-                      <ul className="activity-list">
-                        {clientActivity.map((item, index) => (
-                          <li key={index}>
-                            <ActivityIcon entityType={item.entityType} />
-                            <span className="activity-list__text">{activityLabel(item)}</span>
-                            <span className="activity-list__time">{timeAgo(item.occurredAt)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="muted" style={{ fontSize: 13 }}>
-                        Nothing yet.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </CardBody>
-            </Card>
-          ) : null}
         </div>
       )}
     </>

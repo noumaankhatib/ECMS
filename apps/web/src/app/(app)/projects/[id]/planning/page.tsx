@@ -1,7 +1,11 @@
 import type { SubmissionStatus } from '@ecms/contracts';
 import Link from 'next/link';
 
+import { ProjectContext } from '@/components/context-strip';
+import { EntityCombobox } from '@/components/entity-combobox';
 import { ActionButton, ActionForm, DateField, Field, Select, TextArea } from '@/components/form';
+import { SuggestField } from '@/components/suggest-field';
+import { TemplateChecklist } from '@/components/template-checklist';
 import {
   Badge,
   Breadcrumb,
@@ -15,17 +19,19 @@ import {
 } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
+import { AUTHORITIES, PENDING_WITH } from '@/lib/suggestions';
 import type {
   Milestone,
   Page as ApiPage,
   PlanningActivity,
+  PlanningTemplateItem,
   Project,
-  ProjectMember,
   Submission,
-  UserRow,
 } from '@/lib/types';
+import { loadUserNames } from '@/lib/user-names';
 
 import {
+  applyPlanningTemplate,
   archiveActivity,
   archiveMilestone,
   createActivity,
@@ -65,20 +71,22 @@ export default async function PlanningPage({ params }: { params: Promise<{ id: s
   const session = await requireSession();
   const { id } = await params;
 
-  const [project, activities, milestones, submissions, members] = await Promise.all([
+  const [project, activities, milestones, submissions] = await Promise.all([
     api.get<Project>(`/projects/${id}`),
     api.get<ApiPage<PlanningActivity>>(`/projects/${id}/planning/activities?pageSize=100`),
     api.get<ApiPage<Milestone>>(`/projects/${id}/planning/milestones?pageSize=100`),
     api.get<ApiPage<Submission>>(`/projects/${id}/planning/submissions?pageSize=100`),
-    api.get<ProjectMember[]>(`/projects/${id}/members`),
   ]);
 
-  const users = session.can('user:view')
-    ? await api.get<ApiPage<UserRow>>('/users?pageSize=100').catch(() => null)
-    : null;
-  const userName = new Map((users?.items ?? []).map((u) => [u.id, u.displayName]));
+  const userName = await loadUserNames(activities.items.map((a) => a.assigneeId));
   const nameFor = (userId: string | null): string | null =>
     userId ? (userName.get(userId) ?? userId) : null;
+
+  const templates = await api
+    .get<PlanningTemplateItem[]>('/planning-templates')
+    .catch(() => [] as PlanningTemplateItem[]);
+  const activityTemplates = templates.filter((t) => t.kind === 'ACTIVITY').map((t) => t.name);
+  const milestoneTemplates = templates.filter((t) => t.kind === 'MILESTONE').map((t) => t.name);
 
   const closed = project.status === 'CLOSED';
   const mayCreate = session.can('planning:create', id) && !closed;
@@ -94,6 +102,8 @@ export default async function PlanningPage({ params }: { params: Promise<{ id: s
         ]}
       />
       <PageHead title="Planning" description={project.name} />
+
+      <ProjectContext project={project} session={session} />
 
       <div className="stack">
         <Card>
@@ -153,17 +163,29 @@ export default async function PlanningPage({ params }: { params: Promise<{ id: s
           )}
           {mayCreate ? (
             <CardBody>
+              <TemplateChecklist
+                projectId={id}
+                kind="ACTIVITY"
+                title="Add standard activities"
+                items={activityTemplates}
+                existing={activities.items.map((a) => a.name)}
+                action={applyPlanningTemplate}
+              />
               <ActionForm action={createActivity} submitLabel="Add activity">
                 <input type="hidden" name="projectId" value={id} />
                 <div className="form-grid">
-                  <Field label="Name" name="name" required />
-                  <Select
+                  <SuggestField
+                    label="Name"
+                    name="name"
+                    required
+                    suggestions={[...activities.items.map((a) => a.name), ...activityTemplates]}
+                  />
+                  <EntityCombobox
                     label="Assignee"
                     name="assigneeId"
-                    options={members.map((m) => ({
-                      value: m.userId,
-                      label: nameFor(m.userId) ?? m.userId,
-                    }))}
+                    searchUrl="/lookup/users/search?browse=true&activeOnly=true"
+                    browseOnFocus
+                    placeholder="Select or search a person"
                   />
                   <DateField label="Due date" name="dueDate" />
                 </div>
@@ -231,13 +253,26 @@ export default async function PlanningPage({ params }: { params: Promise<{ id: s
           )}
           {mayCreate ? (
             <CardBody>
+              <TemplateChecklist
+                projectId={id}
+                kind="MILESTONE"
+                title="Add standard milestones"
+                items={milestoneTemplates}
+                existing={milestones.items.map((m) => m.name)}
+                action={applyPlanningTemplate}
+              />
               <ActionForm action={createMilestone} submitLabel="Add milestone">
                 <input type="hidden" name="projectId" value={id} />
                 <div className="form-grid">
                   {/* Named distinctly from the activity form's "Name" field above —
                       both are on this page, and Field's id is derived from name,
                       so two fields called "name" would collide. */}
-                  <Field label="Name" name="milestoneName" required />
+                  <SuggestField
+                    label="Name"
+                    name="milestoneName"
+                    required
+                    suggestions={[...milestones.items.map((m) => m.name), ...milestoneTemplates]}
+                  />
                   <DateField label="Target date" name="targetDate" />
                 </div>
               </ActionForm>
@@ -302,7 +337,12 @@ export default async function PlanningPage({ params }: { params: Promise<{ id: s
                 <input type="hidden" name="projectId" value={id} />
                 <div className="form-grid">
                   <Field label="Reference" name="reference" required />
-                  <Field label="Authority" name="authorityName" required />
+                  <SuggestField
+                    label="Authority"
+                    name="authorityName"
+                    required
+                    suggestions={[...submissions.items.map((s) => s.authorityName), ...AUTHORITIES]}
+                  />
                   <Select
                     label="Department"
                     name="department"
@@ -312,9 +352,13 @@ export default async function PlanningPage({ params }: { params: Promise<{ id: s
                     ]}
                     defaultValue="PLANNING"
                   />
-                  <Field
+                  <SuggestField
                     label="Pending with"
                     name="pendingWith"
+                    suggestions={[
+                      ...submissions.items.flatMap((s) => (s.pendingWith ? [s.pendingWith] : [])),
+                      ...PENDING_WITH,
+                    ]}
                     hint="Who currently holds this — the client, the authority, us…"
                   />
                 </div>

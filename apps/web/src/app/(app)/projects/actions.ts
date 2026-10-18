@@ -19,6 +19,9 @@ export async function createProject(_state: FormState, form: FormData): Promise<
       type: form.get('type'),
       startDate: await nullableText(form, 'startDate'),
       targetEndDate: await nullableText(form, 'targetEndDate'),
+      mulkiyaReceived: form.get('mulkiyaReceived') === 'on',
+      idCardReceived: form.get('idCardReceived') === 'on',
+      agreementReceived: form.get('agreementReceived') === 'on',
     }),
   );
 
@@ -41,6 +44,9 @@ export async function updateProject(_state: FormState, form: FormData): Promise<
       type: form.get('type'),
       startDate: await nullableText(form, 'startDate'),
       targetEndDate: await nullableText(form, 'targetEndDate'),
+      mulkiyaReceived: form.get('mulkiyaReceived') === 'on',
+      idCardReceived: form.get('idCardReceived') === 'on',
+      agreementReceived: form.get('agreementReceived') === 'on',
       version: Number(form.get('version')),
     });
   });

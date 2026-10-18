@@ -71,7 +71,7 @@ export function ReportsClient({
           {visible.map((card) => {
             const Icon = ICONS[card.key];
             return (
-              <a key={card.key} href={card.href} className="report-card">
+              <a key={card.key} href={card.href} className={`report-card report-card--${card.key}`}>
                 <span className="report-card__icon">
                   <Icon width={20} height={20} />
                 </span>

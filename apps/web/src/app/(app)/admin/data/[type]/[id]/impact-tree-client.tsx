@@ -63,7 +63,7 @@ function TreeNode({ node, selected, onToggle, depth }: TreeNodeProps) {
           alignItems: 'center',
           gap: 8,
           padding: '4px 0',
-          borderBottom: '1px solid var(--color-border, #e5e7eb)',
+          borderBottom: '1px solid var(--border)',
         }}
       >
         <input
@@ -82,7 +82,7 @@ function TreeNode({ node, selected, onToggle, depth }: TreeNodeProps) {
               cursor: 'pointer',
               padding: 0,
               fontSize: 12,
-              color: 'var(--color-muted, #6b7280)',
+              color: 'var(--text-muted)',
               width: 16,
             }}
             aria-label={open ? 'Collapse' : 'Expand'}
@@ -96,9 +96,9 @@ function TreeNode({ node, selected, onToggle, depth }: TreeNodeProps) {
           style={{
             fontSize: 12,
             padding: '2px 6px',
-            background: 'var(--color-surface, #f3f4f6)',
+            background: 'var(--slate-100)',
             borderRadius: 4,
-            color: 'var(--color-muted, #6b7280)',
+            color: 'var(--text-muted)',
             flexShrink: 0,
           }}
         >
@@ -159,7 +159,7 @@ function ConfirmDialog({ count, rootLabel, onConfirm, onCancel, pending }: Confi
     >
       <div
         style={{
-          background: 'var(--color-surface-raised, #fff)',
+          background: 'var(--surface)',
           borderRadius: 8,
           padding: 32,
           maxWidth: 480,
@@ -167,7 +167,7 @@ function ConfirmDialog({ count, rootLabel, onConfirm, onCancel, pending }: Confi
           boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
         }}
       >
-        <h2 style={{ marginTop: 0, color: 'var(--color-danger, #c0392b)' }}>Permanent deletion</h2>
+        <h2 style={{ marginTop: 0, color: 'var(--danger)' }}>Permanent deletion</h2>
         <p>
           This will{' '}
           <strong>
@@ -304,7 +304,7 @@ export function ImpactTreeClient({ tree }: { tree: ImpactTree; type: string }) {
 
       <div
         style={{
-          border: '1px solid var(--color-border, #e5e7eb)',
+          border: '1px solid var(--border)',
           borderRadius: 8,
           padding: 'var(--space-3)',
           marginBottom: 'var(--space-4)',
@@ -319,10 +319,10 @@ export function ImpactTreeClient({ tree }: { tree: ImpactTree; type: string }) {
         <div
           style={{
             padding: 'var(--space-3)',
-            background: '#fef2f2',
-            border: '1px solid #fca5a5',
+            background: 'var(--danger-bg)',
+            border: '1px solid var(--danger)',
             borderRadius: 6,
-            color: '#991b1b',
+            color: 'var(--danger-text)',
             marginBottom: 'var(--space-3)',
           }}
         >
@@ -334,10 +334,10 @@ export function ImpactTreeClient({ tree }: { tree: ImpactTree; type: string }) {
         <div
           style={{
             padding: 'var(--space-3)',
-            background: '#f0fdf4',
-            border: '1px solid #86efac',
+            background: 'var(--success-bg)',
+            border: '1px solid var(--success)',
             borderRadius: 6,
-            color: '#166534',
+            color: 'var(--success-text)',
             marginBottom: 'var(--space-3)',
           }}
         >
@@ -351,7 +351,7 @@ export function ImpactTreeClient({ tree }: { tree: ImpactTree; type: string }) {
           justifyContent: 'flex-end',
           gap: 12,
           paddingTop: 'var(--space-3)',
-          borderTop: '1px solid var(--color-border, #e5e7eb)',
+          borderTop: '1px solid var(--border)',
         }}
       >
         <button

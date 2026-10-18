@@ -5,17 +5,7 @@ import {
 } from '@ecms/contracts';
 
 import { ActionButton, ActionForm, Field, FileField, TextArea } from '@/components/form';
-import {
-  Badge,
-  Breadcrumb,
-  Card,
-  CardBody,
-  CardHead,
-  DateText,
-  Empty,
-  PageHead,
-  Value,
-} from '@/components/ui';
+import { Badge, Breadcrumb, Card, CardBody, CardHead, DateText, DetailGroup, DetailItem, Empty, PageHead, Value } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
 import type { Drawing, DrawingRevision, Page as ApiPage, Project } from '@/lib/types';
@@ -218,18 +208,13 @@ export default async function DrawingPage({
         <Card>
           <CardHead title="Details" />
           <CardBody>
-            <dl className="definition">
-              <dt>Number</dt>
-              <dd className="mono">{drawing.number}</dd>
-              <dt>Title</dt>
-              <dd>{drawing.title}</dd>
-              <dt>Current revision</dt>
-              <dd>
-                <Value>
+            <DetailGroup>
+              <DetailItem label="Number" mono>{drawing.number}</DetailItem>
+              <DetailItem label="Title">{drawing.title}</DetailItem>
+              <DetailItem label="Current revision"><Value>
                   {ordered.find((r) => r.id === drawing.currentRevisionId)?.revisionCode}
-                </Value>
-              </dd>
-            </dl>
+                </Value></DetailItem>
+            </DetailGroup>
           </CardBody>
         </Card>
       </div>

@@ -1,20 +1,17 @@
-import { PROJECT_STATUSES } from '@ecms/contracts';
-import type { WorkstreamStats } from '@ecms/contracts';
+import { PROJECT_STATUSES, type WorkstreamStats } from '@ecms/contracts';
 import Link from 'next/link';
 
+import { ProjectListTable } from '@/components/project-list-table';
 import {
   Card,
   CardBody,
-  DateText,
   Empty,
   PageHead,
   Pagination,
-  StatusBadge,
-  Value,
 } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
-import type { Client, Page as ApiPage, Project } from '@/lib/types';
+import type { Page as ApiPage, Project } from '@/lib/types';
 
 export const metadata = { title: 'Supervision — ECMS' };
 
@@ -42,7 +39,7 @@ const STATUS_LABEL: Record<string, string> = {
 export default async function SupervisionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; status?: string; page?: string }>;
+  searchParams: Promise<{ search?: string; status?: string; mine?: string; page?: string }>;
 }) {
   const session = await requireSession();
   const params = await searchParams;
@@ -55,21 +52,19 @@ export default async function SupervisionPage({
   });
   if (params.search) query.set('search', params.search);
   if (params.status) query.set('status', params.status);
+  if (params.mine === '1') query.set('memberId', session.user.id);
 
   const [page, stats] = await Promise.all([
     api.get<ApiPage<Project>>(`/projects?${query.toString()}`),
     api.get<WorkstreamStats>('/insights/workstream-stats?type=SUPERVISION'),
   ]);
 
-  const clients = session.can('client:view')
-    ? await api.get<ApiPage<Client>>('/clients?pageSize=100&includeArchived=true')
-    : { items: [] as Client[] };
-  const clientName = new Map(clients.items.map((c) => [c.id, c.name]));
 
   function buildHref(targetPage: number): string {
     const q = new URLSearchParams();
     if (params.search) q.set('search', params.search);
     if (params.status) q.set('status', params.status);
+    if (params.mine === '1') q.set('mine', '1');
     q.set('page', String(targetPage));
     return `/supervision?${q.toString()}`;
   }
@@ -99,20 +94,18 @@ export default async function SupervisionPage({
         </CardBody>
       </Card>
 
-      <form className="row" style={{ margin: 'var(--space-4) 0' }}>
+      <form className="filter-bar">
         <input
           type="search"
           name="search"
           defaultValue={params.search ?? ''}
-          placeholder="Search by code or name"
+          placeholder="Search by code, name, client, plot or manager"
           aria-label="Search supervision projects"
-          style={{ maxWidth: 300 }}
         />
         <select
           name="status"
           defaultValue={params.status ?? ''}
           aria-label="Filter by status"
-          style={{ width: 'auto' }}
         >
           <option value="">Any status</option>
           {PROJECT_STATUSES.map((status) => (
@@ -121,6 +114,10 @@ export default async function SupervisionPage({
             </option>
           ))}
         </select>
+        <label className="check-inline">
+          <input type="checkbox" name="mine" value="1" defaultChecked={params.mine === '1'} /> My
+          projects
+        </label>
         <button type="submit" className="button button--secondary">
           Search
         </button>
@@ -129,45 +126,19 @@ export default async function SupervisionPage({
       <Card>
         {page.items.length === 0 ? (
           <Empty title="No supervision projects to show">
-            {params.search || params.status
+            {params.search || params.status || params.mine
               ? 'Try a different search.'
               : 'You are not a member of any supervision project yet.'}
           </Empty>
         ) : (
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Name</th>
-                  {session.can('client:view') ? <th>Client</th> : null}
-                  <th>Status</th>
-                  <th>Target end</th>
-                </tr>
-              </thead>
-              <tbody>
-                {page.items.map((project) => (
-                  <tr key={project.id}>
-                    <td className="mono">
-                      <Link href={`/projects/${project.id}/supervision`}>{project.code}</Link>
-                    </td>
-                    <td>{project.name}</td>
-                    {session.can('client:view') ? (
-                      <td>
-                        <Value>{clientName.get(project.clientId)}</Value>
-                      </td>
-                    ) : null}
-                    <td>
-                      <StatusBadge status={project.status} />
-                    </td>
-                    <td className="nowrap">
-                      <DateText value={project.targetEndDate} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ProjectListTable
+            items={page.items}
+            rowHref={(project) => `/projects/${project.id}/supervision`}
+            
+            canClient={session.can('client:view')}
+            canProperty={session.can('property:view')}
+            canPeople={session.can('user:view')}
+          />
         )}
       </Card>
 

@@ -1,19 +1,28 @@
-import { PROJECT_TYPES } from '@ecms/contracts';
+import { formatClientName, PROJECT_TYPES, PROPOSAL_SUBMISSION_TYPES } from '@ecms/contracts';
 
+import { EntityCombobox } from '@/components/entity-combobox';
 import { ActionForm, DateField, Field, Select, TextArea } from '@/components/form';
+import { SubmitterFields } from '@/components/submitter-fields';
 import { Breadcrumb, Card, CardBody, PageHead } from '@/components/ui';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { requirePermission } from '@/lib/session';
-import type {
-  Client,
-  Page as ApiPage,
-  Property,
-  Proposal,
-  ProposalSketchType,
-  UserRow,
-} from '@/lib/types';
+import type { Client, Property, Proposal, ProposalSketchType, UserRow } from '@/lib/types';
 
 import { updateProposal } from '../../actions';
+
+/** Resolves just the one record a combobox needs to show as pre-selected,
+ *  instead of fetching hundreds of rows just to find a label for one id. */
+async function fetchOption<T>(
+  path: string,
+  toOption: (item: T) => { id: string; label: string },
+): Promise<{ id: string; label: string } | null> {
+  try {
+    return toOption(await api.get<T>(path));
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
 
 export const metadata = { title: 'Edit proposal — ECMS' };
 
@@ -23,17 +32,37 @@ const TYPE_LABEL: Record<string, string> = {
   BOTH: 'Planning and supervision',
 };
 
+const SUBMISSION_TYPE_LABEL: Record<string, string> = {
+  SELF: 'Self — the client is dealing with us directly',
+  OTHER: 'Other — someone is submitting on the client’s behalf',
+};
+
 export default async function EditProposalPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requirePermission('proposal:edit');
   const { id } = await params;
 
-  const [proposal, clients, properties, sketchTypes, users] = await Promise.all([
-    api.get<Proposal>(`/proposals/${id}`),
-    api.get<ApiPage<Client>>('/clients?pageSize=100'),
-    api.get<ApiPage<Property>>('/properties?pageSize=100'),
+  const proposal = await api.get<Proposal>(`/proposals/${id}`);
+  const canSeeUsers = session.can('user:view');
+
+  const [sketchTypes, currentClient, currentProperty, currentArchitect] = await Promise.all([
     api.get<ProposalSketchType[]>('/proposal-sketch-types'),
-    session.can('user:view')
-      ? api.get<ApiPage<UserRow>>('/users?pageSize=100').catch(() => null)
+    proposal.clientId
+      ? fetchOption<Client>(`/clients/${proposal.clientId}`, (c) => ({
+          id: c.id,
+          label: formatClientName(c),
+        }))
+      : null,
+    proposal.propertyId
+      ? fetchOption<Property>(`/properties/${proposal.propertyId}`, (p) => ({
+          id: p.id,
+          label: p.name,
+        }))
+      : null,
+    proposal.assignedArchitectId && canSeeUsers
+      ? fetchOption<UserRow>(`/users/${proposal.assignedArchitectId}`, (u) => ({
+          id: u.id,
+          label: u.displayName,
+        }))
       : null,
   ]);
 
@@ -78,18 +107,28 @@ export default async function EditProposalPage({ params }: { params: Promise<{ i
                 name="contactPhone"
                 defaultValue={proposal.contactPhone}
               />
-              <Select
+              <EntityCombobox
                 label="Client"
                 name="clientId"
-                defaultValue={proposal.clientId ?? undefined}
-                options={clients.items.map((c) => ({ value: c.id, label: c.name }))}
+                searchUrl="/lookup/clients/search"
+                placeholder="Search by name, reference, CR/Civil ID or phone"
+                defaultValue={currentClient}
               />
-              <Select
+              <SubmitterFields
+                options={PROPOSAL_SUBMISSION_TYPES.map((type) => ({
+                  value: type,
+                  label: SUBMISSION_TYPE_LABEL[type] ?? type,
+                }))}
+                defaultSubmissionType={proposal.submissionType ?? undefined}
+                defaultSubmittedBy={proposal.submittedBy}
+                defaultRelationship={proposal.submitterRelationship}
+              />
+              <EntityCombobox
                 label="Property"
                 name="propertyId"
-                defaultValue={proposal.propertyId ?? undefined}
+                searchUrl="/lookup/properties/search"
                 hint="Required before this proposal can be converted to a project."
-                options={properties.items.map((p) => ({ value: p.id, label: p.name }))}
+                defaultValue={currentProperty}
               />
               <Select
                 label="Type of sketch"
@@ -113,17 +152,36 @@ export default async function EditProposalPage({ params }: { params: Promise<{ i
                 defaultValue={proposal.approxAreaSqm}
               />
               <Field label="Source" name="source" defaultValue={proposal.source} />
-              {users ? (
-                <Select
+              {canSeeUsers ? (
+                <EntityCombobox
                   label="Assigned architect"
                   name="assignedArchitectId"
-                  defaultValue={proposal.assignedArchitectId ?? undefined}
-                  options={users.items.map((u) => ({ value: u.id, label: u.displayName }))}
+                  searchUrl="/lookup/users/search?browse=true&activeOnly=true&roles=PLANNING,PROJECT_MANAGER"
+                  browseOnFocus
+                  placeholder="Select or search an architect"
+                  defaultValue={currentArchitect}
                 />
               ) : null}
+              <Field
+                label="Survey reference (Krookie)"
+                name="surveyReference"
+                defaultValue={proposal.surveyReference}
+                hint="Required before this proposal can be converted to a project."
+              />
+              <Field
+                label="Title deed reference (Mulkiya)"
+                name="titleDeedReference"
+                defaultValue={proposal.titleDeedReference}
+              />
               <DateField label="Received" name="receivedAt" defaultValue={proposal.receivedAt} />
               <DateField label="Due" name="dueAt" defaultValue={proposal.dueAt} />
             </div>
+            <TextArea
+              label="Requirements"
+              name="requirements"
+              defaultValue={proposal.requirements}
+              hint="Required before this proposal can be converted to a project."
+            />
             <TextArea label="Notes" name="notes" defaultValue={proposal.notes} />
           </ActionForm>
         </CardBody>

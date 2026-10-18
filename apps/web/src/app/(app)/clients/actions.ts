@@ -1,23 +1,28 @@
 'use server';
 
-import type { DuplicateMatch } from '@ecms/contracts';
+import { formatClientName, type DuplicateMatch } from '@ecms/contracts';
 import { redirect } from 'next/navigation';
 
 import { nullableText, refresh, runAction, text } from '@/lib/actions';
 import { api } from '@/lib/api';
 import { changed, checkThenSave } from '@/lib/duplicate-check';
 import type { FormState } from '@/lib/form-state';
+import { returnToProposal } from '@/lib/proposal-link';
 import type { Client, Contact } from '@/lib/types';
 
 /** The client's own fields, identical on create and edit. */
 async function clientFrom(form: FormData) {
   return {
-    name: await text(form, 'name'),
+    firstName: await text(form, 'firstName'),
+    fatherName: await nullableText(form, 'fatherName'),
+    grandfatherName: await nullableText(form, 'grandfatherName'),
+    surname: await nullableText(form, 'surname'),
     reference: await nullableText(form, 'reference'),
     notes: await nullableText(form, 'notes'),
     clientType: await nullableText(form, 'clientType'),
     crNumber: await nullableText(form, 'crNumber'),
     civilId: await nullableText(form, 'civilId'),
+    mobileNumber: await nullableText(form, 'mobileNumber'),
   };
 }
 
@@ -28,7 +33,7 @@ export async function createClient(_state: FormState, form: FormData): Promise<F
     form,
     () =>
       api.post<DuplicateMatch[]>('/clients/duplicates', {
-        name: fields.name,
+        name: formatClientName(fields),
         crNumber: fields.crNumber ?? undefined,
         civilId: fields.civilId ?? undefined,
       }),
@@ -42,6 +47,7 @@ export async function createClient(_state: FormState, form: FormData): Promise<F
   if (!result.ok) return result.state;
 
   await refresh('/clients');
+  await returnToProposal(form, { clientId: result.value.id });
   redirect(`/clients/${result.value.id}`);
 }
 
@@ -49,17 +55,22 @@ export async function updateClient(_state: FormState, form: FormData): Promise<F
   const id = String(form.get('id'));
   const fields = await clientFrom(form);
 
-  // Only what this edit changes is checked — see `changed`.
-  const name = changed(form, 'name');
+  // Only what this edit changes is checked — see `changed`. Any of the 4
+  // name parts changing is treated as the name changing.
+  const nameChanged =
+    changed(form, 'firstName') ??
+    changed(form, 'fatherName') ??
+    changed(form, 'grandfatherName') ??
+    changed(form, 'surname');
   const crNumber = changed(form, 'crNumber');
   const civilId = changed(form, 'civilId');
 
   const result = await checkThenSave(
     form,
     async () =>
-      name || crNumber || civilId
+      nameChanged || crNumber || civilId
         ? api.post<DuplicateMatch[]>('/clients/duplicates', {
-            ...(name ? { name } : {}),
+            ...(nameChanged ? { name: formatClientName(fields) } : {}),
             ...(crNumber ? { crNumber } : {}),
             ...(civilId ? { civilId } : {}),
             excludeId: id,
@@ -101,6 +112,9 @@ export async function addContact(_state: FormState, form: FormData): Promise<For
     await api.post<Contact>(`/clients/${clientId}/contacts`, {
       name: await text(form, 'name'),
       position: await nullableText(form, 'position'),
+      designation: await nullableText(form, 'designation'),
+      placeOfWork: await nullableText(form, 'placeOfWork'),
+      idNumber: await nullableText(form, 'idNumber'),
       email: await nullableText(form, 'email'),
       phone: await nullableText(form, 'phone'),
       isPrimary: form.get('isPrimary') === 'on',
@@ -121,6 +135,9 @@ export async function updateContact(_state: FormState, form: FormData): Promise<
     await api.patch<Contact>(`/contacts/${id}`, {
       name: await text(form, 'name'),
       position: await nullableText(form, 'position'),
+      designation: await nullableText(form, 'designation'),
+      placeOfWork: await nullableText(form, 'placeOfWork'),
+      idNumber: await nullableText(form, 'idNumber'),
       email: await nullableText(form, 'email'),
       phone: await nullableText(form, 'phone'),
       isPrimary: form.get('isPrimary') === 'on',

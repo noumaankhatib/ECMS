@@ -105,9 +105,9 @@ export default async function ReportsPage() {
       />
 
       {!summary.projects && !summary.proposals && !summary.issues ? null : (
-        <div className="grid-2" style={{ marginBottom: 'var(--space-5)' }}>
+        <div className="grid-2 grid-2--fill" style={{ marginBottom: 'var(--space-5)' }}>
           {summary.projects ? (
-            <Card>
+            <Card accent="blue">
               <CardHead title="Project status" />
               <CardBody>
                 <DonutChart
@@ -122,7 +122,7 @@ export default async function ReportsPage() {
           ) : null}
 
           {summary.proposals ? (
-            <Card>
+            <Card accent="purple">
               <CardHead title="Proposal funnel" />
               <CardBody>
                 <Funnel
@@ -137,7 +137,7 @@ export default async function ReportsPage() {
           ) : null}
 
           {summary.issues ? (
-            <Card>
+            <Card accent="red">
               <CardHead title="Issues overview" />
               <CardBody>
                 <div className="stat-grid">
@@ -159,16 +159,16 @@ export default async function ReportsPage() {
           ) : null}
 
           {summary.supervisionAgreements ? (
-            <Card>
+            <Card accent="green">
               <CardHead title="Supervision agreements" />
               <CardBody>
                 <div className="stat-grid">
                   <div className="stat">
-                    <span className="stat__value">{summary.supervisionAgreements.active}</span>
+                    <span className="stat__value stat__value--green">{summary.supervisionAgreements.active}</span>
                     <span className="stat__label">Active</span>
                   </div>
                   <div className="stat">
-                    <span className="stat__value">
+                    <span className="stat__value stat__value--orange">
                       {summary.supervisionAgreements.nearingQuota}
                     </span>
                     <span className="stat__label">Nearing quota</span>

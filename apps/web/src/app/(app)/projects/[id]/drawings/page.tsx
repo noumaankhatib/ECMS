@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { ProjectContext } from '@/components/context-strip';
 import { ActionForm, Field } from '@/components/form';
 import { Breadcrumb, Card, CardBody, Empty, PageHead, Pagination, Value } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -51,6 +52,8 @@ export default async function DrawingsPage({
         ]}
       />
       <PageHead title="Drawings" description={project.name} />
+
+      <ProjectContext project={project} session={session} />
 
       <div className="stack">
         <Card>

@@ -1,10 +1,13 @@
 import Link from 'next/link';
 
-import { ActionForm, DateField, Field, TextArea } from '@/components/form';
+import { AttendeesField } from '@/components/attendees-field';
+import { ProjectContext } from '@/components/context-strip';
+import { ActionForm, DateField, TextArea } from '@/components/form';
 import { Breadcrumb, Card, CardBody, DateText, Empty, PageHead, Value } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
 import type { Page as ApiPage, Project, SiteVisit } from '@/lib/types';
+import { loadStaffNames } from '@/lib/user-names';
 
 import { createSiteVisit } from './actions';
 
@@ -27,6 +30,7 @@ export default async function SupervisionPage({ params }: { params: Promise<{ id
 
   const closed = project.status === 'CLOSED';
   const mayCreate = session.can('supervision:create', id) && !closed;
+  const staff = mayCreate ? await loadStaffNames() : [];
 
   return (
     <>
@@ -42,6 +46,8 @@ export default async function SupervisionPage({ params }: { params: Promise<{ id
           Agreements
         </Link>
       </PageHead>
+
+      <ProjectContext project={project} session={session} />
 
       <div className="stack">
         <Card>
@@ -81,7 +87,7 @@ export default async function SupervisionPage({ params }: { params: Promise<{ id
                 <input type="hidden" name="projectId" value={id} />
                 <div className="form-grid">
                   <DateField label="Visit date" name="visitDate" required />
-                  <Field label="Attendees" name="attendees" hint="Who was there." />
+                  <AttendeesField staff={staff} />
                 </div>
                 <TextArea label="Notes" name="notes" />
               </ActionForm>

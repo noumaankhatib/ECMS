@@ -5,6 +5,7 @@ import {
   type ModificationAction,
 } from '@ecms/contracts';
 
+import { ProjectContext } from '@/components/context-strip';
 import { ActionButton, ActionForm, Field, Select, TextArea } from '@/components/form';
 import {
   Badge,
@@ -18,7 +19,15 @@ import {
 } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
-import type { Modification, Page as ApiPage, Project } from '@/lib/types';
+import type {
+  Drawing,
+  DrawingRevision,
+  Modification,
+  Observation,
+  Page as ApiPage,
+  Project,
+  SiteVisit,
+} from '@/lib/types';
 
 import { createModification, transitionModification } from './actions';
 
@@ -95,6 +104,12 @@ export default async function ModificationsPage({
 
   const closed = project.status === 'CLOSED';
   const mayCreate = session.can('planning:create', id) && !closed;
+
+  // The "raised against" pickers list this project's own revisions and
+  // observations, so nobody has to paste an id. Only loaded when the form shows.
+  const [revisionOptions, observationOptions] = mayCreate
+    ? await Promise.all([loadRevisionOptions(id), loadObservationOptions(id)])
+    : [[], []];
   const mayEdit = session.can('planning:edit', id) && !closed;
   const mayApprove = session.can('planning:approve', id) && !closed;
 
@@ -116,6 +131,8 @@ export default async function ModificationsPage({
         ]}
       />
       <PageHead title="Modifications" description={project.name} />
+
+      <ProjectContext project={project} session={session} />
 
       <div className="stack">
         <Card>
@@ -207,14 +224,16 @@ export default async function ModificationsPage({
                   />
                   <Field label="Cost impact" name="costImpact" hint="e.g. +OMR 1,200" />
                   <Field label="Time impact" name="timeImpact" hint="e.g. +1 week" />
-                  <Field
-                    label="Drawing revision id"
+                  <Select
+                    label="Drawing revision"
                     name="drawingRevisionId"
+                    options={revisionOptions}
                     hint="Optional — if this change was raised against a specific revision."
                   />
-                  <Field
-                    label="Observation id"
+                  <Select
+                    label="Site visit observation"
                     name="observationId"
+                    options={observationOptions}
                     hint="Optional — if this change was raised from a site visit observation."
                   />
                 </div>
@@ -226,4 +245,50 @@ export default async function ModificationsPage({
       </div>
     </>
   );
+}
+
+interface PickOption {
+  value: string;
+  label: string;
+}
+
+async function loadRevisionOptions(projectId: string): Promise<PickOption[]> {
+  const drawings = await api
+    .get<ApiPage<Drawing>>(`/projects/${projectId}/drawings?pageSize=100`)
+    .catch(() => null);
+  const perDrawing = await Promise.all(
+    (drawings?.items ?? []).map(async (drawing) => {
+      const revisions = await api
+        .get<ApiPage<DrawingRevision>>(
+          `/projects/${projectId}/drawings/${drawing.id}/revisions?pageSize=100`,
+        )
+        .catch(() => null);
+      return (revisions?.items ?? []).map((revision) => ({
+        value: revision.id,
+        label: `${drawing.number} · Rev ${revision.revisionCode} — ${drawing.title}`,
+      }));
+    }),
+  );
+  return perDrawing.flat();
+}
+
+async function loadObservationOptions(projectId: string): Promise<PickOption[]> {
+  const visits = await api
+    .get<ApiPage<SiteVisit>>(`/projects/${projectId}/supervision/site-visits?pageSize=100`)
+    .catch(() => null);
+  const perVisit = await Promise.all(
+    (visits?.items ?? []).map(async (visit) => {
+      const observations = await api
+        .get<ApiPage<Observation>>(
+          `/projects/${projectId}/supervision/site-visits/${visit.id}/observations?pageSize=100`,
+        )
+        .catch(() => null);
+      const day = visit.visitDate.slice(0, 10);
+      return (observations?.items ?? []).map((observation) => ({
+        value: observation.id,
+        label: `${day} — ${observation.description.slice(0, 70)}`,
+      }));
+    }),
+  );
+  return perVisit.flat();
 }

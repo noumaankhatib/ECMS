@@ -90,6 +90,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             show: session.can('required_document:admin'),
           },
           {
+            href: '/planning-templates',
+            label: 'Planning templates',
+            icon: 'sketchTypes',
+            show: session.can('work_template:admin'),
+          },
+          {
             href: '/sketch-types',
             label: 'Sketch types',
             icon: 'sketchTypes',
@@ -170,6 +176,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       groups={groups}
       defaultCollapsed={defaultCollapsed}
       quickCreateLinks={quickCreateLinks}
+      theme={cookieStore.get('ecms_theme')?.value === 'dark' ? 'dark' : 'light'}
       brand={
         <>
           <span className="sidebar__brand-mark">EC</span>

@@ -1,3 +1,5 @@
+import { formatClientName } from '@ecms/contracts';
+
 import { DuplicateAwareForm, PrefillFromDuplicate } from '@/components/duplicate-form';
 import { Breadcrumb, Card, CardBody, PageHead } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -13,17 +15,18 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
   const session = await requirePermission('client:edit');
   const { id } = await params;
   const client = await api.get<Client>(`/clients/${id}`);
+  const clientName = formatClientName(client);
 
   return (
     <>
       <Breadcrumb
         items={[
           { href: '/clients', label: 'Clients' },
-          { href: `/clients/${id}`, label: client.name },
+          { href: `/clients/${id}`, label: clientName },
           { label: 'Edit' },
         ]}
       />
-      <PageHead title={`Edit ${client.name}`} />
+      <PageHead title={`Edit ${clientName}`} />
 
       <Card>
         <CardBody>
@@ -44,7 +47,18 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
             <input type="hidden" name="version" value={client.version} />
             {/* What the record held when the form was rendered, so only a
                 changed name or identifier is checked for duplicates. */}
-            <input type="hidden" name="original_name" value={client.name} />
+            <input type="hidden" name="original_firstName" value={client.firstName} />
+            <input
+              type="hidden"
+              name="original_fatherName"
+              value={client.fatherName ?? ''}
+            />
+            <input
+              type="hidden"
+              name="original_grandfatherName"
+              value={client.grandfatherName ?? ''}
+            />
+            <input type="hidden" name="original_surname" value={client.surname ?? ''} />
             <input type="hidden" name="original_crNumber" value={client.crNumber ?? ''} />
             <input type="hidden" name="original_civilId" value={client.civilId ?? ''} />
             <ClientFields client={client} />

@@ -2,6 +2,7 @@ import {
   PROJECT_TRANSITIONS,
   ROLE_DEFINITIONS,
   canTransitionWorkstream,
+  formatClientName,
   type HandoverStatus,
   type ProjectAction,
   type ProjectReadiness,
@@ -10,20 +11,12 @@ import {
 import Link from 'next/link';
 import { Fragment } from 'react';
 
+import { ProjectContext } from '@/components/context-strip';
+import { EntityCombobox } from '@/components/entity-combobox';
 import { ActionButton, ActionForm, Select } from '@/components/form';
+import { NextSteps, deliverySteps } from '@/components/next-steps';
 import { OverrideForm, ReadinessList } from '@/components/readiness';
-import {
-  Badge,
-  Breadcrumb,
-  Card,
-  CardBody,
-  CardHead,
-  DateText,
-  Empty,
-  PageHead,
-  StatusBadge,
-  Value,
-} from '@/components/ui';
+import { Badge, Breadcrumb, Card, CardBody, CardHead, DateText, DetailGroup, DetailItem, Empty, PageHead, StatusBadge, Value } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
 import type {
@@ -31,6 +24,7 @@ import type {
   Page as ApiPage,
   Project,
   ProjectMember,
+  Proposal,
   Property,
   SupervisionAgreement,
   UserRow,
@@ -135,6 +129,14 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
   const isPastActive = project.status === 'COMPLETED' || project.status === 'CLOSED';
 
+  // The proposal this project was converted from, so the work can be traced back.
+  const sourceProposal = session.can('proposal:view')
+    ? await api
+        .get<ApiPage<Proposal>>(`/proposals?convertedProjectId=${id}&pageSize=1`)
+        .then((page) => page.items[0] ?? null)
+        .catch(() => null)
+    : null;
+
   const [client, property, users, currentAgreement, handover, readiness] = await Promise.all([
     session.can('client:view')
       ? api.get<Client>(`/clients/${project.clientId}`).catch(() => null)
@@ -203,9 +205,6 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     !readiness.project.ready;
 
   const onProject = new Set(members.map((m) => m.userId));
-  const addable = (users?.items ?? []).filter(
-    (user) => !onProject.has(user.id) && user.status === 'ACTIVE',
-  );
 
   return (
     <>
@@ -218,6 +217,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           </Link>
         ) : null}
       </PageHead>
+
+      <ProjectContext project={project} session={session} />
 
       {closed ? (
         <div className="alert" style={{ marginBottom: 'var(--space-4)' }} role="status">
@@ -260,352 +261,367 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         ) : null}
       </div>
 
-      <div className="grid-2">
-        <div className="stack">
-          {available.length > 0 || overrideOnly ? (
-            <Card>
-              <CardHead title="Status" />
-              <CardBody>
-                <div className="row" hidden={available.length === 0}>
-                  {available.map((candidate) => (
-                    <ActionButton
-                      key={candidate.action}
-                      action={transitionProject.bind(null, id, candidate.action, project.version)}
-                      label={candidate.label}
-                      variant={candidate.action === 'close' ? 'danger' : 'secondary'}
-                      {...(candidate.confirm ? { confirm: candidate.confirm } : {})}
-                      {...(candidate.action === 'close' && handover && !handover.ready
-                        ? {
-                            disabledReason:
-                              'Close all issues, upload every required document and complete the handover checklist first.',
-                          }
-                        : {})}
-                      {...(candidate.action === 'complete' && readiness && !readiness.project.ready
-                        ? { disabledReason: 'Complete every workstream first.' }
-                        : {})}
-                    />
-                  ))}
-                </div>
-                {(offersComplete || overrideOnly) && readiness ? (
-                  <div style={{ marginTop: 'var(--space-3)' }}>
-                    <ReadinessList
-                      readiness={readiness.project}
-                      title="Before marking complete"
-                      links={gateLinks}
-                    />
-                    {!readiness.project.ready && mayOverride ? (
-                      <OverrideForm
-                        id="override-project"
-                        action={completeWithOverride}
-                        hidden={{ projectId: id, version: project.version }}
-                      />
+      <div className="stack">
+        <Card>
+          <CardHead title="Details" />
+          <CardBody>
+            <DetailGroup>
+              <DetailItem label="Code" mono>
+                {project.code}
+              </DetailItem>
+              {sourceProposal ? (
+                <DetailItem label="From proposal">
+                  <Link href={`/proposals/${sourceProposal.id}`}>{sourceProposal.sketchNumber}</Link>
+                </DetailItem>
+              ) : null}
+              <DetailItem label="Client">
+                {client ? (
+                  <Link href={`/clients/${client.id}`}>{formatClientName(client)}</Link>
+                ) : (
+                  <span className="faint">Not shown</span>
+                )}
+              </DetailItem>
+              <DetailItem label="Property">
+                {property ? (
+                  <>
+                    <Link href={`/properties/${property.id}`}>{property.name}</Link>
+                    {property.mapUrl ? (
+                      <>
+                        {' · '}
+                        <a href={property.mapUrl} target="_blank" rel="noreferrer">
+                          View on map
+                        </a>
+                      </>
                     ) : null}
-                  </div>
-                ) : null}
-                <p className="hint" style={{ marginTop: 'var(--space-3)' }}>
-                  Only the moves that are legal from{' '}
-                  <strong>{project.status.toLowerCase().replace('_', ' ')}</strong> are offered. The
-                  server checks again regardless.
-                </p>
-              </CardBody>
-            </Card>
-          ) : null}
+                  </>
+                ) : (
+                  <span className="faint">Not shown</span>
+                )}
+              </DetailItem>
+              <DetailItem label="Type">
+                {project.type === 'BOTH' ? 'Planning and supervision' : project.type.toLowerCase()}
+              </DetailItem>
+              <DetailItem label="Start">
+                <DateText value={project.startDate} />
+              </DetailItem>
+              <DetailItem label="Target end">
+                <DateText value={project.targetEndDate} />
+              </DetailItem>
+              {project.actualEndDate ? (
+                <DetailItem label="Completed">
+                  <DateText value={project.actualEndDate} />
+                </DetailItem>
+              ) : null}
+              <DetailItem label="Documents received">
+                {[
+                  project.mulkiyaReceived ? 'Mulkiya' : null,
+                  project.idCardReceived ? 'ID card' : null,
+                  project.agreementReceived ? 'Agreement' : null,
+                ]
+                  .filter(Boolean)
+                  .join(', ') || <span className="faint">None yet</span>}
+              </DetailItem>
+              {project.description ? (
+                <DetailItem label="Description" wide>
+                  <span style={{ whiteSpace: 'pre-wrap' }}>{project.description}</span>
+                </DetailItem>
+              ) : null}
+            </DetailGroup>
+          </CardBody>
+        </Card>
 
-          {handover ? (
-            <Card>
-              <CardHead title="Handover" />
-              <CardBody>
-                <dl className="definition">
-                  <dt>Open issues</dt>
-                  <dd>{handover.openIssueCount}</dd>
-                  <dt>Missing required documents</dt>
-                  <dd>{handover.missingDocumentCount}</dd>
-                </dl>
-                <table>
-                  <tbody>
-                    {HANDOVER_ITEMS.map((item) => (
-                      <tr key={item.field}>
-                        <td>{item.label}</td>
-                        <td className="nowrap">
-                          {handover[item.at] ? (
-                            <DateText value={handover[item.at]} />
-                          ) : (
-                            <span className="faint">Not yet</span>
-                          )}
-                        </td>
-                        <td className="right">
-                          {mayEdit && !handover[item.at] ? (
-                            <ActionButton
-                              action={markHandoverItem.bind(null, id, item.field, handover.version)}
-                              label="Mark done"
-                            />
-                          ) : null}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <p className="hint" style={{ marginTop: 'var(--space-3)' }}>
-                  Closing requires no open issues, no missing required documents, and every item
-                  above ticked. The server checks this again regardless.
-                </p>
-              </CardBody>
-            </Card>
-          ) : null}
+        {project.status === 'DRAFT' ? (
+          <NextSteps
+            title="Next steps"
+            steps={[
+              {
+                label: 'Activate the project',
+                detail: 'Use Activate on the Status card below to start the work.',
+              },
+              ...deliverySteps(id, project.type),
+            ]}
+          />
+        ) : null}
 
-          <section className="card" id="workstreams">
-            <CardHead title="Workstreams" />
-            {workstreams.length === 0 ? (
-              <Empty title="No workstreams">Unusual — a project opens with at least one.</Empty>
-            ) : (
+        {available.length > 0 || overrideOnly ? (
+          <Card>
+            <CardHead title="Status" />
+            <CardBody>
+              <div className="row" hidden={available.length === 0}>
+                {available.map((candidate) => (
+                  <ActionButton
+                    key={candidate.action}
+                    action={transitionProject.bind(null, id, candidate.action, project.version)}
+                    label={candidate.label}
+                    variant={candidate.action === 'close' ? 'danger' : 'secondary'}
+                    {...(candidate.confirm ? { confirm: candidate.confirm } : {})}
+                    {...(candidate.action === 'close' && handover && !handover.ready
+                      ? {
+                          disabledReason:
+                            'Close all issues, upload every required document and complete the handover checklist first.',
+                        }
+                      : {})}
+                    {...(candidate.action === 'complete' && readiness && !readiness.project.ready
+                      ? { disabledReason: 'Complete every workstream first.' }
+                      : {})}
+                  />
+                ))}
+              </div>
+              {(offersComplete || overrideOnly) && readiness ? (
+                <div style={{ marginTop: 'var(--space-3)' }}>
+                  <ReadinessList
+                    readiness={readiness.project}
+                    title="Before marking complete"
+                    links={gateLinks}
+                  />
+                  {!readiness.project.ready && mayOverride ? (
+                    <OverrideForm
+                      id="override-project"
+                      action={completeWithOverride}
+                      hidden={{ projectId: id, version: project.version }}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+              <p className="hint" style={{ marginTop: 'var(--space-3)' }}>
+                Only the moves that are legal from{' '}
+                <strong>{project.status.toLowerCase().replace('_', ' ')}</strong> are offered. The
+                server checks again regardless.
+              </p>
+            </CardBody>
+          </Card>
+        ) : null}
+
+        {handover ? (
+          <Card>
+            <CardHead title="Handover" />
+            <CardBody>
+              <DetailGroup>
+                <DetailItem label="Open issues">{handover.openIssueCount}</DetailItem>
+                <DetailItem label="Missing required documents">{handover.missingDocumentCount}</DetailItem>
+              </DetailGroup>
               <table>
-                <thead>
-                  <tr>
-                    <th>Work</th>
-                    <th>Status</th>
-                    <th />
-                  </tr>
-                </thead>
                 <tbody>
-                  {workstreams.map((workstream) => {
-                    const gate = gateFor(workstream.id);
-                    const gated =
-                      (mayEdit || mayOverride) &&
-                      !closed &&
-                      workstream.status === 'IN_PROGRESS' &&
-                      gate;
-                    return (
-                      <Fragment key={workstream.id}>
-                        <tr>
-                          <td>{workstream.name}</td>
-                          <td>
-                            <Badge>
-                              {WORKSTREAM_LABEL[workstream.status] ?? workstream.status}
-                            </Badge>
-                          </td>
-                          <td className="right">
-                            <div className="row" style={{ justifyContent: 'flex-end' }}>
-                              {mayEdit
-                                ? (WORKSTREAM_NEXT[workstream.status] ?? [])
-                                    .filter((next) =>
-                                      canTransitionWorkstream(
-                                        workstream.status,
-                                        next.to as Workstream['status'],
-                                      ),
-                                    )
-                                    .map((next) => (
-                                      <ActionButton
-                                        key={next.to}
-                                        action={transitionWorkstream.bind(
-                                          null,
-                                          id,
-                                          workstream.id,
-                                          next.to,
-                                          workstream.version,
-                                        )}
-                                        label={next.label}
-                                        {...(next.to === 'COMPLETED' && gate && !gate.ready
-                                          ? {
-                                              disabledReason:
-                                                'Finish the outstanding work listed below first.',
-                                            }
-                                          : {})}
-                                      />
-                                    ))
-                                : null}
-                            </div>
-                          </td>
-                        </tr>
-                        {gated ? (
-                          <tr className="readiness-row">
-                            <td colSpan={3}>
-                              <ReadinessList
-                                readiness={gate}
-                                title={`Before completing ${workstream.name.toLowerCase()}`}
-                                links={gateLinks}
-                              />
-                              {!gate.ready && mayOverride ? (
-                                <OverrideForm
-                                  id={`override-${workstream.id}`}
-                                  action={completeWithOverride}
-                                  hidden={{
-                                    projectId: id,
-                                    workstreamId: workstream.id,
-                                    version: workstream.version,
-                                  }}
-                                />
-                              ) : null}
-                            </td>
-                          </tr>
+                  {HANDOVER_ITEMS.map((item) => (
+                    <tr key={item.field}>
+                      <td>{item.label}</td>
+                      <td className="nowrap">
+                        {handover[item.at] ? (
+                          <DateText value={handover[item.at]} />
+                        ) : (
+                          <span className="faint">Not yet</span>
+                        )}
+                      </td>
+                      <td className="right">
+                        {mayEdit && !handover[item.at] ? (
+                          <ActionButton
+                            action={markHandoverItem.bind(null, id, item.field, handover.version)}
+                            label="Mark done"
+                          />
                         ) : null}
-                      </Fragment>
-                    );
-                  })}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
-            )}
-          </section>
+              <p className="hint" style={{ marginTop: 'var(--space-3)' }}>
+                Closing requires no open issues, no missing required documents, and every item above
+                ticked. The server checks this again regardless.
+              </p>
+            </CardBody>
+          </Card>
+        ) : null}
 
-          {isSupervised && session.can('supervision:view', id) ? (
-            <Card>
-              <CardHead title="Supervision agreement">
-                <Link
-                  href={`/projects/${id}/supervision/agreements`}
-                  className="button button--small button--secondary"
-                >
-                  View history
-                </Link>
-              </CardHead>
-              <CardBody>
-                {currentAgreement ? (
-                  <dl className="definition">
-                    <dt>Type</dt>
-                    <dd>{currentAgreement.type === 'MONTHLY' ? 'Monthly' : 'On call'}</dd>
-                    <dt>Amount</dt>
-                    <dd>{currentAgreement.amount}</dd>
-                    <dt>Period</dt>
-                    <dd>
-                      <DateText value={currentAgreement.startDate} /> –{' '}
-                      {currentAgreement.endDate ? (
-                        <DateText value={currentAgreement.endDate} />
-                      ) : (
-                        <span className="faint">ongoing</span>
-                      )}
-                    </dd>
-                    <dt>Visits used</dt>
-                    <dd>
-                      {currentAgreement.visitsUsed} / {currentAgreement.visitsAllowed}
-                    </dd>
-                  </dl>
-                ) : (
-                  <Empty title="No active agreement">
-                    Record one from the agreements page to start tracking a visit quota.
-                  </Empty>
-                )}
-              </CardBody>
-            </Card>
-          ) : null}
-
-          <Card>
-            <CardHead title="Team">
-              <span className="muted" style={{ fontSize: 13 }}>
-                Membership is what grants access to this project
-              </span>
-            </CardHead>
+        <section className="card" id="workstreams">
+          <CardHead title="Workstreams" />
+          {workstreams.length === 0 ? (
+            <Empty title="No workstreams">Unusual — a project opens with at least one.</Empty>
+          ) : (
             <table>
               <thead>
                 <tr>
-                  <th>Person</th>
-                  <th>Role here</th>
-                  <th>Added</th>
+                  <th>Work</th>
+                  <th>Status</th>
                   <th />
                 </tr>
               </thead>
               <tbody>
-                {members.map((member) => (
-                  <tr key={member.userId}>
-                    <td>
-                      <Value>{userName.get(member.userId) ?? member.userId}</Value>
-                    </td>
-                    <td>
-                      <Value>{roleName.get(member.roleCode) ?? member.roleCode}</Value>
-                    </td>
-                    <td className="nowrap">
-                      <DateText value={member.grantedAt} />
-                    </td>
-                    <td className="right">
-                      {mayManageMembers && members.length > 1 ? (
-                        <ActionButton
-                          action={removeMember.bind(null, id, member.userId)}
-                          label="Remove"
-                          variant="danger"
-                          confirm="Remove them from this project? They will lose access to it."
-                        />
+                {workstreams.map((workstream) => {
+                  const gate = gateFor(workstream.id);
+                  const gated =
+                    (mayEdit || mayOverride) &&
+                    !closed &&
+                    workstream.status === 'IN_PROGRESS' &&
+                    gate;
+                  return (
+                    <Fragment key={workstream.id}>
+                      <tr>
+                        <td>{workstream.name}</td>
+                        <td>
+                          <Badge>{WORKSTREAM_LABEL[workstream.status] ?? workstream.status}</Badge>
+                        </td>
+                        <td className="right">
+                          <div className="row" style={{ justifyContent: 'flex-end' }}>
+                            {mayEdit
+                              ? (WORKSTREAM_NEXT[workstream.status] ?? [])
+                                  .filter((next) =>
+                                    canTransitionWorkstream(
+                                      workstream.status,
+                                      next.to as Workstream['status'],
+                                    ),
+                                  )
+                                  .map((next) => (
+                                    <ActionButton
+                                      key={next.to}
+                                      action={transitionWorkstream.bind(
+                                        null,
+                                        id,
+                                        workstream.id,
+                                        next.to,
+                                        workstream.version,
+                                      )}
+                                      label={next.label}
+                                      {...(next.to === 'COMPLETED' && gate && !gate.ready
+                                        ? {
+                                            disabledReason:
+                                              'Finish the outstanding work listed below first.',
+                                          }
+                                        : {})}
+                                    />
+                                  ))
+                              : null}
+                          </div>
+                        </td>
+                      </tr>
+                      {gated ? (
+                        <tr className="readiness-row">
+                          <td colSpan={3}>
+                            <ReadinessList
+                              readiness={gate}
+                              title={`Before completing ${workstream.name.toLowerCase()}`}
+                              links={gateLinks}
+                            />
+                            {!gate.ready && mayOverride ? (
+                              <OverrideForm
+                                id={`override-${workstream.id}`}
+                                action={completeWithOverride}
+                                hidden={{
+                                  projectId: id,
+                                  workstreamId: workstream.id,
+                                  version: workstream.version,
+                                }}
+                              />
+                            ) : null}
+                          </td>
+                        </tr>
                       ) : null}
-                    </td>
-                  </tr>
-                ))}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
+          )}
+        </section>
 
-            {mayManageMembers && addable.length > 0 ? (
-              <CardBody>
-                <ActionForm action={addMember} submitLabel="Add to project">
-                  <input type="hidden" name="projectId" value={id} />
-                  <div className="form-grid">
-                    <Select
-                      label="Person"
-                      name="userId"
-                      required
-                      options={addable.map((u) => ({
-                        value: u.id,
-                        label: `${u.displayName} (${u.username})`,
-                      }))}
-                    />
-                    <Select
-                      label="Role on this project"
-                      name="roleCode"
-                      required
-                      hint="What they do here. Their permissions still come from their own role."
-                      options={ROLE_DEFINITIONS.map((r) => ({ value: r.code, label: r.name }))}
-                    />
-                  </div>
-                </ActionForm>
-              </CardBody>
-            ) : null}
+        {isSupervised && session.can('supervision:view', id) ? (
+          <Card>
+            <CardHead title="Supervision agreement">
+              <Link
+                href={`/projects/${id}/supervision/agreements`}
+                className="button button--small button--secondary"
+              >
+                View history
+              </Link>
+            </CardHead>
+            <CardBody>
+              {currentAgreement ? (
+                <DetailGroup>
+                  <DetailItem label="Type">{currentAgreement.type === 'MONTHLY' ? 'Monthly' : 'On call'}</DetailItem>
+                  <DetailItem label="Amount">{currentAgreement.amount}</DetailItem>
+                  <DetailItem label="Period"><DateText value={currentAgreement.startDate} /> –{' '}
+                    {currentAgreement.endDate ? (
+                      <DateText value={currentAgreement.endDate} />
+                    ) : (
+                      <span className="faint">ongoing</span>
+                    )}</DetailItem>
+                  <DetailItem label="Visits used">{currentAgreement.visitsUsed} / {currentAgreement.visitsAllowed}</DetailItem>
+                </DetailGroup>
+              ) : (
+                <Empty title="No active agreement">
+                  Record one from the agreements page to start tracking a visit quota.
+                </Empty>
+              )}
+            </CardBody>
           </Card>
-        </div>
+        ) : null}
 
         <Card>
-          <CardHead title="Details" />
-          <CardBody>
-            <dl className="definition">
-              <dt>Code</dt>
-              <dd className="mono">{project.code}</dd>
-              <dt>Client</dt>
-              <dd>
-                {client ? (
-                  <Link href={`/clients/${client.id}`}>{client.name}</Link>
-                ) : (
-                  <span className="faint">Not shown</span>
-                )}
-              </dd>
-              <dt>Property</dt>
-              <dd>
-                {property ? (
-                  <Link href={`/properties/${property.id}`}>{property.name}</Link>
-                ) : (
-                  <span className="faint">Not shown</span>
-                )}
-              </dd>
-              <dt>Type</dt>
-              <dd>
-                {project.type === 'BOTH' ? 'Planning and supervision' : project.type.toLowerCase()}
-              </dd>
-              <dt>Start</dt>
-              <dd>
-                <DateText value={project.startDate} />
-              </dd>
-              <dt>Target end</dt>
-              <dd>
-                <DateText value={project.targetEndDate} />
-              </dd>
-              {project.actualEndDate ? (
-                <>
-                  <dt>Completed</dt>
-                  <dd>
-                    <DateText value={project.actualEndDate} />
-                  </dd>
-                </>
-              ) : null}
-              {project.description ? (
-                <>
-                  <dt>Description</dt>
-                  <dd style={{ whiteSpace: 'pre-wrap' }}>{project.description}</dd>
-                </>
-              ) : null}
-            </dl>
-          </CardBody>
+          <CardHead title="Team">
+            <span className="muted" style={{ fontSize: 13 }}>
+              Membership is what grants access to this project
+            </span>
+          </CardHead>
+          <table>
+            <thead>
+              <tr>
+                <th>Person</th>
+                <th>Role here</th>
+                <th>Added</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {members.map((member) => (
+                <tr key={member.userId}>
+                  <td>
+                    <Value>{userName.get(member.userId) ?? member.userId}</Value>
+                  </td>
+                  <td>
+                    <Value>{roleName.get(member.roleCode) ?? member.roleCode}</Value>
+                  </td>
+                  <td className="nowrap">
+                    <DateText value={member.grantedAt} />
+                  </td>
+                  <td className="right">
+                    {mayManageMembers && members.length > 1 ? (
+                      <ActionButton
+                        action={removeMember.bind(null, id, member.userId)}
+                        label="Remove"
+                        variant="danger"
+                        confirm="Remove them from this project? They will lose access to it."
+                      />
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {mayManageMembers ? (
+            <CardBody>
+              <ActionForm action={addMember} submitLabel="Add to project">
+                <input type="hidden" name="projectId" value={id} />
+                <div className="form-grid">
+                  <EntityCombobox
+                    label="Person"
+                    name="userId"
+                    required
+                    searchUrl={`/lookup/users/search?${new URLSearchParams({
+                      activeOnly: 'true',
+                      excludeIds: [...onProject].join(','),
+                    }).toString()}`}
+                  />
+                  <Select
+                    label="Role on this project"
+                    name="roleCode"
+                    required
+                    hint="What they do here. Their permissions still come from their own role."
+                    options={ROLE_DEFINITIONS.map((r) => ({ value: r.code, label: r.name }))}
+                  />
+                </div>
+              </ActionForm>
+            </CardBody>
+          ) : null}
         </Card>
       </div>
     </>

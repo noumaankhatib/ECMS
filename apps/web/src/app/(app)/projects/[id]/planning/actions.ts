@@ -85,7 +85,9 @@ export async function createSubmission(_state: FormState, form: FormData): Promi
       reference: await text(form, 'reference'),
       authorityName: await text(form, 'authorityName'),
       department: form.get('department') || undefined,
-      pendingWith: await nullableText(form, 'pendingWith'),
+      // The create contract accepts the field absent but not null, so a blank
+      // box is left out rather than sent as null.
+      pendingWith: (await nullableText(form, 'pendingWith')) ?? undefined,
       notes: await nullableText(form, 'notes'),
     });
   });
@@ -197,5 +199,29 @@ export async function respondClarification(_state: FormState, form: FormData): P
   });
 
   if (!result.error) await refresh(submissionPath(projectId, id));
+  return result;
+}
+
+/**
+ * Adds the ticked standard activities or milestones to a project. Each is
+ * created exactly as if typed in by hand; names already on the project are
+ * skipped so applying twice cannot duplicate anything.
+ */
+export async function applyPlanningTemplate(
+  _state: FormState,
+  form: FormData,
+): Promise<FormState> {
+  const projectId = String(form.get('projectId'));
+  const kind = String(form.get('kind'));
+  const names = form.getAll('item').map(String);
+
+  const result = await runAction(async () => {
+    const path = kind === 'MILESTONE' ? 'milestones' : 'activities';
+    for (const name of names) {
+      await api.post(`/projects/${projectId}/planning/${path}`, { name });
+    }
+  });
+
+  if (!result.error) await refresh(`/projects/${projectId}/planning`);
   return result;
 }

@@ -1,11 +1,16 @@
+import { formatClientName } from '@ecms/contracts';
 import Link from 'next/link';
 
+import { ContextStrip } from '@/components/context-strip';
 import { ActionButton } from '@/components/form';
+import { RelatedProposals } from '@/components/related-proposals';
 import {
   Breadcrumb,
   Card,
   CardBody,
   CardHead,
+  DetailGroup,
+  DetailItem,
   Empty,
   PageHead,
   StatusBadge,
@@ -18,6 +23,15 @@ import type { Client, Page as ApiPage, Project, Property } from '@/lib/types';
 import { archiveProperty } from '../actions';
 
 export const metadata = { title: 'Property — ECMS' };
+
+const LAND_USE_LABEL: Record<string, string> = {
+  RESIDENTIAL: 'Residential',
+  COMMERCIAL: 'Commercial',
+  AGRICULTURAL: 'Agricultural',
+  INDUSTRIAL: 'Industrial',
+  MIXED_USE: 'Mixed use',
+  GOVERNMENT: 'Government',
+};
 
 export default async function PropertyPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requirePermission('property:view');
@@ -43,7 +57,7 @@ export default async function PropertyPage({ params }: { params: Promise<{ id: s
       <Breadcrumb
         items={[{ href: '/properties', label: 'Properties' }, { label: property.name }]}
       />
-      <PageHead title={property.name} description={client.name}>
+      <PageHead title={property.name} description={formatClientName(client)}>
         {archived ? <span className="badge">Archived</span> : null}
         {session.can('property:edit') && !archived ? (
           <Link href={`/properties/${id}/edit`} className="button button--secondary">
@@ -60,7 +74,18 @@ export default async function PropertyPage({ params }: { params: Promise<{ id: s
         ) : null}
       </PageHead>
 
-      <div className="grid-2">
+      <ContextStrip
+        chips={[
+          session.can('client:view') && {
+            label: 'Client',
+            text: formatClientName(client),
+            href: `/clients/${client.id}`,
+            sub: client.mobileNumber,
+          },
+        ]}
+      />
+
+      <div className="stack">
         <Card>
           <CardHead title="Projects at this property" />
           {projects.items.length === 0 ? (
@@ -93,56 +118,86 @@ export default async function PropertyPage({ params }: { params: Promise<{ id: s
           )}
         </Card>
 
+        <RelatedProposals filter={{ propertyId: id }} session={session} />
+
         <Card>
           <CardHead title="Details" />
           <CardBody>
-            <dl className="definition">
-              <dt>Client</dt>
-              <dd>
-                <Link href={`/clients/${client.id}`}>{client.name}</Link>
-              </dd>
-              <dt>Reference</dt>
-              <dd className="mono">
-                <Value>{property.reference}</Value>
-              </dd>
-              <dt>Address</dt>
-              <dd>
+            <DetailGroup title="Land record">
+              <DetailItem label="Plot number" mono>
+                <Value>{property.plotNumber}</Value>
+              </DetailItem>
+              <DetailItem label="Survey reference (Krookie / Land ID)" mono>
+                <Value>{property.surveyReference}</Value>
+              </DetailItem>
+              <DetailItem label="Title deed reference (Mulkia)" mono>
+                <Value>{property.titleDeedReference}</Value>
+              </DetailItem>
+              <DetailItem label="Block number" mono>
+                <Value>{property.blockNumber}</Value>
+              </DetailItem>
+              <DetailItem label="Plot area">
+                {property.plotArea != null ? `${property.plotArea} sqm` : <Value>{null}</Value>}
+              </DetailItem>
+              <DetailItem label="Type of land use">
+                <Value>
+                  {property.landUseType
+                    ? (LAND_USE_LABEL[property.landUseType] ?? property.landUseType)
+                    : null}
+                </Value>
+              </DetailItem>
+            </DetailGroup>
+
+            <DetailGroup title="Location">
+              <DetailItem label="Wilayat / village">
+                {[property.wilayat, property.village].filter(Boolean).join(' / ') || (
+                  <span className="faint">—</span>
+                )}
+              </DetailItem>
+              <DetailItem label="Address">
                 {address.length === 0 ? (
                   <span className="faint">—</span>
                 ) : (
                   address.map((line) => <div key={line}>{line}</div>)
                 )}
-              </dd>
-              <dt>Plot number</dt>
-              <dd className="mono">
-                <Value>{property.plotNumber}</Value>
-              </dd>
-              <dt>Wilayat / village</dt>
-              <dd>
-                {[property.wilayat, property.village].filter(Boolean).join(' / ') || (
-                  <span className="faint">—</span>
+              </DetailItem>
+              <DetailItem label="Coordinates">
+                {property.easting != null && property.northing != null ? (
+                  <>
+                    {property.easting} E, {property.northing} N
+                    {property.projectionType ? ` (${property.projectionType})` : ''}
+                    {property.mapUrl ? (
+                      <>
+                        {' · '}
+                        <a href={property.mapUrl} target="_blank" rel="noreferrer">
+                          View on map
+                        </a>
+                      </>
+                    ) : null}
+                  </>
+                ) : (
+                  <Value>{null}</Value>
                 )}
-              </dd>
-              <dt>Survey reference (Krookie)</dt>
-              <dd className="mono">
-                <Value>{property.surveyReference}</Value>
-              </dd>
-              <dt>Title deed reference (Mulkia)</dt>
-              <dd className="mono">
-                <Value>{property.titleDeedReference}</Value>
-              </dd>
-              <dt>Registered owner</dt>
-              <dd>
+              </DetailItem>
+            </DetailGroup>
+
+            <DetailGroup title="Ownership">
+              <DetailItem label="Client">
+                <Link href={`/clients/${client.id}`}>{formatClientName(client)}</Link>
+              </DetailItem>
+              <DetailItem label="Registered owner">
                 <Value>{property.ownerName}</Value>
                 {property.ownerNationalId ? ` (ID ${property.ownerNationalId})` : ''}
-              </dd>
+              </DetailItem>
+              <DetailItem label="Reference" mono>
+                <Value>{property.reference}</Value>
+              </DetailItem>
               {property.notes ? (
-                <>
-                  <dt>Notes</dt>
-                  <dd style={{ whiteSpace: 'pre-wrap' }}>{property.notes}</dd>
-                </>
+                <DetailItem label="Notes" wide>
+                  <span style={{ whiteSpace: 'pre-wrap' }}>{property.notes}</span>
+                </DetailItem>
               ) : null}
-            </dl>
+            </DetailGroup>
           </CardBody>
         </Card>
       </div>

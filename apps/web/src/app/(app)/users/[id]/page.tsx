@@ -1,7 +1,7 @@
 import { ROLE_DEFINITIONS, type Role } from '@ecms/contracts';
 
 import { ActionButton, ActionForm, Field, Select } from '@/components/form';
-import { Badge, Breadcrumb, Card, CardBody, CardHead, DateText, PageHead } from '@/components/ui';
+import { Badge, Breadcrumb, Card, CardBody, CardHead, DateText, DetailGroup, DetailItem, PageHead } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requirePermission } from '@/lib/session';
 import type { UserRow } from '@/lib/types';
@@ -131,18 +131,12 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
         <Card>
           <CardHead title="Account" />
           <CardBody>
-            <dl className="definition">
-              <dt>Username</dt>
-              <dd>{user.username}</dd>
-              <dt>Email</dt>
-              <dd>{user.email ?? <span className="faint">—</span>}</dd>
-              <dt>Status</dt>
-              <dd>{user.status === 'ACTIVE' ? 'Active' : 'Disabled'}</dd>
-              <dt>Added</dt>
-              <dd>
-                <DateText value={user.createdAt} />
-              </dd>
-            </dl>
+            <DetailGroup>
+              <DetailItem label="Username">{user.username}</DetailItem>
+              <DetailItem label="Email">{user.email ?? <span className="faint">—</span>}</DetailItem>
+              <DetailItem label="Status">{user.status === 'ACTIVE' ? 'Active' : 'Disabled'}</DetailItem>
+              <DetailItem label="Added"><DateText value={user.createdAt} /></DetailItem>
+            </DetailGroup>
           </CardBody>
         </Card>
       </div>

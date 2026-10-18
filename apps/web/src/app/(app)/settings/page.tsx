@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { Card, CardBody, CardHead, PageHead } from '@/components/ui';
+import { Card, CardBody, CardHead, DetailGroup, DetailItem, PageHead } from '@/components/ui';
 import { requireSession } from '@/lib/session';
 
 export const metadata = { title: 'Settings — ECMS' };
@@ -29,6 +29,12 @@ export default async function SettingsPage() {
       show: session.can('sketch_type:admin'),
     },
     {
+      href: '/planning-templates',
+      title: 'Planning templates',
+      description: 'The standard activities and milestones offered on the Planning page.',
+      show: session.can('work_template:admin'),
+    },
+    {
       href: '/required-documents',
       title: 'Required documents',
       description: 'The checklist a project is measured against for completeness.',
@@ -44,18 +50,13 @@ export default async function SettingsPage() {
         <Card>
           <CardHead title="Your account" />
           <CardBody>
-            <dl className="definition">
-              <dt>Name</dt>
-              <dd>{session.user.displayName}</dd>
-              <dt>Username</dt>
-              <dd>{session.user.username}</dd>
+            <DetailGroup>
+              <DetailItem label="Name">{session.user.displayName}</DetailItem>
+              <DetailItem label="Username">{session.user.username}</DetailItem>
               {session.user.email ? (
-                <>
-                  <dt>Email</dt>
-                  <dd>{session.user.email}</dd>
-                </>
+                <DetailItem label="Email">{session.user.email}</DetailItem>
               ) : null}
-            </dl>
+            </DetailGroup>
           </CardBody>
         </Card>
 

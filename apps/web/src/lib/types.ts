@@ -33,13 +33,17 @@ export interface Page<T> {
 
 export interface Client {
   id: string;
-  name: string;
+  firstName: string;
+  fatherName: string | null;
+  grandfatherName: string | null;
+  surname: string | null;
   reference: string | null;
   notes: string | null;
   clientType: 'COMPANY' | 'INDIVIDUAL' | null;
   /** Commercial Registration number, stored normalised. */
   crNumber: string | null;
   civilId: string | null;
+  mobileNumber: string | null;
   version: number;
   createdAt: string;
   archivedAt: string | null;
@@ -50,6 +54,9 @@ export interface Contact {
   clientId: string;
   name: string;
   position: string | null;
+  designation: string | null;
+  placeOfWork: string | null;
+  idNumber: string | null;
   email: string | null;
   phone: string | null;
   isPrimary: boolean;
@@ -75,6 +82,18 @@ export interface Property {
   titleDeedReference: string | null;
   ownerName: string | null;
   ownerNationalId: string | null;
+  blockNumber: string | null;
+  /** A Prisma Decimal, serialised as a string — same convention as Proposal.approxAreaSqm. */
+  plotArea: string | null;
+  landUseType: string | null;
+  easting: string | null;
+  northing: string | null;
+  projectionType: string | null;
+  /** Derived server-side from easting/northing/projectionType — never stored. */
+  latitude: number | null;
+  longitude: number | null;
+  /** omanreal.com map link, derived server-side from latitude/longitude. */
+  mapUrl: string | null;
   version: number;
   archivedAt: string | null;
 }
@@ -92,8 +111,19 @@ export interface Project {
   targetEndDate: string | null;
   actualEndDate: string | null;
   externalPlanningReference: string | null;
+  mulkiyaReceived: boolean;
+  idCardReceived: boolean;
+  agreementReceived: boolean;
   version: number;
   createdAt: string;
+  /** Sent by the list endpoint only, and only to people who may see them. */
+  clientName?: string | null;
+  clientPhone?: string | null;
+  propertyName?: string | null;
+  propertyLocation?: string | null;
+  managerId?: string | null;
+  managerName?: string | null;
+  managers?: { id: string; name: string }[];
 }
 
 export interface ProjectMember {
@@ -111,6 +141,9 @@ export interface Workstream {
   name: string;
   notes: string | null;
   status: 'NOT_STARTED' | 'IN_PROGRESS' | 'ON_HOLD' | 'COMPLETED';
+  krookieReceived: boolean;
+  approvedDrawingsReceived: boolean;
+  siteEngineerId: string | null;
   version: number;
 }
 
@@ -293,6 +326,13 @@ export interface DrawingRevision {
 // Phase 5 — proposals and the sketch-type pick list
 // ---------------------------------------------------------------------------
 
+/** A proposal row from the list endpoint: the names its ids point at. */
+export interface ProposalListItem extends Proposal {
+  clientName: string | null;
+  propertyName: string | null;
+  propertyLocation: string | null;
+}
+
 export interface Proposal {
   id: string;
   clientId: string | null;
@@ -305,6 +345,12 @@ export interface Proposal {
   approxAreaSqm: string | null;
   source: string | null;
   assignedArchitectId: string | null;
+  surveyReference: string | null;
+  titleDeedReference: string | null;
+  requirements: string | null;
+  submissionType: 'SELF' | 'OTHER' | null;
+  submittedBy: string | null;
+  submitterRelationship: string | null;
   status: ProposalStatus;
   receivedAt: string | null;
   dueAt: string | null;
@@ -313,6 +359,13 @@ export interface Proposal {
   convertedAt: string | null;
   version: number;
   createdAt: string;
+}
+
+export interface PlanningTemplateItem {
+  id: string;
+  kind: 'ACTIVITY' | 'MILESTONE';
+  name: string;
+  sortOrder: number;
 }
 
 export interface ProposalSketchType {

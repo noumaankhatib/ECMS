@@ -42,14 +42,13 @@ export default async function UsersPage({
         ) : null}
       </PageHead>
 
-      <form className="row" style={{ marginBottom: 'var(--space-4)' }}>
+      <form className="filter-bar">
         <input
           type="search"
           name="search"
           defaultValue={params.search ?? ''}
           placeholder="Search by name, username or email"
           aria-label="Search users"
-          style={{ maxWidth: 320 }}
         />
         <button type="submit" className="button button--secondary">
           Search
@@ -61,7 +60,7 @@ export default async function UsersPage({
           <Empty title="No users found">Try a different search term.</Empty>
         ) : (
           <div className="table-scroll">
-            <table>
+            <table className="table--cards">
               <thead>
                 <tr>
                   <th>Name</th>
@@ -75,12 +74,14 @@ export default async function UsersPage({
               <tbody>
                 {page.items.map((user) => (
                   <tr key={user.id}>
-                    <td>
+                    <td data-label="Name">
                       <Link href={`/users/${user.id}`}>{user.displayName}</Link>
                     </td>
-                    <td className="mono">{user.username}</td>
-                    <td>{user.email ?? <span className="faint">—</span>}</td>
-                    <td>
+                    <td data-label="Username" className="mono">
+                      {user.username}
+                    </td>
+                    <td data-label="Email">{user.email ?? <span className="faint">—</span>}</td>
+                    <td data-label="Roles">
                       <div className="row">
                         {user.roles.length === 0 ? (
                           // Worth pointing out: no role means no permissions at
@@ -93,7 +94,7 @@ export default async function UsersPage({
                         )}
                       </div>
                     </td>
-                    <td className="nowrap">
+                    <td data-label="Added" className="nowrap">
                       <DateText value={user.createdAt} />
                     </td>
                     <td className="right">

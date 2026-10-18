@@ -2,14 +2,41 @@ import { Field, Select, TextArea } from '@/components/form';
 import type { Client } from '@/lib/types';
 
 /** Carried to an existing client by "Update existing" on the duplicate panel. */
-export const CLIENT_PREFILL_FIELDS = ['clientType', 'crNumber', 'civilId', 'reference', 'notes'];
+export const CLIENT_PREFILL_FIELDS = [
+  'fatherName',
+  'grandfatherName',
+  'surname',
+  'clientType',
+  'crNumber',
+  'civilId',
+  'mobileNumber',
+  'reference',
+  'notes',
+];
 
 /** The client form's fields, shared by New and Edit. */
 export function ClientFields({ client }: { client?: Client }) {
   return (
     <>
       <div className="form-grid">
-        <Field label="Name" name="name" defaultValue={client?.name} required wide />
+        <Field label="First name" name="firstName" defaultValue={client?.firstName} required />
+        <Field
+          label="Middle name"
+          name="fatherName"
+          defaultValue={client?.fatherName}
+          hint="Father's name, or husband's name for a married woman"
+        />
+        <Field
+          label="Grandfather name"
+          name="grandfatherName"
+          defaultValue={client?.grandfatherName}
+        />
+        <Field label="Surname" name="surname" defaultValue={client?.surname} />
+        <Field
+          label="Mobile number"
+          name="mobileNumber"
+          defaultValue={client?.mobileNumber}
+        />
         <Select
           label="Type"
           name="clientType"
@@ -23,7 +50,7 @@ export function ClientFields({ client }: { client?: Client }) {
           label="Reference"
           name="reference"
           defaultValue={client?.reference}
-          hint="Your own reference for this client. Must be unique."
+          hint={client ? 'Must be unique.' : 'Leave blank to generate one automatically.'}
         />
         <Field
           label="CR number"
@@ -32,7 +59,7 @@ export function ClientFields({ client }: { client?: Client }) {
           hint="Commercial Registration — companies."
         />
         <Field
-          label="Civil ID"
+          label="ID Card # (Civil ID)"
           name="civilId"
           defaultValue={client?.civilId}
           hint="Civil ID or passport number — individuals."

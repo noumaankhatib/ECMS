@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 
 import { Header, type QuickCreateLink } from './header';
+import { MobileBottomNav } from './mobile-bottom-nav';
 import { Sidebar, type SidebarGroup } from './sidebar';
 
 /**
@@ -22,6 +23,7 @@ export function AppShell({
   notificationCount,
   signOutAction,
   quickCreateLinks,
+  theme,
   children,
 }: {
   groups: SidebarGroup[];
@@ -33,6 +35,7 @@ export function AppShell({
   notificationCount: number;
   signOutAction: () => Promise<void>;
   quickCreateLinks: QuickCreateLink[];
+  theme: 'light' | 'dark';
   children: ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -56,8 +59,14 @@ export function AppShell({
           signOutAction={signOutAction}
           onOpenMobileMenu={() => setMobileOpen(true)}
           quickCreateLinks={quickCreateLinks}
+          theme={theme}
         />
         <main className="main">{children}</main>
+        <MobileBottomNav
+          groups={groups}
+          notificationCount={notificationCount}
+          onOpenMenu={() => setMobileOpen(true)}
+        />
       </div>
     </div>
   );

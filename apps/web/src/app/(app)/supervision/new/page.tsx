@@ -1,17 +1,17 @@
 import Link from 'next/link';
 
+import { EntityCombobox } from '@/components/entity-combobox';
 import {
   ActionButton,
   ActionForm,
   DateRangeFields,
   Field,
-  Select,
   TextArea,
 } from '@/components/form';
 import { Breadcrumb, Card, CardBody, CardHead, PageHead } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requirePermission } from '@/lib/session';
-import type { Client, Page as ApiPage, Project, Property } from '@/lib/types';
+import type { Page as ApiPage, Project } from '@/lib/types';
 
 import { createNewSupervisionProject, upgradeExistingProject } from './actions';
 
@@ -32,9 +32,10 @@ export default async function NewSupervisionPage({
 }: {
   searchParams: Promise<{ search?: string }>;
 }) {
-  await requirePermission('project:edit');
+  const session = await requirePermission('project:edit');
   const params = await searchParams;
   const search = params.search?.trim() ?? '';
+  const canSeeUsers = session.can('user:view');
 
   // `type=PLANNING` also returns BOTH projects — correct for the Planning
   // list page, wrong here: a BOTH project already has supervision, so
@@ -47,16 +48,6 @@ export default async function NewSupervisionPage({
         )
         .then((page) => ({ ...page, items: page.items.filter((p) => p.type === 'PLANNING') }))
     : null;
-
-  const [clients, properties] = await Promise.all([
-    api.get<ApiPage<Client>>('/clients?pageSize=100'),
-    api.get<ApiPage<Property>>('/properties?pageSize=100'),
-  ]);
-  const clientName = new Map(clients.items.map((c) => [c.id, c.name]));
-  const propertyOptions = properties.items.map((property) => ({
-    value: property.id,
-    label: `${property.name} — ${clientName.get(property.clientId) ?? 'unknown client'}`,
-  }));
 
   return (
     <>
@@ -129,18 +120,19 @@ export default async function NewSupervisionPage({
             cancelHref="/supervision"
           >
             <div className="form-grid">
-              <Select
+              <EntityCombobox
                 label="Client"
                 name="clientId"
                 required
-                options={clients.items.map((c) => ({ value: c.id, label: c.name }))}
+                searchUrl="/lookup/clients/search"
+                placeholder="Search by name, reference, CR/Civil ID or phone"
               />
-              <Select
+              <EntityCombobox
                 label="Property"
                 name="propertyId"
                 required
-                hint="Must belong to the client above."
-                options={propertyOptions}
+                searchUrl="/lookup/properties/search"
+                hint="Must belong to the client above — each result shows its client."
               />
               <Field label="Name" name="name" required />
               <Field
@@ -155,7 +147,38 @@ export default async function NewSupervisionPage({
                 endLabel="Target end date"
                 endName="targetEndDate"
               />
+              {canSeeUsers ? (
+                <EntityCombobox
+                  label="Assigned site engineer"
+                  name="siteEngineerId"
+                  searchUrl="/lookup/users/search"
+                />
+              ) : null}
             </div>
+            <fieldset className="stack" style={{ gap: 'var(--space-2)' }}>
+              <legend>Documents received</legend>
+              <label className="row" style={{ gap: 'var(--space-2)', fontSize: 14 }}>
+                <input type="checkbox" name="mulkiyaReceived" style={{ width: 'auto' }} />
+                Mulkiya (title deed)
+              </label>
+              <label className="row" style={{ gap: 'var(--space-2)', fontSize: 14 }}>
+                <input type="checkbox" name="idCardReceived" style={{ width: 'auto' }} />
+                ID card
+              </label>
+              <label className="row" style={{ gap: 'var(--space-2)', fontSize: 14 }}>
+                <input type="checkbox" name="agreementReceived" style={{ width: 'auto' }} />
+                Agreement
+              </label>
+              <label className="row" style={{ gap: 'var(--space-2)', fontSize: 14 }}>
+                <input type="checkbox" name="krookieReceived" style={{ width: 'auto' }} />
+                Krookie (survey reference)
+              </label>
+              <label className="row" style={{ gap: 'var(--space-2)', fontSize: 14 }}>
+                <input type="checkbox" name="approvedDrawingsReceived" style={{ width: 'auto' }} />
+                Approved drawings
+                <span className="hint">If not done by our company.</span>
+              </label>
+            </fieldset>
             <TextArea label="Description" name="description" />
           </ActionForm>
         </CardBody>

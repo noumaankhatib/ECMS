@@ -7,6 +7,7 @@ import { nullableText, refresh, text } from '@/lib/actions';
 import { api } from '@/lib/api';
 import { changed, checkThenSave } from '@/lib/duplicate-check';
 import type { FormState } from '@/lib/form-state';
+import { returnToProposal } from '@/lib/proposal-link';
 import type { Property } from '@/lib/types';
 
 /** The address fields, which behave identically on create and edit. */
@@ -16,9 +17,7 @@ async function addressFrom(form: FormData) {
     reference: await nullableText(form, 'reference'),
     addressLine1: await nullableText(form, 'addressLine1'),
     addressLine2: await nullableText(form, 'addressLine2'),
-    city: await nullableText(form, 'city'),
     postcode: await nullableText(form, 'postcode'),
-    country: await nullableText(form, 'country'),
     notes: await nullableText(form, 'notes'),
     plotNumber: await nullableText(form, 'plotNumber'),
     wilayat: await nullableText(form, 'wilayat'),
@@ -27,6 +26,12 @@ async function addressFrom(form: FormData) {
     titleDeedReference: await nullableText(form, 'titleDeedReference'),
     ownerName: await nullableText(form, 'ownerName'),
     ownerNationalId: await nullableText(form, 'ownerNationalId'),
+    blockNumber: await nullableText(form, 'blockNumber'),
+    plotArea: await nullableText(form, 'plotArea'),
+    landUseType: await nullableText(form, 'landUseType'),
+    easting: await nullableText(form, 'easting'),
+    northing: await nullableText(form, 'northing'),
+    projectionType: await nullableText(form, 'projectionType'),
   };
 }
 
@@ -42,7 +47,6 @@ export async function createProperty(_state: FormState, form: FormData): Promise
         ...(fields.name ? { name: fields.name } : {}),
         ...(fields.plotNumber ? { plotNumber: fields.plotNumber } : {}),
         ...(fields.wilayat ? { wilayat: fields.wilayat } : {}),
-        ...(fields.surveyReference ? { surveyReference: fields.surveyReference } : {}),
       }),
     (duplicateOverride) =>
       api.post<Property>('/properties', {
@@ -55,6 +59,7 @@ export async function createProperty(_state: FormState, form: FormData): Promise
   if (!result.ok) return result.state;
 
   await refresh('/properties');
+  await returnToProposal(form, { clientId, propertyId: result.value.id });
   redirect(`/properties/${result.value.id}`);
 }
 
@@ -63,22 +68,23 @@ export async function updateProperty(_state: FormState, form: FormData): Promise
   const fields = await addressFrom(form);
 
   // A plot's identity is its number AND wilayat, so a change to either is
-  // checked against the pair it will have afterwards.
+  // checked against the pair it will have afterwards. surveyReference is
+  // excluded — it's hard-unique now (see property.service.ts), so a clash
+  // there is reported as an ordinary field error from the save itself, not a
+  // soft warn-and-override check.
   const plotChanged = changed(form, 'plotNumber') ?? changed(form, 'wilayat');
   const name = changed(form, 'name');
-  const surveyReference = changed(form, 'surveyReference');
 
   const result = await checkThenSave(
     form,
     async () =>
-      plotChanged || name || surveyReference
+      plotChanged || name
         ? api.post<DuplicateMatch[]>('/properties/duplicates', {
             excludeId: id,
             ...(name ? { name, clientId: String(form.get('checkClientId')) } : {}),
             ...(plotChanged && fields.plotNumber && fields.wilayat
               ? { plotNumber: fields.plotNumber, wilayat: fields.wilayat }
               : {}),
-            ...(surveyReference ? { surveyReference } : {}),
           })
         : [],
     (duplicateOverride) =>

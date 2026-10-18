@@ -1,10 +1,13 @@
-import { PROJECT_TYPES } from '@ecms/contracts';
+import { PROJECT_TYPES, PROPOSAL_SUBMISSION_TYPES } from '@ecms/contracts';
 
+import { EntityCombobox } from '@/components/entity-combobox';
 import { ActionForm, DateField, Field, Select, TextArea } from '@/components/form';
+import { FormAutofill } from '@/components/form-autofill';
+import { SubmitterFields } from '@/components/submitter-fields';
 import { Breadcrumb, Card, CardBody, PageHead } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requirePermission } from '@/lib/session';
-import type { Client, Page as ApiPage, Property, ProposalSketchType, UserRow } from '@/lib/types';
+import type { ProposalSketchType } from '@/lib/types';
 
 import { createProposal } from '../actions';
 
@@ -16,17 +19,16 @@ const TYPE_LABEL: Record<string, string> = {
   BOTH: 'Planning and supervision',
 };
 
+const SUBMISSION_TYPE_LABEL: Record<string, string> = {
+  SELF: 'Self — the client is dealing with us directly',
+  OTHER: 'Other — someone is submitting on the client’s behalf',
+};
+
 export default async function NewProposalPage() {
   const session = await requirePermission('proposal:create');
 
-  const [clients, properties, sketchTypes, users] = await Promise.all([
-    api.get<ApiPage<Client>>('/clients?pageSize=100'),
-    api.get<ApiPage<Property>>('/properties?pageSize=100'),
-    api.get<ProposalSketchType[]>('/proposal-sketch-types'),
-    session.can('user:view')
-      ? api.get<ApiPage<UserRow>>('/users?pageSize=100').catch(() => null)
-      : null,
-  ]);
+  const sketchTypes = await api.get<ProposalSketchType[]>('/proposal-sketch-types');
+  const canSeeUsers = session.can('user:view');
 
   return (
     <>
@@ -40,19 +42,38 @@ export default async function NewProposalPage() {
         <CardBody>
           <ActionForm action={createProposal} submitLabel="Create proposal" cancelHref="/proposals">
             <div className="form-grid">
-              <Field label="Contact name" name="contactName" required wide />
-              <Field label="Contact phone" name="contactPhone" />
-              <Select
+              <FormAutofill
+                rules={[
+                  { source: 'clientId', target: 'contactName', key: 'name' },
+                  { source: 'clientId', target: 'contactPhone', key: 'mobile' },
+                ]}
+              />
+              <EntityCombobox
                 label="Client"
                 name="clientId"
+                searchUrl="/lookup/clients/search"
+                placeholder="Search by name, reference, CR/Civil ID or phone"
                 hint="Attach now if known, or leave blank and add it later."
-                options={clients.items.map((c) => ({ value: c.id, label: c.name }))}
               />
-              <Select
+              <Field
+                label="Contact name"
+                name="contactName"
+                required
+                wide
+                hint="Filled from the client; change it if someone else is the contact."
+              />
+              <Field label="Contact phone" name="contactPhone" />
+              <SubmitterFields
+                options={PROPOSAL_SUBMISSION_TYPES.map((type) => ({
+                  value: type,
+                  label: SUBMISSION_TYPE_LABEL[type] ?? type,
+                }))}
+              />
+              <EntityCombobox
                 label="Property"
                 name="propertyId"
+                searchUrl="/lookup/properties/search"
                 hint="Required before this proposal can be converted to a project."
-                options={properties.items.map((p) => ({ value: p.id, label: p.name }))}
               />
               <Select
                 label="Type of sketch"
@@ -69,16 +90,21 @@ export default async function NewProposalPage() {
               />
               <Field label="Approx. area (sqm)" name="approxAreaSqm" type="number" />
               <Field label="Source" name="source" hint="e.g. referral, walk-in, old customer." />
-              {users ? (
-                <Select
+              {canSeeUsers ? (
+                <EntityCombobox
                   label="Assigned architect"
                   name="assignedArchitectId"
-                  options={users.items.map((u) => ({ value: u.id, label: u.displayName }))}
+                  searchUrl="/lookup/users/search?browse=true&activeOnly=true&roles=PLANNING,PROJECT_MANAGER"
+                  browseOnFocus
+                  placeholder="Select or search an architect"
                 />
               ) : null}
+              <Field label="Survey reference (Krookie)" name="surveyReference" required />
+              <Field label="Title deed reference (Mulkiya)" name="titleDeedReference" />
               <DateField label="Received" name="receivedAt" />
               <DateField label="Due" name="dueAt" />
             </div>
+            <TextArea label="Requirements" name="requirements" required />
             <TextArea label="Notes" name="notes" />
           </ActionForm>
         </CardBody>

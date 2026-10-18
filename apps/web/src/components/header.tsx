@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   useEffect,
   useRef,
@@ -11,6 +12,7 @@ import {
 } from 'react';
 
 import { CommandPalette } from './command-palette';
+import { ThemeToggle } from './theme-toggle';
 import {
   BellIcon,
   ChevronDownIcon,
@@ -62,6 +64,7 @@ export function Header({
   signOutAction,
   onOpenMobileMenu,
   quickCreateLinks,
+  theme,
 }: {
   displayName: string;
   identifier: string;
@@ -69,7 +72,10 @@ export function Header({
   signOutAction: () => Promise<void>;
   onOpenMobileMenu: () => void;
   quickCreateLinks: QuickCreateLink[];
+  theme: 'light' | 'dark';
 }) {
+  const pathname = usePathname();
+  const mobileTitle = mobileTitleOf(pathname);
   const [menuOpen, setMenuOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -126,6 +132,8 @@ export function Header({
         <span />
         <span />
       </button>
+
+      <span className="header__title">{mobileTitle}</span>
 
       <form
         action="/search"
@@ -191,6 +199,8 @@ export function Header({
           </div>
         ) : null}
 
+        <ThemeToggle initial={theme} />
+
         <Link href="/notifications" className="header__icon-button" aria-label="Notifications">
           <BellIcon />
           {notificationCount > 0 ? (
@@ -253,4 +263,12 @@ function MenuPanel({
       </form>
     </div>
   );
+}
+
+/** Page title shown in the mobile header (the desktop header has none — each
+ *  page owns its own PageHead there). First path segment, title-cased. */
+function mobileTitleOf(pathname: string): string {
+  const segment = pathname.split('/').filter(Boolean)[0] ?? 'dashboard';
+  const words = segment.replace(/-/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }

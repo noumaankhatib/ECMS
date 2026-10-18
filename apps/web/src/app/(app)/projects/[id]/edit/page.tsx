@@ -75,6 +75,36 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
                 endDefaultValue={forDateInput(project.targetEndDate)}
               />
             </div>
+            <fieldset className="stack" style={{ gap: 'var(--space-2)' }}>
+              <legend>Documents received</legend>
+              <label className="row" style={{ gap: 'var(--space-2)', fontSize: 14 }}>
+                <input
+                  type="checkbox"
+                  name="mulkiyaReceived"
+                  defaultChecked={project.mulkiyaReceived}
+                  style={{ width: 'auto' }}
+                />
+                Mulkiya (title deed)
+              </label>
+              <label className="row" style={{ gap: 'var(--space-2)', fontSize: 14 }}>
+                <input
+                  type="checkbox"
+                  name="idCardReceived"
+                  defaultChecked={project.idCardReceived}
+                  style={{ width: 'auto' }}
+                />
+                ID card
+              </label>
+              <label className="row" style={{ gap: 'var(--space-2)', fontSize: 14 }}>
+                <input
+                  type="checkbox"
+                  name="agreementReceived"
+                  defaultChecked={project.agreementReceived}
+                  style={{ width: 'auto' }}
+                />
+                Agreement
+              </label>
+            </fieldset>
             <TextArea label="Description" name="description" defaultValue={project.description} />
           </ActionForm>
         </CardBody>

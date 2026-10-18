@@ -1,7 +1,7 @@
 import { REQUIRED_DOCUMENT_SCOPES } from '@ecms/contracts';
 
 import { ActionButton, ActionForm, Field, Select } from '@/components/form';
-import { Badge, Card, CardBody, CardHead, Empty, PageHead } from '@/components/ui';
+import { Card, CardHead, Empty, PageHead } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requirePermission } from '@/lib/session';
 import type { RequiredDocument } from '@/lib/types';
@@ -43,61 +43,58 @@ export default async function RequiredDocumentsPage() {
         description="The checklist a project's document completeness is measured against. Retiring one keeps it out of new checks, but does not rewrite a project's past."
       />
 
-      <Card>
-        <CardHead title="Active requirements" />
+      <Card accent="blue">
+        <CardHead title="Active requirements">
+          <span className="count-pill">{sorted.length}</span>
+        </CardHead>
         {sorted.length === 0 ? (
           <Empty title="No required documents">Add the first one below.</Empty>
         ) : (
-          <table>
+          <table className="ref-table">
             <thead>
               <tr>
                 <th>Category</th>
-                <th>Applies to</th>
-                <th>Label</th>
-                <th>Sort order</th>
+                <th>Label, applies to and sort order</th>
                 <th />
               </tr>
             </thead>
             <tbody>
               {sorted.map((requiredDocument) => (
                 <tr key={requiredDocument.id}>
-                  <td className="mono">{requiredDocument.category}</td>
                   <td>
-                    <Badge>{SCOPE_LABEL[requiredDocument.scope] ?? requiredDocument.scope}</Badge>
+                    <span className="ref-code">{requiredDocument.category}</span>
                   </td>
-                  <td>
-                    <ActionForm action={updateRequiredDocument} submitLabel="Save">
+                  <td className="ref-edit">
+                    <ActionForm action={updateRequiredDocument} submitLabel="Save" layout="compact">
                       <input type="hidden" name="id" value={requiredDocument.id} />
-                      <div className="row">
-                        <Field
-                          label="Label"
-                          name="label"
-                          id={`label-${requiredDocument.id}`}
-                          defaultValue={requiredDocument.label}
-                        />
-                        <Select
-                          label="Applies to"
-                          name="scope"
-                          id={`scope-${requiredDocument.id}`}
-                          defaultValue={requiredDocument.scope}
-                          required
-                          options={REQUIRED_DOCUMENT_SCOPES.map((scope) => ({
-                            value: scope,
-                            label: SCOPE_LABEL[scope] ?? scope,
-                          }))}
-                        />
-                        <Field
-                          label="Sort order"
-                          name="sortOrder"
-                          id={`sortOrder-${requiredDocument.id}`}
-                          type="number"
-                          defaultValue={String(requiredDocument.sortOrder)}
-                        />
-                      </div>
+                      <Field
+                        label="Label"
+                        name="label"
+                        id={`label-${requiredDocument.id}`}
+                        defaultValue={requiredDocument.label}
+                      />
+                      <Select
+                        label="Applies to"
+                        name="scope"
+                        id={`scope-${requiredDocument.id}`}
+                        defaultValue={requiredDocument.scope}
+                        required
+                        options={REQUIRED_DOCUMENT_SCOPES.map((scope) => ({
+                          value: scope,
+                          label: SCOPE_LABEL[scope] ?? scope,
+                        }))}
+                      />
+                      <Field
+                        label="Sort order"
+                        name="sortOrder"
+                        id={`sortOrder-${requiredDocument.id}`}
+                        type="number"
+                        narrow
+                        defaultValue={String(requiredDocument.sortOrder)}
+                      />
                     </ActionForm>
                   </td>
-                  <td>{requiredDocument.sortOrder}</td>
-                  <td className="right">
+                  <td className="ref-actions">
                     <ActionButton
                       action={archiveRequiredDocument.bind(null, requiredDocument.id)}
                       label="Retire"
@@ -112,33 +109,33 @@ export default async function RequiredDocumentsPage() {
         )}
       </Card>
 
-      <Card>
-        <CardHead title="Add a required document" />
-        <CardBody>
-          <ActionForm action={createRequiredDocument} submitLabel="Add">
-            <div className="form-grid">
-              <Field
-                label="Category"
-                name="category"
-                required
-                hint="Must match a document's own category exactly, ignoring case and spacing — e.g. Design."
-              />
-              <Field label="Label" name="label" required hint="What staff see on the checklist." />
-              <Select
-                label="Applies to"
-                name="scope"
-                defaultValue="ANY"
-                required
-                options={REQUIRED_DOCUMENT_SCOPES.map((scope) => ({
-                  value: scope,
-                  label: SCOPE_LABEL[scope] ?? scope,
-                }))}
-              />
-              <Field label="Sort order" name="sortOrder" type="number" defaultValue="0" />
-            </div>
+      <div className="ref-add card card--accent card--green">
+        <header className="card__head">
+          <h2>Add a required document</h2>
+        </header>
+        <div className="card__body">
+          <ActionForm action={createRequiredDocument} submitLabel="Add" layout="inline">
+            <Field
+              label="Category"
+              name="category"
+              required
+              hint="Must match a document's own category exactly, ignoring case and spacing — e.g. Design."
+            />
+            <Field label="Label" name="label" required hint="What staff see on the checklist." />
+            <Select
+              label="Applies to"
+              name="scope"
+              defaultValue="ANY"
+              required
+              options={REQUIRED_DOCUMENT_SCOPES.map((scope) => ({
+                value: scope,
+                label: SCOPE_LABEL[scope] ?? scope,
+              }))}
+            />
+            <Field label="Sort order" name="sortOrder" type="number" narrow defaultValue="0" />
           </ActionForm>
-        </CardBody>
-      </Card>
+        </div>
+      </div>
     </>
   );
 }

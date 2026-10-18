@@ -1,10 +1,11 @@
 import { PROJECT_STATUSES } from '@ecms/contracts';
 import Link from 'next/link';
 
-import { Card, DateText, Empty, PageHead, Pagination, StatusBadge, Value } from '@/components/ui';
+import { ProjectListTable } from '@/components/project-list-table';
+import { Card, Empty, PageHead, Pagination } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
-import type { Client, Page as ApiPage, Project } from '@/lib/types';
+import type { Page as ApiPage, Project } from '@/lib/types';
 
 export const metadata = { title: 'Projects — ECMS' };
 
@@ -29,7 +30,7 @@ const STATUS_LABEL: Record<string, string> = {
 export default async function ProjectsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; status?: string; page?: string }>;
+  searchParams: Promise<{ search?: string; status?: string; mine?: string; page?: string }>;
 }) {
   const session = await requireSession();
   const params = await searchParams;
@@ -38,19 +39,16 @@ export default async function ProjectsPage({
   const query = new URLSearchParams({ page: String(pageNumber), pageSize: String(PAGE_SIZE) });
   if (params.search) query.set('search', params.search);
   if (params.status) query.set('status', params.status);
+  if (params.mine === '1') query.set('memberId', session.user.id);
 
   const page = await api.get<ApiPage<Project>>(`/projects?${query.toString()}`);
 
-  // Only asked for if this person may see clients at all; a Planner may not.
-  const clients = session.can('client:view')
-    ? await api.get<ApiPage<Client>>('/clients?pageSize=100&includeArchived=true')
-    : { items: [] as Client[] };
-  const clientName = new Map(clients.items.map((c) => [c.id, c.name]));
 
   function buildHref(targetPage: number): string {
     const q = new URLSearchParams();
     if (params.search) q.set('search', params.search);
     if (params.status) q.set('status', params.status);
+    if (params.mine === '1') q.set('mine', '1');
     q.set('page', String(targetPage));
     return `/projects?${q.toString()}`;
   }
@@ -68,20 +66,18 @@ export default async function ProjectsPage({
         ) : null}
       </PageHead>
 
-      <form className="row" style={{ marginBottom: 'var(--space-4)' }}>
+      <form className="filter-bar">
         <input
           type="search"
           name="search"
           defaultValue={params.search ?? ''}
-          placeholder="Search by code or name"
+          placeholder="Search by code, name, client, plot or manager"
           aria-label="Search projects"
-          style={{ maxWidth: 300 }}
         />
         <select
           name="status"
           defaultValue={params.status ?? ''}
           aria-label="Filter by status"
-          style={{ width: 'auto' }}
         >
           <option value="">Any status</option>
           {PROJECT_STATUSES.map((status) => (
@@ -90,6 +86,10 @@ export default async function ProjectsPage({
             </option>
           ))}
         </select>
+        <label className="check-inline">
+          <input type="checkbox" name="mine" value="1" defaultChecked={params.mine === '1'} /> My
+          projects
+        </label>
         <button type="submit" className="button button--secondary">
           Search
         </button>
@@ -98,45 +98,19 @@ export default async function ProjectsPage({
       <Card>
         {page.items.length === 0 ? (
           <Empty title="No projects to show">
-            {params.search || params.status
+            {params.search || params.status || params.mine
               ? 'Try a different search.'
               : 'You are not a member of any project yet. Ask an administrator or the project manager to add you.'}
           </Empty>
         ) : (
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Name</th>
-                  {session.can('client:view') ? <th>Client</th> : null}
-                  <th>Status</th>
-                  <th>Target end</th>
-                </tr>
-              </thead>
-              <tbody>
-                {page.items.map((project) => (
-                  <tr key={project.id}>
-                    <td className="mono">
-                      <Link href={`/projects/${project.id}`}>{project.code}</Link>
-                    </td>
-                    <td>{project.name}</td>
-                    {session.can('client:view') ? (
-                      <td>
-                        <Value>{clientName.get(project.clientId)}</Value>
-                      </td>
-                    ) : null}
-                    <td>
-                      <StatusBadge status={project.status} />
-                    </td>
-                    <td className="nowrap">
-                      <DateText value={project.targetEndDate} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ProjectListTable
+            items={page.items}
+            rowHref={(project) => `/projects/${project.id}`}
+            cards
+            canClient={session.can('client:view')}
+            canProperty={session.can('property:view')}
+            canPeople={session.can('user:view')}
+          />
         )}
       </Card>
 

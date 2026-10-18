@@ -2,6 +2,8 @@ import type { ProjectStatus } from '@ecms/contracts';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import { BackButton } from '@/components/back-button';
+
 /**
  * The small pieces every screen is built from.
  *
@@ -9,8 +11,12 @@ import type { ReactNode } from 'react';
  * what a person may do — pages pass that in, having asked the session.
  */
 
-export function Card({ children }: { children: ReactNode }) {
-  return <section className="card">{children}</section>;
+export type CardAccent = 'blue' | 'purple' | 'green' | 'red' | 'orange';
+
+/** `accent` colours the card's top edge — one colour per kind of information,
+ *  the same pairing the KPI tiles and status badges already use. */
+export function Card({ children, accent }: { children: ReactNode; accent?: CardAccent }) {
+  return <section className={`card${accent ? ` card--accent card--${accent}` : ''}`}>{children}</section>;
 }
 
 export function CardHead({ title, children }: { title: string; children?: ReactNode }) {
@@ -46,16 +52,50 @@ export function PageHead({
   );
 }
 
-export function Breadcrumb({ items }: { items: { href?: string; label: string }[] }) {
+/** A titled group of key/value facts laid out as tiles — see `.definition-grid`. */
+export function DetailGroup({ title, children }: { title?: string; children: ReactNode }) {
   return (
-    <nav className="breadcrumb" aria-label="Breadcrumb">
-      {items.map((item, index) => (
-        <span key={item.label}>
-          {index > 0 ? ' / ' : ''}
-          {item.href ? <Link href={item.href}>{item.label}</Link> : item.label}
-        </span>
-      ))}
-    </nav>
+    <section className="definition-group">
+      {title ? <h3 className="definition-group__title">{title}</h3> : null}
+      <dl className="definition-grid">{children}</dl>
+    </section>
+  );
+}
+
+export function DetailItem({
+  label,
+  mono,
+  wide,
+  children,
+}: {
+  label: string;
+  mono?: boolean;
+  wide?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className={wide ? 'definition-wide' : undefined}>
+      <dt>{label}</dt>
+      <dd className={mono ? 'mono' : undefined}>{children}</dd>
+    </div>
+  );
+}
+
+export function Breadcrumb({ items }: { items: { href?: string; label: string }[] }) {
+  // Where Back lands when there is no history to return to: the nearest parent.
+  const parent = [...items].reverse().find((item) => item.href)?.href;
+  return (
+    <div className="breadcrumb-bar">
+      {parent ? <BackButton fallbackHref={parent} /> : null}
+      <nav className="breadcrumb" aria-label="Breadcrumb">
+        {items.map((item, index) => (
+          <span key={item.label}>
+            {index > 0 ? ' / ' : ''}
+            {item.href ? <Link href={item.href}>{item.label}</Link> : item.label}
+          </span>
+        ))}
+      </nav>
+    </div>
   );
 }
 

@@ -33,6 +33,12 @@ export async function createProposal(_state: FormState, form: FormData): Promise
       approxAreaSqm: form.get('approxAreaSqm') || null,
       source: form.get('source'),
       assignedArchitectId: form.get('assignedArchitectId') || null,
+      surveyReference: form.get('surveyReference') || null,
+      titleDeedReference: form.get('titleDeedReference') || null,
+      requirements: form.get('requirements') || null,
+      submissionType: form.get('submissionType') || null,
+      submittedBy: form.get('submittedBy') || null,
+      submitterRelationship: form.get('submitterRelationship') || null,
       receivedAt: form.get('receivedAt'),
       dueAt: form.get('dueAt'),
       notes: form.get('notes'),
@@ -59,6 +65,12 @@ export async function updateProposal(_state: FormState, form: FormData): Promise
       approxAreaSqm: await nullableText(form, 'approxAreaSqm'),
       source: await nullableText(form, 'source'),
       assignedArchitectId: await nullableText(form, 'assignedArchitectId'),
+      surveyReference: await nullableText(form, 'surveyReference'),
+      titleDeedReference: await nullableText(form, 'titleDeedReference'),
+      requirements: await nullableText(form, 'requirements'),
+      submissionType: await nullableText(form, 'submissionType'),
+      submittedBy: await nullableText(form, 'submittedBy'),
+      submitterRelationship: await nullableText(form, 'submitterRelationship'),
       receivedAt: await nullableText(form, 'receivedAt'),
       dueAt: await nullableText(form, 'dueAt'),
       notes: await nullableText(form, 'notes'),
@@ -105,6 +117,30 @@ export async function convertProposal(_state: FormState, form: FormData): Promis
     await api.post(`/proposals/${id}/convert`, { version: Number(form.get('version')) });
   });
 
+  if (result.error) return result;
+
+  await refresh(`/proposals/${id}`);
+  redirect(`/proposals/${id}`);
+}
+
+/**
+ * Fills in what a Won proposal still lacks before it can be converted — the
+ * client, the property, the Krookie reference and the requirements — in one
+ * save. Only the fields actually submitted are sent, so a blank field never
+ * overwrites something already on the proposal.
+ */
+export async function completeForConversion(_state: FormState, form: FormData): Promise<FormState> {
+  const id = String(form.get('id'));
+  const patch: Record<string, unknown> = { version: Number(form.get('version')) };
+  for (const name of ['clientId', 'propertyId', 'surveyReference', 'requirements']) {
+    const value = String(form.get(name) ?? '').trim();
+    if (value) patch[name] = value;
+  }
+  if (Object.keys(patch).length === 1) return { error: 'Fill in at least one missing item.' };
+
+  const result = await runAction(async () => {
+    await api.patch<Proposal>(`/proposals/${id}`, patch);
+  });
   if (result.error) return result;
 
   await refresh(`/proposals/${id}`);

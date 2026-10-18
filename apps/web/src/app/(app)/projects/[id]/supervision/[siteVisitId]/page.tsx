@@ -1,16 +1,8 @@
 import Link from 'next/link';
 
-import { ActionButton, ActionForm, DateField, Field, Select, TextArea } from '@/components/form';
-import {
-  Breadcrumb,
-  Card,
-  CardBody,
-  CardHead,
-  DateText,
-  Empty,
-  PageHead,
-  Value,
-} from '@/components/ui';
+import { EntityCombobox } from '@/components/entity-combobox';
+import { ActionButton, ActionForm, DateField, Field, TextArea } from '@/components/form';
+import { Breadcrumb, Card, CardBody, CardHead, DateText, DetailGroup, DetailItem, Empty, PageHead, Value } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
 import type {
@@ -18,10 +10,9 @@ import type {
   Observation,
   Page as ApiPage,
   Project,
-  ProjectMember,
   SiteVisit,
-  UserRow,
 } from '@/lib/types';
+import { loadUserNames } from '@/lib/user-names';
 
 import { createInstruction, createObservation, markInstructionActioned } from './actions';
 
@@ -35,7 +26,7 @@ export default async function SiteVisitPage({
   const session = await requireSession();
   const { id, siteVisitId } = await params;
 
-  const [project, visit, observations, instructions, members] = await Promise.all([
+  const [project, visit, observations, instructions] = await Promise.all([
     api.get<Project>(`/projects/${id}`),
     api.get<SiteVisit>(`/projects/${id}/supervision/site-visits/${siteVisitId}`),
     api.get<ApiPage<Observation>>(
@@ -44,13 +35,9 @@ export default async function SiteVisitPage({
     api.get<ApiPage<Instruction>>(
       `/projects/${id}/supervision/site-visits/${siteVisitId}/instructions?pageSize=100`,
     ),
-    api.get<ProjectMember[]>(`/projects/${id}/members`),
   ]);
 
-  const users = session.can('user:view')
-    ? await api.get<ApiPage<UserRow>>('/users?pageSize=100').catch(() => null)
-    : null;
-  const userName = new Map((users?.items ?? []).map((u) => [u.id, u.displayName]));
+  const userName = await loadUserNames(instructions.items.map((i) => i.assigneeId));
   const nameFor = (userId: string | null): string | null =>
     userId ? (userName.get(userId) ?? userId) : null;
 
@@ -177,13 +164,12 @@ export default async function SiteVisitPage({
                   <input type="hidden" name="siteVisitId" value={siteVisitId} />
                   <TextArea label="Directive" name="directiveText" />
                   <div className="form-grid">
-                    <Select
+                    <EntityCombobox
                       label="Assignee"
                       name="assigneeId"
-                      options={members.map((m) => ({
-                        value: m.userId,
-                        label: nameFor(m.userId) ?? m.userId,
-                      }))}
+                      searchUrl="/lookup/users/search?browse=true&activeOnly=true"
+                      browseOnFocus
+                      placeholder="Select or search a person"
                     />
                     <DateField label="Due date" name="dueDate" />
                   </div>
@@ -196,22 +182,13 @@ export default async function SiteVisitPage({
         <Card>
           <CardHead title="Details" />
           <CardBody>
-            <dl className="definition">
-              <dt>Date</dt>
-              <dd>
-                <DateText value={visit.visitDate} />
-              </dd>
-              <dt>Attendees</dt>
-              <dd>
-                <Value>{visit.attendees}</Value>
-              </dd>
+            <DetailGroup>
+              <DetailItem label="Date"><DateText value={visit.visitDate} /></DetailItem>
+              <DetailItem label="Attendees"><Value>{visit.attendees}</Value></DetailItem>
               {visit.notes ? (
-                <>
-                  <dt>Notes</dt>
-                  <dd style={{ whiteSpace: 'pre-wrap' }}>{visit.notes}</dd>
-                </>
+                <DetailItem label="Notes" wide><span style={{ whiteSpace: 'pre-wrap' }}>{visit.notes}</span></DetailItem>
               ) : null}
-            </dl>
+            </DetailGroup>
           </CardBody>
         </Card>
       </div>

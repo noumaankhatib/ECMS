@@ -38,6 +38,12 @@ export async function createNewSupervisionProject(
       startDate: await nullableText(form, 'startDate'),
       targetEndDate: await nullableText(form, 'targetEndDate'),
       externalPlanningReference: await nullableText(form, 'externalPlanningReference'),
+      siteEngineerId: await nullableText(form, 'siteEngineerId'),
+      mulkiyaReceived: form.get('mulkiyaReceived') === 'on',
+      idCardReceived: form.get('idCardReceived') === 'on',
+      agreementReceived: form.get('agreementReceived') === 'on',
+      krookieReceived: form.get('krookieReceived') === 'on',
+      approvedDrawingsReceived: form.get('approvedDrawingsReceived') === 'on',
     }),
   );
 

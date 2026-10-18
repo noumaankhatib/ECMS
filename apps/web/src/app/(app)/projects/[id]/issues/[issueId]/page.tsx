@@ -6,20 +6,13 @@ import {
   type IssueStatus,
 } from '@ecms/contracts';
 
+import { EntityCombobox } from '@/components/entity-combobox';
 import { ActionButton, ActionForm, DateField, Select, TextArea } from '@/components/form';
-import {
-  Badge,
-  Breadcrumb,
-  Card,
-  CardBody,
-  CardHead,
-  DateText,
-  PageHead,
-  Value,
-} from '@/components/ui';
+import { Badge, Breadcrumb, Card, CardBody, CardHead, DateText, DetailGroup, DetailItem, PageHead, Value } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
-import type { Issue, Page as ApiPage, Project, ProjectMember, UserRow } from '@/lib/types';
+import type { Issue, Project } from '@/lib/types';
+import { loadUserNames } from '@/lib/user-names';
 
 import { transitionIssue, updateIssue } from '../actions';
 
@@ -57,16 +50,12 @@ export default async function IssuePage({
   const session = await requireSession();
   const { id, issueId } = await params;
 
-  const [project, issue, members] = await Promise.all([
+  const [project, issue] = await Promise.all([
     api.get<Project>(`/projects/${id}`),
     api.get<Issue>(`/projects/${id}/issues/${issueId}`),
-    api.get<ProjectMember[]>(`/projects/${id}/members`),
   ]);
 
-  const users = session.can('user:view')
-    ? await api.get<ApiPage<UserRow>>('/users?pageSize=100').catch(() => null)
-    : null;
-  const userName = new Map((users?.items ?? []).map((u) => [u.id, u.displayName]));
+  const userName = await loadUserNames([issue.ownerId]);
 
   const closed = project.status === 'CLOSED';
   const mayEdit = session.can('issue:edit', id) && !closed;
@@ -147,14 +136,17 @@ export default async function IssuePage({
                       defaultValue={issue.priority}
                       options={ISSUE_PRIORITIES.map((p) => ({ value: p, label: p }))}
                     />
-                    <Select
+                    <EntityCombobox
                       label="Owner"
                       name="ownerId"
-                      defaultValue={issue.ownerId ?? undefined}
-                      options={members.map((m) => ({
-                        value: m.userId,
-                        label: userName.get(m.userId) ?? m.userId,
-                      }))}
+                      searchUrl="/lookup/users/search?browse=true&activeOnly=true"
+                      browseOnFocus
+                      placeholder="Select or search a person"
+                      defaultValue={
+                        issue.ownerId
+                          ? { id: issue.ownerId, label: userName.get(issue.ownerId) ?? issue.ownerId }
+                          : null
+                      }
                     />
                     <DateField
                       label="Due date"
@@ -177,34 +169,20 @@ export default async function IssuePage({
         <Card>
           <CardHead title="Details" />
           <CardBody>
-            <dl className="definition">
-              <dt>Severity</dt>
-              <dd>{issue.severity}</dd>
-              <dt>Priority</dt>
-              <dd>{issue.priority}</dd>
-              <dt>Owner</dt>
-              <dd>
-                <Value>
+            <DetailGroup>
+              <DetailItem label="Severity">{issue.severity}</DetailItem>
+              <DetailItem label="Priority">{issue.priority}</DetailItem>
+              <DetailItem label="Owner"><Value>
                   {issue.ownerId ? (userName.get(issue.ownerId) ?? issue.ownerId) : null}
-                </Value>
-              </dd>
-              <dt>Due</dt>
-              <dd>
-                <DateText value={issue.dueDate} />
-              </dd>
+                </Value></DetailItem>
+              <DetailItem label="Due"><DateText value={issue.dueDate} /></DetailItem>
               {issue.description ? (
-                <>
-                  <dt>Description</dt>
-                  <dd style={{ whiteSpace: 'pre-wrap' }}>{issue.description}</dd>
-                </>
+                <DetailItem label="Description" wide><span style={{ whiteSpace: 'pre-wrap' }}>{issue.description}</span></DetailItem>
               ) : null}
               {issue.closureNotes ? (
-                <>
-                  <dt>Closure notes</dt>
-                  <dd style={{ whiteSpace: 'pre-wrap' }}>{issue.closureNotes}</dd>
-                </>
+                <DetailItem label="Closure notes" wide><span style={{ whiteSpace: 'pre-wrap' }}>{issue.closureNotes}</span></DetailItem>
               ) : null}
-            </dl>
+            </DetailGroup>
           </CardBody>
         </Card>
       </div>

@@ -1,4 +1,5 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
+import { cookies } from 'next/headers';
 import { IBM_Plex_Mono, IBM_Plex_Sans } from 'next/font/google';
 import type { ReactNode } from 'react';
 
@@ -7,6 +8,14 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'ECMS',
   description: 'Engineering Consultancy Management System',
+};
+
+export const viewport: Viewport = {
+  viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#152238' },
+    { media: '(prefers-color-scheme: dark)', color: '#0a101c' },
+  ],
 };
 
 /**
@@ -32,9 +41,10 @@ const plexMono = IBM_Plex_Mono({
   display: 'swap',
 });
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const theme = (await cookies()).get('ecms_theme')?.value === 'dark' ? 'dark' : 'light';
   return (
-    <html lang="en-GB" className={`${plexSans.variable} ${plexMono.variable}`}>
+    <html lang="en-GB" data-theme={theme} className={`${plexSans.variable} ${plexMono.variable}`}>
       <body>{children}</body>
     </html>
   );

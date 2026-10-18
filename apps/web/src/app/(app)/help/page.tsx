@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHead, PageHead } from '@/components/ui';
+import { Card, CardBody, CardHead, DetailGroup, DetailItem, PageHead } from '@/components/ui';
 import { requireSession } from '@/lib/session';
 
 export const metadata = { title: 'Help & Support — ECMS' };
@@ -29,21 +29,14 @@ export default async function HelpPage() {
         <Card>
           <CardHead title="Common questions" />
           <CardBody>
-            <dl className="definition">
-              <dt>A record I need isn&apos;t visible</dt>
-              <dd>
-                Visibility follows your role and, for project work, project membership. Ask a
+            <DetailGroup>
+              <DetailItem label="A record I need isn&apos;t visible">Visibility follows your role and, for project work, project membership. Ask a
                 Project Manager to add you to the project, or a System Administrator to review your
-                role.
-              </dd>
-              <dt>An action is refused</dt>
-              <dd>
-                The message names what is missing — an unmet precondition (like open issues blocking
-                a project close) or a permission you don&apos;t hold. Both are shown, not hidden.
-              </dd>
-              <dt>I need a register as a spreadsheet</dt>
-              <dd>Use the &quot;Export CSV&quot; action on the relevant list page.</dd>
-            </dl>
+                role.</DetailItem>
+              <DetailItem label="An action is refused">The message names what is missing — an unmet precondition (like open issues blocking
+                a project close) or a permission you don&apos;t hold. Both are shown, not hidden.</DetailItem>
+              <DetailItem label="I need a register as a spreadsheet">Use the &quot;Export CSV&quot; action on the relevant list page.</DetailItem>
+            </DetailGroup>
           </CardBody>
         </Card>
       </div>

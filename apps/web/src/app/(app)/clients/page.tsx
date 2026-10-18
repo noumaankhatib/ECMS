@@ -1,3 +1,4 @@
+import { formatClientName } from '@ecms/contracts';
 import Link from 'next/link';
 
 import { ActionButton } from '@/components/form';
@@ -70,14 +71,13 @@ export default async function ClientsPage({
         </p>
       </div>
 
-      <form className="row" style={{ marginBottom: 'var(--space-4)' }}>
+      <form className="filter-bar">
         <input
           type="search"
           name="search"
           defaultValue={params.search ?? ''}
-          placeholder="Search by name or reference"
+          placeholder="Search by name, reference, CR/Civil ID or phone"
           aria-label="Search clients"
-          style={{ maxWidth: 320 }}
         />
         <label className="row" style={{ gap: 'var(--space-1)', fontSize: 14 }}>
           <input
@@ -85,7 +85,6 @@ export default async function ClientsPage({
             name="archived"
             value="true"
             defaultChecked={params.archived === 'true'}
-            style={{ width: 'auto' }}
           />
           Include archived
         </label>
@@ -101,54 +100,67 @@ export default async function ClientsPage({
           </Empty>
         ) : (
           <div className="table-scroll">
-            <table>
+            <table className="table--cards">
               <thead>
                 <tr>
                   <th>Name</th>
                   <th>Reference</th>
+                  <th>ID Card #</th>
+                  <th>Mobile</th>
                   <th>Added</th>
                   <th>Status</th>
                   <th />
                 </tr>
               </thead>
               <tbody>
-                {result.items.map((client) => (
-                  <tr key={client.id}>
-                    <td>
-                      <div className="entity-cell">
-                        <span className="entity-cell__icon">{initialsOf(client.name)}</span>
-                        <Link href={`/clients/${client.id}`}>{client.name}</Link>
-                      </div>
-                    </td>
-                    <td className="mono">{client.reference ?? <span className="faint">—</span>}</td>
-                    <td className="nowrap">
-                      <DateText value={client.createdAt} />
-                    </td>
-                    <td>
-                      {client.archivedAt ? (
-                        <span className="badge">Archived</span>
-                      ) : (
-                        <span className="badge badge--active">Active</span>
-                      )}
-                    </td>
-                    <td className="right">
-                      <RowMenu>
-                        <Link href={`/clients/${client.id}`}>View</Link>
-                        {session.can('client:edit') ? (
-                          <Link href={`/clients/${client.id}/edit`}>Edit</Link>
-                        ) : null}
-                        {session.can('client:archive') && !client.archivedAt ? (
-                          <ActionButton
-                            action={archiveClient.bind(null, client.id)}
-                            label="Archive"
-                            variant="danger"
-                            confirm={`Archive ${client.name}? Properties and projects linked to it are unaffected, but it will no longer appear in new-record pickers.`}
-                          />
-                        ) : null}
-                      </RowMenu>
-                    </td>
-                  </tr>
-                ))}
+                {result.items.map((client) => {
+                  const clientName = formatClientName(client);
+                  return (
+                    <tr key={client.id}>
+                      <td data-label="Name">
+                        <div className="entity-cell">
+                          <span className="entity-cell__icon">{initialsOf(clientName)}</span>
+                          <Link href={`/clients/${client.id}`}>{clientName}</Link>
+                        </div>
+                      </td>
+                      <td data-label="Reference" className="mono">
+                        {client.reference ?? <span className="faint">—</span>}
+                      </td>
+                      <td data-label="ID Card #" className="mono">
+                        {client.civilId ?? <span className="faint">—</span>}
+                      </td>
+                      <td data-label="Mobile" className="mono">
+                        {client.mobileNumber ?? <span className="faint">—</span>}
+                      </td>
+                      <td data-label="Added" className="nowrap">
+                        <DateText value={client.createdAt} />
+                      </td>
+                      <td data-label="Status">
+                        {client.archivedAt ? (
+                          <span className="badge">Archived</span>
+                        ) : (
+                          <span className="badge badge--active">Active</span>
+                        )}
+                      </td>
+                      <td className="right">
+                        <RowMenu>
+                          <Link href={`/clients/${client.id}`}>View</Link>
+                          {session.can('client:edit') ? (
+                            <Link href={`/clients/${client.id}/edit`}>Edit</Link>
+                          ) : null}
+                          {session.can('client:archive') && !client.archivedAt ? (
+                            <ActionButton
+                              action={archiveClient.bind(null, client.id)}
+                              label="Archive"
+                              variant="danger"
+                              confirm={`Archive ${clientName}? Properties and projects linked to it are unaffected, but it will no longer appear in new-record pickers.`}
+                            />
+                          ) : null}
+                        </RowMenu>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
