@@ -74,7 +74,12 @@ const ready =
   (await waitFor('http://localhost:3000/login', 60));
 
 if (!ready) {
-  process.stdout.write('The servers did not come up.\n');
+  process.stdout.write(
+    'The servers did not come up.\n' +
+      'The API needs DB_* settings in its environment and a PostgreSQL it can reach; this\n' +
+      'script does not load .env. To run the suite against a disposable database with\n' +
+      'everything set up for you, use:  pnpm run e2e:local\n',
+  );
   stopAll();
   process.exit(1);
 }

@@ -4,9 +4,13 @@ services:
     build: ./docker/postgres
     container_name: ecms-postgres
     environment:
-      POSTGRES_DB: ecms
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${DB_NAME:-ecms}
+      # Only takes effect the first time the data volume is created — if you
+      # change DB_SUPER_USER/PASSWORD in .env afterward, it will NOT update
+      # the running container's actual password. Recreate the volume
+      # (`pnpm run db:wipe`) if the two ever drift apart.
+      POSTGRES_USER: ${DB_SUPER_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_SUPER_PASSWORD:-postgres}
     ports:
       - '5432:5432'
     volumes:
