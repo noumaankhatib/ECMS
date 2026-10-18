@@ -1,5 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { signInAs } from './auth';
+import { submitCreate } from './duplicates';
+import { fillDate, pickEntity } from './pickers';
+
 /**
  * Phase 2's definition of done, performed through the browser
  * (docs/phase-2-plan.md §8): a Planning Team member can create an activity, a
@@ -28,11 +32,7 @@ async function createUser(page: Page, email: string, name: string, role: string)
 }
 
 async function signIn(page: Page, email: string): Promise<void> {
-  await page.goto('/login');
-  await page.getByLabel('Username or email').fill(email);
-  await page.getByLabel('Password').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL('**/dashboard');
+  await signInAs(page, email, PASSWORD);
 }
 
 test.describe.configure({ mode: 'serial' });
@@ -44,30 +44,27 @@ test.describe('Phase 2 through the browser', () => {
     await signIn(page, ADMIN);
 
     await page.goto('/clients/new');
-    await page.getByLabel('Name').fill(`Phase 2 Client ${tag}`);
-    await page.getByRole('button', { name: 'Create client' }).click();
-    await page.waitForURL(/\/clients\/[0-9a-f-]{36}$/);
+    await page.getByLabel('First name').fill(`Phase 2 Client ${tag}`);
+    await submitCreate(page, 'Create client', /\/clients\/[0-9a-f-]{36}$/);
     const clientId = page.url().split('/').pop() ?? '';
 
     await page.goto(`/properties/new?clientId=${clientId}`);
-    await page.getByLabel('Client').selectOption(clientId);
-    await page.getByLabel('Name', { exact: true }).fill(`Phase 2 House ${tag}`);
-    await page.getByRole('button', { name: 'Create property' }).click();
-    await page.waitForURL(/\/properties\/[0-9a-f-]{36}$/);
-    const propertyId = page.url().split('/').pop() ?? '';
+    await pickEntity(page, 'clientId', tag);
+    await page.locator('#name').fill(`Phase 2 House ${tag}`);
+    await submitCreate(page, 'Create property', /\/properties\/[0-9a-f-]{36}$/);
 
     await page.goto('/projects/new');
-    await page.getByLabel('Client').selectOption(clientId);
-    await page.getByLabel('Property').selectOption(propertyId);
+    await pickEntity(page, 'clientId', tag);
+    await pickEntity(page, 'propertyId', tag);
     await page.getByLabel('Project code').fill(`P2-${tag}`);
-    await page.getByLabel('Name').fill(`Phase 2 Project ${tag}`);
+    await page.locator('#name').fill(`Phase 2 Project ${tag}`);
     await page.getByLabel('Type').selectOption('BOTH');
     await page.getByRole('button', { name: 'Create project' }).click();
     await page.waitForURL(/\/projects\/[0-9a-f-]{36}$/);
     projectId = page.url().split('/').pop() ?? '';
 
-    await expect(page.getByRole('link', { name: 'Planning' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Supervision' })).toBeVisible();
+    await expect(page.getByRole('main').getByRole('link', { name: 'Planning', exact: true })).toBeVisible();
+    await expect(page.getByRole('main').getByRole('link', { name: 'Supervision', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Issues' })).toBeVisible();
 
     await createUser(page, OUTSIDER, `Outsider ${tag}`, 'SUPERVISION');
@@ -79,7 +76,7 @@ test.describe('Phase 2 through the browser', () => {
 
     // By id, not label text: the activity and milestone forms both have a
     // field labelled "Name", so the label text alone does not pick one out.
-    await page.locator('#name').fill('Draft the brief');
+    await page.locator('input[name="name"]').fill('Draft the brief');
     await page.getByRole('button', { name: 'Add activity' }).click();
     await expect(page.getByRole('cell', { name: 'Draft the brief' })).toBeVisible();
     await expect(page.getByText('Open', { exact: true }).first()).toBeVisible();
@@ -89,10 +86,10 @@ test.describe('Phase 2 through the browser', () => {
       .getByRole('button', { name: 'Mark done' })
       .click();
     await expect(
-      page.getByRole('row', { name: /Draft the brief/ }).getByText('Done'),
+      page.getByRole('row', { name: /Draft the brief/ }).getByText('Done', { exact: true }),
     ).toBeVisible();
 
-    await page.locator('#milestoneName').fill('Planning submitted');
+    await page.locator('input[name="milestoneName"]').fill('Planning submitted');
     await page.getByRole('button', { name: 'Add milestone' }).click();
     await expect(page.getByRole('cell', { name: 'Planning submitted' })).toBeVisible();
     await expect(page.getByText('Not yet').first()).toBeVisible();
@@ -106,23 +103,22 @@ test.describe('Phase 2 through the browser', () => {
     ).toHaveCount(0);
 
     await page.getByLabel('Reference').fill('SUB-001');
-    await page.getByLabel('Authority').fill('Local Planning Authority');
+    await page.locator('input[name="authorityName"]').fill('Local Planning Authority');
     await page.getByRole('button', { name: 'Add submission' }).click();
     await expect(page.getByRole('cell', { name: 'SUB-001' })).toBeVisible();
     await expect(page.getByRole('row', { name: /SUB-001/ }).getByText('Draft')).toBeVisible();
 
-    await page
-      .getByRole('row', { name: /SUB-001/ })
-      .getByRole('button', { name: 'Submit' })
-      .click();
-    await expect(page.getByRole('row', { name: /SUB-001/ }).getByText('Submitted')).toBeVisible();
+    // Moving a submission on happens on its own page; the list only links to it.
+    await page.getByRole('row', { name: /SUB-001/ }).getByRole('link', { name: 'View' }).click();
+    await page.getByRole('button', { name: 'Submit', exact: true }).click();
+    await expect(page.locator('.badge', { hasText: 'Submitted' }).first()).toBeVisible();
   });
 
   test('a site visit, an observation and an instruction can be recorded', async ({ page }) => {
     await signIn(page, ADMIN);
     await page.goto(`/projects/${projectId}/supervision`);
 
-    await page.getByLabel('Visit date').fill('2026-06-01');
+    await fillDate(page, 'visitDate', '2026-06-01');
     await page.getByLabel('Attendees').fill('Ada, Sam');
     await page.getByRole('button', { name: 'Record site visit' }).click();
     await page.waitForURL(/\/supervision\/[0-9a-f-]{36}$/);

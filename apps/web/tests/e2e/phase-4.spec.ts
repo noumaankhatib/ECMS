@@ -1,6 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { signInAs } from './auth';
 import { submitCreate } from './duplicates';
+import { pickEntity } from './pickers';
+
 
 /**
  * Phase 4's definition of done, performed through the browser
@@ -29,11 +32,7 @@ const PASSWORD = process.env['E2E_ADMIN_PASSWORD'] ?? 'correct-horse-battery';
 const tag = Math.random().toString(36).slice(2, 8).toUpperCase();
 
 async function signIn(page: Page): Promise<void> {
-  await page.goto('/login');
-  await page.getByLabel('Username or email').fill(ADMIN);
-  await page.getByLabel('Password').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL('**/dashboard');
+  await signInAs(page, ADMIN, PASSWORD);
 }
 
 test.describe('Phase 4 through the browser', () => {
@@ -41,12 +40,12 @@ test.describe('Phase 4 through the browser', () => {
     await signIn(page);
 
     await page.goto('/clients/new');
-    await page.locator('#name').fill(`AAA Phase 4 Client ${tag}`);
+    await page.locator('#firstName').fill(`AAA Phase 4 Client ${tag}`);
     await submitCreate(page, 'Create client', /\/clients\/[0-9a-f-]{36}$/);
     const clientId = page.url().split('/').pop() ?? '';
 
     await page.goto(`/properties/new?clientId=${clientId}`);
-    await page.locator('#clientId').selectOption(clientId);
+    await pickEntity(page, 'clientId', tag);
     await page.locator('#name').fill(`AAA Phase 4 Plot ${tag}`);
     // Unique per run: the same plot twice is refused as a duplicate, and
     // this database keeps every earlier run's plots.
@@ -70,19 +69,18 @@ test.describe('Phase 4 through the browser', () => {
     await signIn(page);
 
     await page.goto('/clients/new');
-    await page.locator('#name').fill(`AAA Phase 4 Numbering Client ${tag}`);
+    await page.locator('#firstName').fill(`AAA Phase 4 Numbering Client ${tag}`);
     await submitCreate(page, 'Create client', /\/clients\/[0-9a-f-]{36}$/);
     const clientId = page.url().split('/').pop() ?? '';
 
     await page.goto(`/properties/new?clientId=${clientId}`);
-    await page.locator('#clientId').selectOption(clientId);
+    await pickEntity(page, 'clientId', tag);
     await page.locator('#name').fill(`AAA Phase 4 Numbering Plot ${tag}`);
     await submitCreate(page, 'Create property', /\/properties\/[0-9a-f-]{36}$/);
-    const propertyId = page.url().split('/').pop() ?? '';
 
     await page.goto('/projects/new');
-    await page.locator('#clientId').selectOption(clientId);
-    await page.locator('#propertyId').selectOption(propertyId);
+    await pickEntity(page, 'clientId', tag);
+    await pickEntity(page, 'propertyId', tag);
     // Project code left blank on purpose.
     await page.locator('#name').fill(`AAA Phase 4 Supervision Project ${tag}`);
     await page.locator('#type').selectOption('SUPERVISION');

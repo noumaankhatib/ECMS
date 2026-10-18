@@ -4,6 +4,10 @@ import { join } from 'node:path';
 
 import { expect, test, type Page } from '@playwright/test';
 
+import { signInAs } from './auth';
+import { submitCreate } from './duplicates';
+import { chooseCategory, pickEntity } from './pickers';
+
 /**
  * Phase 9's definition of done, performed through the browser
  * (docs/phase-9-plan.md §8): an administrator adds a required-document
@@ -36,11 +40,7 @@ async function createUser(page: Page, email: string, name: string, role: string)
 }
 
 async function signIn(page: Page, email: string): Promise<void> {
-  await page.goto('/login');
-  await page.getByLabel('Username or email').fill(email);
-  await page.getByLabel('Password').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL('**/dashboard');
+  await signInAs(page, email, PASSWORD);
 }
 
 test.describe.configure({ mode: 'serial' });
@@ -64,21 +64,18 @@ test.describe('Phase 9 through the browser', () => {
     await expect(page.getByText(CATEGORY)).toBeVisible();
 
     await page.goto('/clients/new');
-    await page.locator('#name').fill(`AAA Phase 9 Client ${tag}`);
-    await page.getByRole('button', { name: 'Create client' }).click();
-    await page.waitForURL(/\/clients\/[0-9a-f-]{36}$/);
+    await page.locator('#firstName').fill(`AAA Phase 9 Client ${tag}`);
+    await submitCreate(page, 'Create client', /\/clients\/[0-9a-f-]{36}$/);
     const clientId = page.url().split('/').pop() ?? '';
 
     await page.goto(`/properties/new?clientId=${clientId}`);
-    await page.locator('#clientId').selectOption(clientId);
+    await pickEntity(page, 'clientId', tag);
     await page.locator('#name').fill(`AAA Phase 9 Plot ${tag}`);
-    await page.getByRole('button', { name: 'Create property' }).click();
-    await page.waitForURL(/\/properties\/[0-9a-f-]{36}$/);
-    const propertyId = page.url().split('/').pop() ?? '';
+    await submitCreate(page, 'Create property', /\/properties\/[0-9a-f-]{36}$/);
 
     await page.goto('/projects/new');
-    await page.locator('#clientId').selectOption(clientId);
-    await page.locator('#propertyId').selectOption(propertyId);
+    await pickEntity(page, 'clientId', tag);
+    await pickEntity(page, 'propertyId', tag);
     await page.locator('#name').fill(`AAA Phase 9 Project ${tag}`);
     await page.locator('#type').selectOption('PLANNING');
     await page.getByRole('button', { name: 'Create project' }).click();
@@ -96,7 +93,7 @@ test.describe('Phase 9 through the browser', () => {
 
     await expect(page.getByText(`✗ Phase 9 requirement ${tag}`)).toBeVisible();
 
-    await page.getByLabel('Category').fill(CATEGORY);
+    await chooseCategory(page, CATEGORY);
     await page.getByLabel('Title').fill('Matching upload');
     await page.setInputFiles('#file', fixturePath);
     await page.getByRole('button', { name: 'Upload document' }).click();

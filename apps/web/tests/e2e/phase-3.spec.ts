@@ -4,6 +4,10 @@ import { join } from 'node:path';
 
 import { expect, test, type Page } from '@playwright/test';
 
+import { signInAs } from './auth';
+import { submitCreate } from './duplicates';
+import { chooseCategory, pickEntity } from './pickers';
+
 /**
  * Phase 3's definition of done, performed through the browser
  * (docs/phase-3-plan.md §11): a drawing is registered, a revision is
@@ -32,11 +36,7 @@ async function createUser(page: Page, email: string, name: string, role: string)
 }
 
 async function signIn(page: Page, email: string): Promise<void> {
-  await page.goto('/login');
-  await page.getByLabel('Username or email').fill(email);
-  await page.getByLabel('Password').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL('**/dashboard');
+  await signInAs(page, email, PASSWORD);
 }
 
 test.describe.configure({ mode: 'serial' });
@@ -51,30 +51,27 @@ test.describe('Phase 3 through the browser', () => {
     await signIn(page, ADMIN);
 
     await page.goto('/clients/new');
-    await page.getByLabel('Name').fill(`Phase 3 Client ${tag}`);
-    await page.getByRole('button', { name: 'Create client' }).click();
-    await page.waitForURL(/\/clients\/[0-9a-f-]{36}$/);
+    await page.getByLabel('First name').fill(`Phase 3 Client ${tag}`);
+    await submitCreate(page, 'Create client', /\/clients\/[0-9a-f-]{36}$/);
     const clientId = page.url().split('/').pop() ?? '';
 
     await page.goto(`/properties/new?clientId=${clientId}`);
-    await page.getByLabel('Client').selectOption(clientId);
-    await page.getByLabel('Name', { exact: true }).fill(`Phase 3 House ${tag}`);
-    await page.getByRole('button', { name: 'Create property' }).click();
-    await page.waitForURL(/\/properties\/[0-9a-f-]{36}$/);
-    const propertyId = page.url().split('/').pop() ?? '';
+    await pickEntity(page, 'clientId', tag);
+    await page.locator('#name').fill(`Phase 3 House ${tag}`);
+    await submitCreate(page, 'Create property', /\/properties\/[0-9a-f-]{36}$/);
 
     await page.goto('/projects/new');
-    await page.getByLabel('Client').selectOption(clientId);
-    await page.getByLabel('Property').selectOption(propertyId);
+    await pickEntity(page, 'clientId', tag);
+    await pickEntity(page, 'propertyId', tag);
     await page.getByLabel('Project code').fill(`P3-${tag}`);
-    await page.getByLabel('Name').fill(`Phase 3 Project ${tag}`);
+    await page.locator('#name').fill(`Phase 3 Project ${tag}`);
     await page.getByLabel('Type').selectOption('BOTH');
     await page.getByRole('button', { name: 'Create project' }).click();
     await page.waitForURL(/\/projects\/[0-9a-f-]{36}$/);
     projectId = page.url().split('/').pop() ?? '';
 
     await expect(page.getByRole('link', { name: 'Drawings' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Documents' })).toBeVisible();
+    await expect(page.getByRole('main').getByRole('link', { name: 'Documents', exact: true })).toBeVisible();
 
     await createUser(page, OUTSIDER, `Outsider ${tag}`, 'SUPERVISION');
   });
@@ -125,7 +122,7 @@ test.describe('Phase 3 through the browser', () => {
     await signIn(page, ADMIN);
     await page.goto(`/projects/${projectId}/documents`);
 
-    await page.getByLabel('Category').fill('Report');
+    await chooseCategory(page, 'Report');
     await page.getByLabel('Title').fill('Site inspection report');
     await page.setInputFiles('#file', fixturePath);
     await page.getByRole('button', { name: 'Upload document' }).click();

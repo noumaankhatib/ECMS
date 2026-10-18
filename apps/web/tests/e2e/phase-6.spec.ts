@@ -1,6 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { signInAs } from './auth';
 import { submitCreate } from './duplicates';
+import { fillDate, pickEntity } from './pickers';
+
 
 /**
  * Phase 6's definition of done, performed through the browser
@@ -36,11 +39,7 @@ async function createUser(page: Page, email: string, name: string, role: string)
 }
 
 async function signIn(page: Page, email: string): Promise<void> {
-  await page.goto('/login');
-  await page.getByLabel('Username or email').fill(email);
-  await page.getByLabel('Password').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL('**/dashboard');
+  await signInAs(page, email, PASSWORD);
 }
 
 test.describe.configure({ mode: 'serial' });
@@ -53,19 +52,18 @@ test.describe('Phase 6 through the browser', () => {
     await signIn(page, ADMIN);
 
     await page.goto('/clients/new');
-    await page.locator('#name').fill(`AAA Phase 6 Client ${tag}`);
+    await page.locator('#firstName').fill(`AAA Phase 6 Client ${tag}`);
     await submitCreate(page, 'Create client', /\/clients\/[0-9a-f-]{36}$/);
     const clientId = page.url().split('/').pop() ?? '';
 
     await page.goto(`/properties/new?clientId=${clientId}`);
-    await page.locator('#clientId').selectOption(clientId);
+    await pickEntity(page, 'clientId', tag);
     await page.locator('#name').fill(`AAA Phase 6 Plot ${tag}`);
     await submitCreate(page, 'Create property', /\/properties\/[0-9a-f-]{36}$/);
-    const propertyId = page.url().split('/').pop() ?? '';
 
     await page.goto('/projects/new');
-    await page.locator('#clientId').selectOption(clientId);
-    await page.locator('#propertyId').selectOption(propertyId);
+    await pickEntity(page, 'clientId', tag);
+    await pickEntity(page, 'propertyId', tag);
     await page.locator('#name').fill(`AAA Phase 6 Project ${tag}`);
     await page.locator('#type').selectOption('PLANNING');
     await page.getByRole('button', { name: 'Create project' }).click();
@@ -80,9 +78,9 @@ test.describe('Phase 6 through the browser', () => {
     // authenticated redirects straight past the form (see login/page.tsx).
     await page.goto(`/projects/${projectId}/planning`);
     await page.locator('#reference').fill(`SUB-${tag}`);
-    await page.locator('#authorityName').fill('Ministry of Housing');
+    await page.locator('input[name="authorityName"]').fill('Ministry of Housing');
     await page.locator('#department').selectOption('HOUSING');
-    await page.locator('#pendingWith').fill('Client');
+    await page.locator('input[name="pendingWith"]').fill('Client');
     await page.getByRole('button', { name: 'Add submission' }).click();
 
     const row = page.getByRole('row', { name: new RegExp(`SUB-${tag}`) });
@@ -144,8 +142,8 @@ test.describe('Phase 6 through the browser', () => {
     await signIn(page, ADMIN);
     await page.goto(`/projects/${projectId}/planning/submissions/${submissionId}`);
 
-    await page.locator('#reviewDate').fill('2026-09-01');
-    await page.locator('#reviewerName').fill('Eng. Salim');
+    await fillDate(page, 'reviewDate', '2026-09-01');
+    await page.locator('input[name="reviewerName"]').fill('Eng. Salim');
     await page.locator('#comments').fill('Missing setback dimensions');
     await page.getByRole('button', { name: 'Log review' }).click();
     await expect(page.getByText('Missing setback dimensions')).toBeVisible();

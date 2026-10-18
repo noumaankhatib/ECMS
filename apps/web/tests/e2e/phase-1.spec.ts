@@ -1,6 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { signInAs } from './auth';
 import { submitCreate } from './duplicates';
+import { pickEntity } from './pickers';
+
 
 /**
  * Phase 1's definition of done, performed through the browser.
@@ -44,7 +47,7 @@ async function createUser(page: Page, email: string, name: string, role: string)
   await page.goto('/users/new');
   await page.getByLabel('Full name').fill(name);
   await page.getByLabel('Username').fill(email.split('@')[0] ?? email);
-  await page.getByLabel('Username or email').fill(email);
+  await page.getByLabel('Email address').fill(email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByLabel('Role').selectOption(role);
   await page.getByRole('button', { name: 'Create user' }).click();
@@ -69,15 +72,13 @@ const banner = (page: Page) => page.locator('div.alert');
 const statusBadge = (page: Page, status: string) => page.locator(`.badge--${status}`);
 
 async function signIn(page: Page, email: string): Promise<void> {
-  await page.goto('/login');
-  await page.getByLabel('Username or email').fill(email);
-  await page.getByLabel('Password').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL('**/dashboard');
+  await signInAs(page, email, PASSWORD);
 }
 
 async function signOut(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Sign out' }).click();
+  // Sign out lives in the account menu.
+  await page.locator('button.header__account').click();
+  await page.getByRole('menuitem', { name: 'Sign out' }).click();
   await page.waitForURL('**/login');
 }
 
@@ -115,16 +116,15 @@ test.describe('Phase 1 through the browser', () => {
     await signIn(page, ADMIN);
 
     await page.goto('/clients/new');
-    await page.getByLabel('Name').fill(`Riverside Developments ${tag}`);
+    await page.locator('#firstName').fill(`Riverside Developments ${tag}`);
     await page.getByLabel('Reference').fill(`RIV-${tag}`);
     await submitCreate(page, 'Create client', /\/clients\/[0-9a-f-]{36}$/);
     clientId = page.url().split('/').pop() ?? '';
     await expect(page.getByRole('heading', { level: 1 })).toContainText(tag);
 
     await page.goto(`/properties/new?clientId=${clientId}`);
-    await page.getByLabel('Client').selectOption(clientId);
-    await page.getByLabel('Name', { exact: true }).fill(`Riverside House ${tag}`);
-    await page.getByLabel('Town or city').fill('Leeds');
+    await pickEntity(page, 'clientId', tag);
+    await page.locator('#name').fill(`Riverside House ${tag}`);
     await page.getByLabel('Postcode').fill('LS1 4AP');
     await submitCreate(page, 'Create property', /\/properties\/[0-9a-f-]{36}$/);
     propertyId = page.url().split('/').pop() ?? '';
@@ -132,10 +132,10 @@ test.describe('Phase 1 through the browser', () => {
 
     projectCode = `RIV-${tag}-01`;
     await page.goto('/projects/new');
-    await page.getByLabel('Client').selectOption(clientId);
-    await page.getByLabel('Property').selectOption(propertyId);
+    await pickEntity(page, 'clientId', tag);
+    await pickEntity(page, 'propertyId', tag);
     await page.getByLabel('Project code').fill(projectCode);
-    await page.getByLabel('Name').fill(`Riverside Refurbishment ${tag}`);
+    await page.locator('#name').fill(`Riverside Refurbishment ${tag}`);
     await page.getByLabel('Type').selectOption('BOTH');
     await page.getByRole('button', { name: 'Create project' }).click();
 
@@ -173,6 +173,7 @@ test.describe('Phase 1 through the browser', () => {
 
   test('THE CRITICAL TEST: a non-member gets nothing for a project', async ({ page }) => {
     await signIn(page, MANAGER);
+    await page.goto('/projects');
 
     // A Project Manager holds project:view — but only within their own
     // projects, and this is not one of them.
@@ -193,21 +194,24 @@ test.describe('Phase 1 through the browser', () => {
     // Planning holds no user:view, so the navigation does not offer it.
     await expect(page.getByRole('link', { name: 'Users' })).toHaveCount(0);
     // They may read reference data, so those do appear.
-    await expect(page.getByRole('link', { name: 'Clients' })).toBeVisible();
+    await expect(
+      page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Clients', exact: true }),
+    ).toBeVisible();
   });
 
   test('membership opens exactly one project, and grants nothing extra', async ({ page }) => {
     await signIn(page, ADMIN);
     await page.goto(`/projects/${projectId}`);
 
-    await page.getByLabel('Person').selectOption({ label: `Outside Manager ${tag} (${MANAGER})` });
+    await pickEntity(page, 'userId', `Outside Manager ${tag}`);
     await page.getByLabel('Role on this project').selectOption('PROJECT_MANAGER');
     await page.getByRole('button', { name: 'Add to project' }).click();
     await expect(page.getByRole('cell', { name: `Outside Manager ${tag}` })).toBeVisible();
     await signOut(page);
 
     await signIn(page, MANAGER);
-    await expect(page.getByRole('link', { name: projectCode })).toBeVisible();
+    await page.goto('/projects');
+    await expect(page.getByRole('link', { name: projectCode, exact: true })).toBeVisible();
 
     await page.goto(`/projects/${projectId}`);
     await expect(page.getByRole('heading', { level: 1 })).toContainText(tag);
@@ -219,14 +223,15 @@ test.describe('Phase 1 through the browser', () => {
   test('a planner added to a project can see it but still not edit it', async ({ page }) => {
     await signIn(page, ADMIN);
     await page.goto(`/projects/${projectId}`);
-    await page.getByLabel('Person').selectOption({ label: `Outside Planner ${tag} (${PLANNER})` });
+    await pickEntity(page, 'userId', `Outside Planner ${tag}`);
     await page.getByLabel('Role on this project').selectOption('PLANNING');
     await page.getByRole('button', { name: 'Add to project' }).click();
     await expect(page.getByRole('cell', { name: `Outside Planner ${tag}` })).toBeVisible();
     await signOut(page);
 
     await signIn(page, PLANNER);
-    await expect(page.getByRole('link', { name: projectCode })).toBeVisible();
+    await page.goto('/projects');
+    await expect(page.getByRole('link', { name: projectCode, exact: true })).toBeVisible();
 
     await page.goto(`/projects/${projectId}`);
     // Membership widened WHERE they may work, not WHAT they may do.

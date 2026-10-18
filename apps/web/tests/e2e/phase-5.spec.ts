@@ -1,5 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { signInAs } from './auth';
+import { submitCreate } from './duplicates';
+import { pickEntity } from './pickers';
+
 /**
  * Phase 5's definition of done, performed through the browser
  * (docs/phase-5-plan.md §9): a proposal can be logged with just a contact
@@ -24,11 +28,7 @@ const PASSWORD = process.env['E2E_ADMIN_PASSWORD'] ?? 'correct-horse-battery';
 const tag = Math.random().toString(36).slice(2, 8).toUpperCase();
 
 async function signIn(page: Page): Promise<void> {
-  await page.goto('/login');
-  await page.getByLabel('Username or email').fill(ADMIN);
-  await page.getByLabel('Password').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL('**/dashboard');
+  await signInAs(page, ADMIN, PASSWORD);
 }
 
 test.describe('Phase 5 through the browser', () => {
@@ -38,6 +38,8 @@ test.describe('Phase 5 through the browser', () => {
     await page.goto('/proposals/new');
     await page.locator('#contactName').fill(`AAA Phase 5 Contact ${tag}`);
     await page.locator('#contactPhone').fill('+968 9123 4567');
+    await page.locator('#surveyReference').fill(`1-35-055-01-${tag}`);
+    await page.locator('#requirements').fill('Built for the browser test.');
     await page.getByRole('button', { name: 'Create proposal' }).click();
     await page.waitForURL(/\/proposals\/[0-9a-f-]{36}$/);
 
@@ -49,23 +51,22 @@ test.describe('Phase 5 through the browser', () => {
     await signIn(page);
 
     await page.goto('/clients/new');
-    await page.locator('#name').fill(`AAA Phase 5 Client ${tag}`);
-    await page.getByRole('button', { name: 'Create client' }).click();
-    await page.waitForURL(/\/clients\/[0-9a-f-]{36}$/);
+    await page.locator('#firstName').fill(`AAA Phase 5 Client ${tag}`);
+    await submitCreate(page, 'Create client', /\/clients\/[0-9a-f-]{36}$/);
     const clientId = page.url().split('/').pop() ?? '';
 
     await page.goto(`/properties/new?clientId=${clientId}`);
-    await page.locator('#clientId').selectOption(clientId);
+    await pickEntity(page, 'clientId', tag);
     await page.locator('#name').fill(`AAA Phase 5 Plot ${tag}`);
-    await page.getByRole('button', { name: 'Create property' }).click();
-    await page.waitForURL(/\/properties\/[0-9a-f-]{36}$/);
-    const propertyId = page.url().split('/').pop() ?? '';
+    await submitCreate(page, 'Create property', /\/properties\/[0-9a-f-]{36}$/);
 
     await page.goto('/proposals/new');
     await page.locator('#contactName').fill(`AAA Phase 5 Convert ${tag}`);
-    await page.locator('#clientId').selectOption(clientId);
-    await page.locator('#propertyId').selectOption(propertyId);
+    await pickEntity(page, 'clientId', tag);
+    await pickEntity(page, 'propertyId', tag);
     await page.locator('#projectType').selectOption('SUPERVISION');
+    await page.locator('#surveyReference').fill(`1-35-055-01-${tag}`);
+    await page.locator('#requirements').fill('Built for the browser test.');
     await page.getByRole('button', { name: 'Create proposal' }).click();
     await page.waitForURL(/\/proposals\/[0-9a-f-]{36}$/);
 
@@ -80,7 +81,7 @@ test.describe('Phase 5 through the browser', () => {
     await page.getByRole('button', { name: 'Mark won' }).click();
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText('Won')).toBeVisible();
+    await expect(page.getByText('Won').first()).toBeVisible();
 
     await page.getByRole('button', { name: 'Convert to project' }).click();
     await page.waitForLoadState('networkidle');
@@ -92,11 +93,13 @@ test.describe('Phase 5 through the browser', () => {
     await expect(page.getByText(new RegExp(`^${year}\\.S\\.\\d{3,}$`)).first()).toBeVisible();
   });
 
-  test('converting is refused, by name, when no property is attached', async ({ page }) => {
+  test('converting is not offered, and the missing property is named, when none is attached', async ({ page }) => {
     await signIn(page);
 
     await page.goto('/proposals/new');
     await page.locator('#contactName').fill(`AAA Phase 5 No Property ${tag}`);
+    await page.locator('#surveyReference').fill(`1-35-055-01-${tag}`);
+    await page.locator('#requirements').fill('Built for the browser test.');
     await page.getByRole('button', { name: 'Create proposal' }).click();
     await page.waitForURL(/\/proposals\/[0-9a-f-]{36}$/);
 
@@ -109,11 +112,9 @@ test.describe('Phase 5 through the browser', () => {
     await page.getByRole('button', { name: 'Mark won' }).click();
     await page.waitForLoadState('networkidle');
 
-    await page.getByRole('button', { name: 'Convert to project' }).click();
-    await page.waitForLoadState('networkidle');
-
-    await expect(
-      page.getByText('Attach a property to this proposal before converting it.'),
-    ).toBeVisible();
+    // The page no longer offers a button it knows would be refused: the
+    // readiness list names what is missing, and "Convert to project" is absent.
+    await expect(page.getByText('Property attached')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Convert to project' })).toHaveCount(0);
   });
 });

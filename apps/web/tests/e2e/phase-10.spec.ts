@@ -4,7 +4,10 @@ import { join } from 'node:path';
 
 import { expect, test, type Page } from '@playwright/test';
 
+import { signInAs } from './auth';
 import { submitCreate } from './duplicates';
+import { chooseCategory, pickEntity } from './pickers';
+
 
 /**
  * Phase 10's definition of done, performed through the browser
@@ -25,11 +28,7 @@ const PASSWORD = process.env['E2E_ADMIN_PASSWORD'] ?? 'correct-horse-battery';
 const tag = Math.random().toString(36).slice(2, 8).toUpperCase();
 
 async function signIn(page: Page, email: string): Promise<void> {
-  await page.goto('/login');
-  await page.getByLabel('Username or email').fill(email);
-  await page.getByLabel('Password').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL('**/dashboard');
+  await signInAs(page, email, PASSWORD);
 }
 
 test.describe.configure({ mode: 'serial' });
@@ -44,19 +43,18 @@ test.describe('Phase 10 through the browser', () => {
     await signIn(page, ADMIN);
 
     await page.goto('/clients/new');
-    await page.locator('#name').fill(`AAA Phase 10 Client ${tag}`);
+    await page.locator('#firstName').fill(`AAA Phase 10 Client ${tag}`);
     await submitCreate(page, 'Create client', /\/clients\/[0-9a-f-]{36}$/);
     const clientId = page.url().split('/').pop() ?? '';
 
     await page.goto(`/properties/new?clientId=${clientId}`);
-    await page.locator('#clientId').selectOption(clientId);
+    await pickEntity(page, 'clientId', tag);
     await page.locator('#name').fill(`AAA Phase 10 Plot ${tag}`);
     await submitCreate(page, 'Create property', /\/properties\/[0-9a-f-]{36}$/);
-    const propertyId = page.url().split('/').pop() ?? '';
 
     await page.goto('/projects/new');
-    await page.locator('#clientId').selectOption(clientId);
-    await page.locator('#propertyId').selectOption(propertyId);
+    await pickEntity(page, 'clientId', tag);
+    await pickEntity(page, 'propertyId', tag);
     await page.locator('#name').fill(`AAA Phase 10 Project ${tag}`);
     await page.locator('#type').selectOption('PLANNING');
     await page.getByRole('button', { name: 'Create project' }).click();
@@ -108,16 +106,16 @@ test.describe('Phase 10 through the browser', () => {
     const categories: string[] = [];
     for (let i = 0; i < count; i += 1) {
       const row = rows.nth(i);
-      const scope = (await row.locator('td').nth(1).innerText()).trim();
-      if (scope === 'Any project' || scope === 'Planning') {
-        categories.push((await row.locator('td.mono').innerText()).trim());
+      const scope = await row.locator('select[name="scope"]').inputValue();
+      if (scope === 'ANY' || scope === 'PLANNING') {
+        categories.push((await row.locator('.ref-code').innerText()).trim());
       }
     }
     expect(categories.length).toBeGreaterThan(0);
 
     for (const category of categories) {
       await page.goto(`/projects/${projectId}/documents`);
-      await page.getByLabel('Category').fill(category);
+      await chooseCategory(page, category);
       await page.getByLabel('Title').fill(`${category} (phase 10 e2e)`);
       await page.setInputFiles('#file', fixturePath);
       await page.getByRole('button', { name: 'Upload document' }).click();

@@ -1,5 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { signInAs } from './auth';
+import { submitCreate } from './duplicates';
+import { fillDate, pickEntity } from './pickers';
+
 /**
  * Phase 7's definition of done, performed through the browser
  * (docs/phase-7-plan.md §9): a Supervision project can record an agreement,
@@ -29,11 +33,7 @@ async function createUser(page: Page, email: string, name: string, role: string)
 }
 
 async function signIn(page: Page, email: string): Promise<void> {
-  await page.goto('/login');
-  await page.getByLabel('Username or email').fill(email);
-  await page.getByLabel('Password').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL('**/dashboard');
+  await signInAs(page, email, PASSWORD);
 }
 
 test.describe.configure({ mode: 'serial' });
@@ -45,21 +45,18 @@ test.describe('Phase 7 through the browser', () => {
     await signIn(page, ADMIN);
 
     await page.goto('/clients/new');
-    await page.locator('#name').fill(`AAA Phase 7 Client ${tag}`);
-    await page.getByRole('button', { name: 'Create client' }).click();
-    await page.waitForURL(/\/clients\/[0-9a-f-]{36}$/);
+    await page.locator('#firstName').fill(`AAA Phase 7 Client ${tag}`);
+    await submitCreate(page, 'Create client', /\/clients\/[0-9a-f-]{36}$/);
     const clientId = page.url().split('/').pop() ?? '';
 
     await page.goto(`/properties/new?clientId=${clientId}`);
-    await page.locator('#clientId').selectOption(clientId);
+    await pickEntity(page, 'clientId', tag);
     await page.locator('#name').fill(`AAA Phase 7 Plot ${tag}`);
-    await page.getByRole('button', { name: 'Create property' }).click();
-    await page.waitForURL(/\/properties\/[0-9a-f-]{36}$/);
-    const propertyId = page.url().split('/').pop() ?? '';
+    await submitCreate(page, 'Create property', /\/properties\/[0-9a-f-]{36}$/);
 
     await page.goto('/projects/new');
-    await page.locator('#clientId').selectOption(clientId);
-    await page.locator('#propertyId').selectOption(propertyId);
+    await pickEntity(page, 'clientId', tag);
+    await pickEntity(page, 'propertyId', tag);
     await page.locator('#name').fill(`AAA Phase 7 Project ${tag}`);
     await page.locator('#type').selectOption('SUPERVISION');
     await page.getByRole('button', { name: 'Create project' }).click();
@@ -80,7 +77,7 @@ test.describe('Phase 7 through the browser', () => {
     await page.locator('#type').selectOption('MONTHLY');
     await page.locator('#visitsAllowed').fill('4');
     await page.locator('#amount').fill('500');
-    await page.locator('#startDate').fill(today);
+    await fillDate(page, 'startDate', today);
     await page.getByRole('button', { name: 'Record agreement' }).click();
 
     await expect(page.getByRole('cell', { name: 'Monthly' })).toBeVisible();
@@ -91,7 +88,7 @@ test.describe('Phase 7 through the browser', () => {
     await expect(page.getByText('0 / 4')).toBeVisible();
 
     await page.goto(`/projects/${projectId}/supervision`);
-    await page.locator('#visitDate').fill(today);
+    await fillDate(page, 'visitDate', today);
     await page.getByRole('button', { name: 'Record site visit' }).click();
     await page.waitForURL(/\/supervision\/[0-9a-f-]{36}$/);
 
