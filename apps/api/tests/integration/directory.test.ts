@@ -6,6 +6,7 @@ import { AuditService } from '../../src/modules/audit/audit.service';
 import { ClientService } from '../../src/modules/directory/client.service';
 import { ContactService } from '../../src/modules/directory/contact.service';
 import { PropertyService } from '../../src/modules/directory/property.service';
+import { WilayatService } from '../../src/modules/directory/wilayat.service';
 import { SequenceService } from '../../src/modules/sequence';
 import { runInRequestContext } from '../../src/shared/context/request-context';
 import type { PrismaService } from '../../src/shared/database/prisma.service';
@@ -26,6 +27,7 @@ describe('directory', () => {
   const clients = new ClientService(prisma, audit, new SequenceService());
   const properties = new PropertyService(prisma, audit, new SequenceService());
   const contacts = new ContactService(prisma, audit);
+  const wilayats = new WilayatService(prisma, audit);
 
   const actor = crypto.randomUUID();
   const requestId = '77777777-6666-4555-8444-333333333333';
@@ -232,6 +234,35 @@ describe('directory', () => {
     expect(await found(`owner${tag} findings`, true)).toBe(true);
     // Without permission to see clients, the client's name finds nothing.
     expect(await found(`Owner${tag}`, false)).toBe(false);
+  });
+
+  it('keeps a managed list of wilayats, with the villages already recorded under each', async () => {
+    const name = `Testwilayat ${crypto.randomUUID().slice(0, 8)}`;
+    const village = `Village ${crypto.randomUUID().slice(0, 8)}`;
+
+    const entry = await inContext(() => wilayats.create({ name, sortOrder: 0 }));
+    await inContext(() =>
+      properties.create({ clientId, name: 'Wilayat plot', wilayat: name, village }, actor),
+    );
+
+    // Listed with the village recorded under it (matched without regard to case).
+    const listed = await wilayats.list();
+    expect(listed.find((w) => w.id === entry.id)?.villages).toEqual([village]);
+
+    // The same name twice is refused, and a retired one is brought back.
+    await expect(inContext(() => wilayats.create({ name, sortOrder: 0 }))).rejects.toMatchObject({
+      code: 'CONFLICT',
+    });
+    await inContext(() => wilayats.archive(entry.id));
+    expect((await wilayats.list()).some((w) => w.id === entry.id)).toBe(false);
+    const restored = await inContext(() => wilayats.create({ name, sortOrder: 3 }));
+    expect(restored.id).toBe(entry.id);
+    expect((await wilayats.list()).some((w) => w.id === entry.id)).toBe(true);
+
+    // The property itself keeps what was written, whatever happens to the list.
+    await inContext(() => wilayats.archive(entry.id));
+    const stored = await prisma.property.findFirst({ where: { wilayat: name } });
+    expect(stored?.village).toBe(village);
   });
 
   it('keeps at most one primary contact, demoting the previous one', async () => {

@@ -76,8 +76,9 @@ export function ProjectListTable({
                   {project.managers && project.managers.length > 0 ? (
                     project.managers.map((manager, index) => (
                       <span key={manager.id} className="nowrap">
-                        {index > 0 ? ', ' : null}
+                        {index > 0 ? ' ' : null}
                         <Link href={`/users/${manager.id}`}>{manager.name}</Link>
+                        {index < (project.managers?.length ?? 0) - 1 ? ',' : null}
                       </span>
                     ))
                   ) : (

@@ -4232,3 +4232,65 @@ tbody tr.readiness-row:hover {
 .table-scroll thead th {
   white-space: nowrap;
 }
+
+/* On a phone, a table wider than the screen scrolls inside its card instead of
+ * pushing the whole page sideways. (Tables marked .table--cards already
+ * collapse to stacked cards.) */
+@media (max-width: 720px) {
+  .card table:not(.table--cards),
+  .approvals-table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
+
+/* A side column on a reference list (the villages under a wilayat) gets room
+ * to read instead of being squeezed by the editable column. */
+.ref-table .ref-meta {
+  min-width: 200px;
+  max-width: 320px;
+}
+
+/* On a phone each reference-list row becomes a small card: the code or name on
+ * top, the edit fields at full width, then the buttons — instead of five
+ * controls fighting for one line. */
+@media (max-width: 720px) {
+  .card .ref-table,
+  .card .ref-table tbody,
+  .card .ref-table tr,
+  .card .ref-table td {
+    display: block;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+  .ref-table thead {
+    display: none;
+  }
+  .ref-table tr {
+    padding: var(--space-3);
+    border-bottom: 1px solid var(--border);
+  }
+  .ref-table td {
+    padding: 2px 0;
+    border: 0;
+  }
+  .ref-table .ref-edit .field {
+    flex: 1 1 100%;
+  }
+  .ref-table .ref-edit .field--narrow {
+    flex: 0 0 96px;
+  }
+  .ref-table .ref-actions {
+    width: auto;
+    text-align: left;
+    margin-top: var(--space-2);
+  }
+
+  /* Context chips sit two to a row rather than one per line. */
+  .context-chip {
+    flex: 1 1 calc(50% - var(--space-2));
+    min-width: 0;
+  }
+}

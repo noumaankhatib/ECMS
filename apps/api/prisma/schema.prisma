@@ -948,6 +948,24 @@ model RequiredDocument {
   @@map("required_document")
 }
 
+/// The wilayats a property can be placed in — a short list an administrator
+/// maintains so the same place is always spelled the same way. `Property.wilayat`
+/// stays free text (no foreign key): an older or imported record whose spelling
+/// is not on the list must keep displaying exactly what was written.
+model Wilayat {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  name String @db.VarChar(100)
+
+  sortOrder Int @default(0) @map("sort_order")
+
+  /// Retired, never deleted — same treatment as `ProposalSketchType`.
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+
+  @@unique([name])
+  @@map("wilayat")
+}
+
 /// A standard activity or milestone offered when a project's planning is
 /// being set up (the "Add standard activities" checklist on the Planning page).
 /// Reference data an administrator maintains — offered, never created

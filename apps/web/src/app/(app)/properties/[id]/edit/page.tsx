@@ -1,7 +1,8 @@
-import { LAND_USE_TYPES, PROJECTION_TYPES } from '@ecms/contracts';
+import { LAND_USE_TYPES, PROJECTION_TYPES, type WilayatWithVillages } from '@ecms/contracts';
 
 import { DuplicateAwareForm, PrefillFromDuplicate } from '@/components/duplicate-form';
 import { Field, Select, TextArea } from '@/components/form';
+import { LocationFields } from '@/components/location-fields';
 import { Breadcrumb, Card, CardBody, PageHead } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requirePermission } from '@/lib/session';
@@ -31,6 +32,7 @@ export default async function EditPropertyPage({ params }: { params: Promise<{ i
   const session = await requirePermission('property:edit');
   const { id } = await params;
   const property = await api.get<Property>(`/properties/${id}`);
+  const wilayats = await api.get<WilayatWithVillages[]>('/wilayats').catch(() => []);
 
   return (
     <>
@@ -89,8 +91,11 @@ export default async function EditPropertyPage({ params }: { params: Promise<{ i
                 defaultValue={property.plotNumber}
                 hint="The Krookie's plot number."
               />
-              <Field label="Wilayat" name="wilayat" defaultValue={property.wilayat} />
-              <Field label="Village" name="village" defaultValue={property.village} />
+              <LocationFields
+                wilayats={wilayats}
+                defaultWilayat={property.wilayat}
+                defaultVillage={property.village}
+              />
               <Field
                 label="Survey reference (Krookie / Land ID)"
                 name="surveyReference"

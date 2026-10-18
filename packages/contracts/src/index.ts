@@ -132,6 +132,10 @@ export const PERMISSIONS = [
    *  Planning page. Seeing the list is bundled into `planning:view`. */
   'work_template:admin',
 
+  /** Managing the list of wilayats offered on the property form. Reading it
+   *  is bundled into `property:view`. */
+  'wilayat:admin',
+
   'planning:view',
   'planning:create',
   'planning:edit',
@@ -976,6 +980,33 @@ export const updateProposalSketchTypeSchema = z
   .strict();
 
 export type UpdateProposalSketchType = z.infer<typeof updateProposalSketchTypeSchema>;
+
+/** The wilayats offered on the property form. */
+export const createWilayatSchema = z
+  .object({
+    name: z.string().trim().min(1, 'A name is required').max(100),
+    sortOrder: z.number().int().default(0),
+  })
+  .strict();
+
+export type CreateWilayat = z.infer<typeof createWilayatSchema>;
+
+export const updateWilayatSchema = z
+  .object({
+    name: z.string().trim().min(1).max(100).optional(),
+    sortOrder: z.number().int().optional(),
+  })
+  .strict();
+
+export type UpdateWilayat = z.infer<typeof updateWilayatSchema>;
+
+/** A wilayat with the villages already recorded under it, for the village hints. */
+export interface WilayatWithVillages {
+  id: string;
+  name: string;
+  sortOrder: number;
+  villages: string[];
+}
 
 /** The standard activities and milestones offered on the Planning page. */
 export const PLANNING_TEMPLATE_KINDS = ['ACTIVITY', 'MILESTONE'] as const;

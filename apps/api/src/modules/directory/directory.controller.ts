@@ -3,16 +3,19 @@ import {
   createClientSchema,
   createContactSchema,
   createPropertySchema,
+  createWilayatSchema,
   listQuerySchema,
   propertyDuplicateQuerySchema,
   propertyListQuerySchema,
   updateClientSchema,
   updateContactSchema,
   updatePropertySchema,
+  updateWilayatSchema,
   type ClientDuplicateQuery,
   type CreateClient,
   type CreateContact,
   type CreateProperty,
+  type CreateWilayat,
   type DuplicateMatch,
   type DuplicateOverride,
   type ListQuery,
@@ -22,6 +25,8 @@ import {
   type UpdateClient,
   type UpdateContact,
   type UpdateProperty,
+  type UpdateWilayat,
+  type WilayatWithVillages,
 } from '@ecms/contracts';
 import {
   Body,
@@ -36,17 +41,18 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
-import type { Client, Contact, Property } from '@prisma/client';
+import type { Client, Contact, Property, Wilayat } from '@prisma/client';
 import type { Request } from 'express';
 
 import { appError } from '../../shared/errors/app-error';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
-import { AuthorizationService, RequirePermission } from '../access';
+import { AuthorizationService, RequirePermission, RequirePermissionAnywhere } from '../access';
 
 import { ClientService } from './client.service';
 import { ContactService } from './contact.service';
 import { DuplicateService } from './duplicates';
 import { PropertyService } from './property.service';
+import { WilayatService } from './wilayat.service';
 
 /** The signed-in user. The guard guarantees it; this keeps the assertion in one place. */
 function actorOf(req: Request): string {
@@ -242,5 +248,42 @@ export class PropertyController {
   @RequirePermission('property:archive')
   archive(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request): Promise<void> {
     return this.properties.archive(id, actorOf(req));
+  }
+}
+
+/**
+ * The wilayats offered on the property form. Anyone who can work with
+ * properties needs the list to pick from; changing it needs its own permission.
+ */
+@Controller('wilayats')
+export class WilayatController {
+  constructor(private readonly wilayats: WilayatService) {}
+
+  @Get()
+  @RequirePermissionAnywhere('property:view')
+  list(): Promise<WilayatWithVillages[]> {
+    return this.wilayats.list();
+  }
+
+  @Post()
+  @RequirePermission('wilayat:admin')
+  create(@Body(new ZodValidationPipe(createWilayatSchema)) body: CreateWilayat): Promise<Wilayat> {
+    return this.wilayats.create(body);
+  }
+
+  @Patch(':id')
+  @RequirePermission('wilayat:admin')
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(updateWilayatSchema)) body: UpdateWilayat,
+  ): Promise<Wilayat> {
+    return this.wilayats.update(id, body);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  @RequirePermission('wilayat:admin')
+  archive(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
+    return this.wilayats.archive(id);
   }
 }

@@ -29,6 +29,12 @@ export default async function SettingsPage() {
       show: session.can('sketch_type:admin'),
     },
     {
+      href: '/wilayats',
+      title: 'Wilayats',
+      description: 'The wilayats offered when a property is added.',
+      show: session.can('wilayat:admin'),
+    },
+    {
       href: '/planning-templates',
       title: 'Planning templates',
       description: 'The standard activities and milestones offered on the Planning page.',

@@ -12,4 +12,5 @@ export { DirectoryModule } from './directory.module';
 export { ClientService } from './client.service';
 export { ContactService } from './contact.service';
 export { PropertyService } from './property.service';
+export { WilayatService } from './wilayat.service';
 export { DuplicateService, findClientDuplicates, findPropertyDuplicates } from './duplicates';

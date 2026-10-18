@@ -1,9 +1,15 @@
-import { formatClientName, LAND_USE_TYPES, PROJECTION_TYPES } from '@ecms/contracts';
+import {
+  formatClientName,
+  LAND_USE_TYPES,
+  PROJECTION_TYPES,
+  type WilayatWithVillages,
+} from '@ecms/contracts';
 
 import { DuplicateAwareForm } from '@/components/duplicate-form';
 import { EntityCombobox } from '@/components/entity-combobox';
 import { Field, Select, TextArea } from '@/components/form';
 import { FormAutofill } from '@/components/form-autofill';
+import { LocationFields } from '@/components/location-fields';
 import { PropertyNameField } from '@/components/property-name-field';
 import { Breadcrumb, Card, CardBody, PageHead } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -43,6 +49,9 @@ export default async function NewPropertyPage({
   // offering it would only lead somebody to a refusal they could not have
   // predicted. The search endpoint behind the combobox already excludes
   // them by default, same as the plain list did.
+  // The wilayat list and the villages already under each, for the place fields.
+  const wilayats = await api.get<WilayatWithVillages[]>('/wilayats').catch(() => []);
+
   const preselectedClient = params.clientId
     ? await api
         .get<Client>(`/clients/${params.clientId}`)
@@ -108,8 +117,7 @@ export default async function NewPropertyPage({
               <Field label="Address line 2" name="addressLine2" wide />
               <Field label="Postcode" name="postcode" />
               <Field label="Plot number" name="plotNumber" hint="The Krookie's plot number." />
-              <Field label="Wilayat" name="wilayat" />
-              <Field label="Village" name="village" />
+              <LocationFields wilayats={wilayats} />
               <Field
                 label="Survey reference (Krookie / Land ID)"
                 name="surveyReference"

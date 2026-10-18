@@ -90,6 +90,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             show: session.can('required_document:admin'),
           },
           {
+            href: '/wilayats',
+            label: 'Wilayats',
+            icon: 'sketchTypes',
+            show: session.can('wilayat:admin'),
+          },
+          {
             href: '/planning-templates',
             label: 'Planning templates',
             icon: 'sketchTypes',
