@@ -484,13 +484,10 @@ export class ProjectService {
     if (target === 'CLOSED' && !(await this.handover.isReady(id))) {
       await this.recordRefusal(id, from, target, actorId);
       throw appError('HANDOVER_INCOMPLETE', {
-        fields: [
-          {
-            field: 'status',
-            reason:
-              'Close all issues, upload every required document and complete the handover checklist first.',
-          },
-        ],
+        fields: (await this.unmetHandoverReasons(id)).map((reason) => ({
+          field: 'status',
+          reason,
+        })),
       });
     }
 
@@ -563,6 +560,45 @@ export class ProjectService {
       }),
     );
   }
+
+  /**
+   * What is still standing between this project and being closed, in words a
+   * person can act on — one line per unmet condition, instead of one sentence
+   * that lists all three and leaves them to work out which applies.
+   */
+  private async unmetHandoverReasons(projectId: string): Promise<string[]> {
+    const status = await this.handover.status(projectId);
+    const reasons: string[] = [];
+
+    if (status.openIssueCount > 0) {
+      reasons.push(
+        `${status.openIssueCount} open issue${status.openIssueCount === 1 ? '' : 's'} must be closed.`,
+      );
+    }
+    if (status.missingDocumentCount > 0) {
+      reasons.push(
+        `${status.missingDocumentCount} required document categor${
+          status.missingDocumentCount === 1 ? 'y is' : 'ies are'
+        } still missing.`,
+      );
+    }
+    const checklist: [string, string | null][] = [
+      ['Final inspection', status.finalInspectionAt],
+      ['Authority documents received', status.authorityDocsReceivedAt],
+      ['Test reports received', status.testsReceivedAt],
+      ['As-built drawings received', status.asBuiltReceivedAt],
+      ['Warranties received', status.warrantiesReceivedAt],
+      ['Final report issued', status.finalReportIssuedAt],
+    ];
+    const outstanding = checklist.filter(([, done]) => !done).map(([label]) => label);
+    if (outstanding.length > 0) {
+      reasons.push(`Handover checklist not complete: ${outstanding.join(', ')}.`);
+    }
+
+    return reasons.length > 0
+      ? reasons
+      : ['Close all issues, upload every required document and complete the handover checklist first.'];
+  }
 }
 
 function humanise(status: ProjectStatus): string {
@@ -577,6 +613,7 @@ function rethrowDuplicateCode(error: unknown): never {
     });
   }
   throw error;
+
 }
 
 /** A project as the list returns it: the row plus where it is and who runs it.

@@ -164,7 +164,13 @@ describe('handover', () => {
 
     await expect(
       inContext(() => projects.transition(id, 'close', { version }, admin)),
-    ).rejects.toMatchObject({ code: 'HANDOVER_INCOMPLETE' });
+    ).rejects.toMatchObject({
+      code: 'HANDOVER_INCOMPLETE',
+      // The refusal names what is unmet, not a sentence listing everything.
+      fields: expect.arrayContaining([
+        expect.objectContaining({ reason: expect.stringContaining('1 open issue must be closed') }),
+      ]),
+    });
 
     expect((await handover.status(id)).openIssueCount).toBe(1);
   });
@@ -186,7 +192,14 @@ describe('handover', () => {
 
     await expect(
       inContext(() => projects.transition(id, 'close', { version }, admin)),
-    ).rejects.toMatchObject({ code: 'HANDOVER_INCOMPLETE' });
+    ).rejects.toMatchObject({
+      code: 'HANDOVER_INCOMPLETE',
+      fields: expect.arrayContaining([
+        expect.objectContaining({
+          reason: expect.stringContaining('Handover checklist not complete: Final inspection'),
+        }),
+      ]),
+    });
   });
 
   it('records the refusal, not only a successful close', async () => {

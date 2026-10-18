@@ -4,6 +4,7 @@ import { AccessModule } from '../access';
 
 import { ActivityService } from './activity.service';
 import { MilestoneService } from './milestone.service';
+import { PlanningTemplateService } from './planning-template.service';
 import {
   ActivityController,
   MilestoneController,
@@ -12,7 +13,6 @@ import {
   SubmissionMeetingController,
   SubmissionReviewController,
 } from './planning.controller';
-import { PlanningTemplateService } from './planning-template.service';
 import { SubmissionMeetingService } from './submission-meeting.service';
 import { SubmissionReviewService } from './submission-review.service';
 import { SubmissionService } from './submission.service';

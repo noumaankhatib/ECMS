@@ -169,7 +169,18 @@ export class SubmissionService {
     if (!current || current.projectId !== projectId) throw appError('NOT_FOUND');
 
     if (action === 'approve' && current.createdBy === actorId) {
-      throw appError('FORBIDDEN', { context: { submission_id: id, reason: 'self_approval' } });
+      throw appError('FORBIDDEN', {
+        // Said to the person, not only logged: otherwise the refusal reads as a
+        // missing permission when the real cause is who created the record.
+        fields: [
+          {
+            field: 'status',
+            reason:
+              'You cannot approve a submission you created yourself. Ask another approver to do it.',
+          },
+        ],
+        context: { submission_id: id, reason: 'self_approval' },
+      });
     }
 
     const from = current.status as SubmissionStatus;

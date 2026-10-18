@@ -289,6 +289,36 @@ describe('documents', () => {
     expect(document.linkedId).toBe(activity.id);
   });
 
+  it('links a document to a modification on the same project', async () => {
+    // The database check on linked_type once listed only the original four
+    // types, so this failed with a constraint error rather than saving.
+    const modification = await prisma.modification.create({
+      data: {
+        projectId,
+        requestText: 'Widen the north window.',
+        impactArea: 'ARCHITECTURE',
+        createdBy: admin,
+      },
+    });
+
+    const document = await inContext(() =>
+      documents.create(
+        projectId,
+        {
+          category: 'Correspondence',
+          title: 'Linked to a modification',
+          linkedType: 'MODIFICATION',
+          linkedId: modification.id,
+        },
+        fakeFile('modification file'),
+        owningController,
+      ),
+    );
+
+    expect(document.linkedType).toBe('MODIFICATION');
+    expect(document.linkedId).toBe(modification.id);
+  });
+
   it('refuses a link to an activity that belongs to another project', async () => {
     const otherProperty = await inContext(() =>
       properties.create({ clientId, name: 'Other Document House' }, admin),
