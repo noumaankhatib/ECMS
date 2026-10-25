@@ -1,0 +1,409 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  ECMS (kashif) single-instance stack: one EC2 running docker compose, one
+  Elastic IP, a private S3 bucket for deploy bundles and DB backups, daily EBS
+  snapshots, alarms and a budget. No NAT gateway, load balancer, RDS, ECR or SSH.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: ecms
+    AllowedPattern: '[a-z][a-z0-9-]{1,19}'
+  ImageId:
+    Type: AWS::EC2::Image::Id
+    Description: Amazon Linux 2023 x86_64 AMI. 01-provision.sh resolves this once and pins it, so stack updates never replace the instance.
+  InstanceType:
+    Type: String
+    Default: t3.small
+    AllowedValues: [t3.small, t3.medium, t3.large]
+  RootVolumeGiB:
+    Type: Number
+    Default: 30
+    MinValue: 20
+    MaxValue: 200
+  AlertEmail:
+    Type: String
+    AllowedPattern: '[^@ ]+@[^@ ]+\.[^@ ]+'
+  MonthlyBudgetUsd:
+    Type: Number
+    Default: 100
+  LogRetentionDays:
+    Type: Number
+    Default: 7
+  SnapshotsToKeep:
+    Type: Number
+    Default: 3
+  VpcCidr:
+    Type: String
+    Default: 10.30.0.0/16
+
+Resources:
+  # ---------------------------------------------------------------- network
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags: [{ Key: Name, Value: !Sub '${ProjectName}-vpc' }]
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags: [{ Key: Name, Value: !Sub '${ProjectName}-igw' }]
+
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  # MapPublicIpOnLaunch gives the instance internet access while it boots,
+  # before the Elastic IP is associated.
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, 4, 8]]
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags: [{ Key: Name, Value: !Sub '${ProjectName}-public' }]
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags: [{ Key: Name, Value: !Sub '${ProjectName}-public' }]
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  # HTTP only for now. Add a 443 rule here when a domain and certificate exist.
+  # No SSH (use SSM Session Manager) and no database port.
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ECMS web ingress (80 only)
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0, Description: HTTP }
+      Tags: [{ Key: Name, Value: !Sub '${ProjectName}-web' }]
+
+  # ---------------------------------------------------------------- storage
+  OpsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      VersioningConfiguration: { Status: Enabled }
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - { Id: expire-backups, Status: Enabled, Prefix: backups/, ExpirationInDays: 30, NoncurrentVersionExpiration: { NoncurrentDays: 1 } }
+          - { Id: expire-deploy-bundles, Status: Enabled, Prefix: deploy/, ExpirationInDays: 14, NoncurrentVersionExpiration: { NoncurrentDays: 1 } }
+          - { Id: abort-multipart, Status: Enabled, AbortIncompleteMultipartUpload: { DaysAfterInitiation: 2 } }
+
+  OpsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref OpsBucket
+      PolicyDocument:
+        Statement:
+          - Sid: TlsOnly
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource: [!GetAtt OpsBucket.Arn, !Sub '${OpsBucket.Arn}/*']
+            Condition: { Bool: { 'aws:SecureTransport': 'false' } }
+
+  # ---------------------------------------------------------------- logging
+  ApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: { LogGroupName: !Sub '/${ProjectName}/api', RetentionInDays: !Ref LogRetentionDays }
+  WebLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: { LogGroupName: !Sub '/${ProjectName}/web', RetentionInDays: !Ref LogRetentionDays }
+  NginxLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: { LogGroupName: !Sub '/${ProjectName}/nginx', RetentionInDays: !Ref LogRetentionDays }
+  PostgresLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: { LogGroupName: !Sub '/${ProjectName}/postgres', RetentionInDays: !Ref LogRetentionDays }
+  SsmCommandLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: { LogGroupName: !Sub '/${ProjectName}/ssm-commands', RetentionInDays: !Ref LogRetentionDays }
+
+  # ---------------------------------------------------------------- IAM
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - { Effect: Allow, Principal: { Service: ec2.amazonaws.com }, Action: sts:AssumeRole }
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore'
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/CloudWatchAgentServerPolicy'
+      Policies:
+        - PolicyName: ecms-instance
+          PolicyDocument:
+            Statement:
+              - Sid: ReadOwnSecrets
+                Effect: Allow
+                Action: [ssm:GetParameter, ssm:GetParameters, ssm:GetParametersByPath]
+                Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ProjectName}/prod*'
+              - Sid: BucketList
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt OpsBucket.Arn
+              - Sid: BucketObjects
+                Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource: !Sub '${OpsBucket.Arn}/*'
+              - Sid: DockerAwsLogs
+                Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/${ProjectName}/*'
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties: { Roles: [!Ref InstanceRole] }
+
+  SnapshotRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - { Effect: Allow, Principal: { Service: dlm.amazonaws.com }, Action: sts:AssumeRole }
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole'
+
+  # ---------------------------------------------------------------- compute
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        ImageId: !Ref ImageId
+        InstanceType: !Ref InstanceType
+        IamInstanceProfile: { Arn: !GetAtt InstanceProfile.Arn }
+        MetadataOptions: { HttpTokens: required, HttpPutResponseHopLimit: 1, HttpEndpoint: enabled }
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs: { VolumeSize: !Ref RootVolumeGiB, VolumeType: gp3, Encrypted: true, DeleteOnTermination: true }
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            # First-boot setup only. Everything that changes per release lives in
+            # infra/aws/server/ and is applied by remote-deploy.sh.
+            exec > >(tee -a /var/log/ecms-bootstrap.log) 2>&1
+            set -uxo pipefail
+            retry() { for i in 1 2 3 4 5 6 7 8; do "$@" && return 0; sleep 15; done; return 1; }
+
+            mkdir -p /opt/ecms/releases /var/backups/ecms
+            cat > /opt/ecms/instance.env <<'EOF'
+            AWS_REGION=${AWS::Region}
+            PROJECT=${ProjectName}
+            BACKUP_BUCKET=${OpsBucket}
+            EOF
+            chmod 644 /opt/ecms/instance.env
+
+            retry dnf install -y docker amazon-cloudwatch-agent tar gzip
+            if [ ! -f /swapfile ]; then
+              dd if=/dev/zero of=/swapfile bs=1M count=2048
+              chmod 600 /swapfile; mkswap /swapfile; swapon /swapfile
+              echo '/swapfile none swap sw 0 0' >> /etc/fstab
+            fi
+            systemctl enable --now docker
+
+            ARCH=$(uname -m)
+            mkdir -p /usr/local/lib/docker/cli-plugins
+            retry curl -fsSL -o /usr/local/lib/docker/cli-plugins/docker-compose \
+              "https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-linux-$ARCH"
+            retry curl -fsSL -o /usr/local/lib/docker/cli-plugins/docker-buildx \
+              "https://github.com/docker/buildx/releases/download/v0.17.1/buildx-v0.17.1.linux-$([ "$ARCH" = x86_64 ] && echo amd64 || echo arm64)"
+            chmod +x /usr/local/lib/docker/cli-plugins/*
+
+            cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'EOF'
+            {"agent":{"metrics_collection_interval":300},
+             "metrics":{"append_dimensions":{"InstanceId":"${!aws:InstanceId}"},
+               "metrics_collected":{
+                 "mem":{"measurement":["mem_used_percent"]},
+                 "disk":{"measurement":["used_percent"],"resources":["/"],"drop_device":true}}}}
+            EOF
+            /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s \
+              -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+            touch /opt/ecms/.bootstrapped
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      SubnetId: !Ref PublicSubnet
+      SecurityGroupIds: [!Ref WebSecurityGroup]
+      Tags:
+        - { Key: Name, Value: !Sub '${ProjectName}-prod' }
+        - { Key: Project, Value: !Ref ProjectName }
+
+  ElasticIp:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags: [{ Key: Name, Value: !Sub '${ProjectName}-prod' }]
+
+  ElasticIpAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt ElasticIp.AllocationId
+      InstanceId: !Ref Instance
+
+  SnapshotPolicy:
+    Type: AWS::DLM::LifecyclePolicy
+    Properties:
+      Description: !Sub '${ProjectName} daily EBS snapshots'
+      State: ENABLED
+      ExecutionRoleArn: !GetAtt SnapshotRole.Arn
+      PolicyDetails:
+        ResourceTypes: [INSTANCE]
+        TargetTags: [{ Key: Project, Value: !Ref ProjectName }]
+        Schedules:
+          - Name: daily
+            CreateRule: { Interval: 24, IntervalUnit: HOURS, Times: ['21:00'] }
+            RetainRule: { Count: !Ref SnapshotsToKeep }
+            CopyTags: true
+
+  # ---------------------------------------------------------------- alerts
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${ProjectName}-alerts'
+      Subscription: [{ Protocol: email, Endpoint: !Ref AlertEmail }]
+
+  SystemStatusAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Host problem - auto-recover the instance
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed_System
+      Dimensions: [{ Name: InstanceId, Value: !Ref Instance }]
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions: [!Sub 'arn:${AWS::Partition}:automate:${AWS::Region}:ec2:recover', !Ref AlertTopic]
+
+  InstanceStatusAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Instance status check failing
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed_Instance
+      Dimensions: [{ Name: InstanceId, Value: !Ref Instance }]
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 3
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions: [!Ref AlertTopic]
+
+  CpuCreditAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: CPU credits nearly exhausted (burstable instance will throttle)
+      Namespace: AWS/EC2
+      MetricName: CPUCreditBalance
+      Dimensions: [{ Name: InstanceId, Value: !Ref Instance }]
+      Statistic: Minimum
+      Period: 300
+      EvaluationPeriods: 3
+      Threshold: 20
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertTopic]
+
+  DiskAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Root disk above 80 percent
+      Namespace: CWAgent
+      MetricName: disk_used_percent
+      Dimensions:
+        - { Name: InstanceId, Value: !Ref Instance }
+        - { Name: path, Value: / }
+        - { Name: fstype, Value: xfs }
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertTopic]
+
+  MemoryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Memory above 90 percent
+      Namespace: CWAgent
+      MetricName: mem_used_percent
+      Dimensions: [{ Name: InstanceId, Value: !Ref Instance }]
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 3
+      Threshold: 90
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertTopic]
+
+  # backup.sh publishes this metric after each good backup; no data for ~26h = alarm.
+  BackupMissingAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: No successful database backup in the last day
+      Namespace: ECMS
+      MetricName: BackupSucceeded
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref AlertTopic]
+
+  MonthlyBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: !Sub '${ProjectName}-monthly'
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit: { Amount: !Ref MonthlyBudgetUsd, Unit: USD }
+      NotificationsWithSubscribers:
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 50, ThresholdType: PERCENTAGE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 80, ThresholdType: PERCENTAGE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+        - Notification: { NotificationType: FORECASTED, ComparisonOperator: GREATER_THAN, Threshold: 100, ThresholdType: PERCENTAGE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+
+Outputs:
+  InstanceId: { Value: !Ref Instance }
+  PublicIp: { Value: !Ref ElasticIp }
+  BucketName: { Value: !Ref OpsBucket }
+  AlertTopicArn: { Value: !Ref AlertTopic }

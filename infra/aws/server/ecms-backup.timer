@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily ECMS database backup
+
+[Timer]
+OnCalendar=*-*-* 02:00:00 UTC
+RandomizedDelaySec=300
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -30,3 +30,6 @@ next-env.d.ts
 
 # Saved Playwright sessions (see tests/e2e/auth.ts)
 apps/web/tests/e2e/.auth/
+
+# AWS deploy settings (no secrets, but account-specific)
+infra/aws/config.env

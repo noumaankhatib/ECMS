@@ -1,0 +1,7 @@
+[Unit]
+Description=ECMS database backup to S3
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/ecms/backup.sh scheduled
