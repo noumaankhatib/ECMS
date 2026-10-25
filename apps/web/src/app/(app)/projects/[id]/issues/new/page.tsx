@@ -71,14 +71,14 @@ export default async function NewIssuePage({
                 name="severity"
                 required
                 defaultValue="MEDIUM"
-                options={ISSUE_SEVERITIES.map((s) => ({ value: s, label: s }))}
+                options={ISSUE_SEVERITIES.map((s) => ({ value: s, label: s.charAt(0) + s.slice(1).toLowerCase() }))}
               />
               <Select
                 label="Priority"
                 name="priority"
                 required
                 defaultValue="MEDIUM"
-                options={ISSUE_PRIORITIES.map((p) => ({ value: p, label: p }))}
+                options={ISSUE_PRIORITIES.map((p) => ({ value: p, label: p.charAt(0) + p.slice(1).toLowerCase() }))}
               />
               <EntityCombobox
                 label="Owner"

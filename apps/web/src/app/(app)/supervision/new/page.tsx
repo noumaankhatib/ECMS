@@ -134,6 +134,11 @@ export default async function NewSupervisionPage({
                 searchUrl="/lookup/properties/search"
                 hint="Must belong to the client above — each result shows its client."
               />
+              <Field
+                label="Project code"
+                name="code"
+                hint="Leave blank to generate one automatically."
+              />
               <Field label="Name" name="name" required />
               <Field
                 label="External planning reference"

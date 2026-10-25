@@ -346,6 +346,7 @@ export default async function SubmissionPage({
                   <input type="hidden" name="submissionId" value={submissionId} />
                   <div className="form-grid">
                     <Field label="Scheduled for" name="meetingAt" type="datetime-local" />
+                    <Field label="Attendees" name="attendees" hint="Names, separated by commas." />
                     <label className="field" htmlFor="required">
                       <span>Required</span>
                       <input id="required" type="checkbox" name="required" />
