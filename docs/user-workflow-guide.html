@@ -24,6 +24,8 @@ code { background: #eef2f5; padding: 0 3px; border-radius: 2px; font-size: 8.8pt
 ul, ol { margin: 4px 0 8px 18px; padding: 0; }
 li { margin: 2px 0; }
 .req { color: #b00020; font-weight: bold; }
+img.shot{display:block;width:100%;max-height:150mm;object-fit:contain;object-position:top;border:1px solid #c9d3da;margin:6px 0 10px}
+.cap{font-size:8pt;color:#555;margin:-6px 0 8px}
 </style></head><body>
 
 <div class="cover">
@@ -102,6 +104,7 @@ li { margin: 2px 0; }
 
 <h3>2.1 Users &nbsp;<span class="meta">/users/new</span></h3>
 <p><b>What it is.</b> One account per person. They can sign in as soon as you save. Tell them the password by a route other than email (the system sends no mail).</p>
+<img class="shot" src="guide-images/users-new.png" alt="The New user screen"><p class="cap">The New user screen</p>
 <table>
 <tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
 <tr><td>Username</td><td class="req">*</td><td>What they sign in with. Lowercase letters, numbers, dots, underscores or hyphens. 3 to 50 characters. Cannot be changed later.</td><td><code>fatima.alharthy</code></td></tr>
@@ -115,6 +118,7 @@ li { margin: 2px 0; }
 
 <h3>2.2 Wilayats &nbsp;<span class="meta">/wilayats</span></h3>
 <p><b>What it is.</b> The list of wilayats offered on the property form. Picking from it keeps spelling identical everywhere, which makes searching and duplicate detection (plot number plus wilayat) reliable.</p>
+<img class="shot" src="guide-images/wilayats.png" alt="The Wilayats screen. The Villages recorded column fills in as properties are saved; you never type villages here."><p class="cap">The Wilayats screen. The Villages recorded column fills in as properties are saved; you never type villages here.</p>
 <table>
 <tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
 <tr><td>Name</td><td class="req">*</td><td>The wilayat exactly as it should always be spelled. Unique. Up to 100 characters.</td><td><code>Seeb</code></td></tr>
@@ -125,6 +129,7 @@ li { margin: 2px 0; }
 
 <h3>2.3 Sketch types &nbsp;<span class="meta">/sketch-types</span></h3>
 <p><b>What it is.</b> The kinds of sketch a client can ask for. Staff choose one in "Type of sketch" on a proposal. Ten are pre-loaded: Villa GF only, Villa G+1, Villa G+1 with penthouse, Twin villa, Farm house, Extension, Industrial, Residential-commercial, Plot division, Krookie division.</p>
+<img class="shot" src="guide-images/sketch-types.png" alt="The Sketch types screen"><p class="cap">The Sketch types screen</p>
 <table>
 <tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
 <tr><td>Code</td><td class="req">*</td><td>Internal key. Upper-case letters, digits and underscores only. Up to 50 characters. <b>Never editable afterwards.</b></td><td><code>VILLA_G_PLUS_2</code></td></tr>
@@ -135,6 +140,7 @@ li { margin: 2px 0; }
 
 <h3>2.4 Planning templates &nbsp;<span class="meta">/planning-templates</span></h3>
 <p><b>What it is.</b> Ready-made activity and milestone names. On a project's planning page, "Add standard activities" and "Add standard milestones" show these as tick lists, so staff do not retype them. Pre-loaded: 10 activities (Site survey, Soil test coordination, Concept layout, Client presentation, Architectural drawings, Structural design, MEP design, BOQ preparation, Municipality submission pack, Final drawing set) and 5 milestones (Concept approved, Client approval, Authority submission, Permit received, Planning complete).</p>
+<img class="shot" src="guide-images/planning-templates.png" alt="The Planning templates screen"><p class="cap">The Planning templates screen</p>
 <table>
 <tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
 <tr><td>Type</td><td class="req">*</td><td>Activity (a task) or Milestone (a checkpoint). Cannot be changed afterwards.</td><td>Milestone</td></tr>
@@ -145,6 +151,7 @@ li { margin: 2px 0; }
 
 <h3>2.5 Required documents &nbsp;<span class="meta">/required-documents</span></h3>
 <p><b>What it is.</b> The checklist of document categories a project must have. The Documents page shows a tick or cross per row, and a project <b>cannot be closed</b> while a required category is missing. Pre-loaded, all "Any project": Design, Tests, Authority, Contract, Construction, Completion.</p>
+<img class="shot" src="guide-images/required-documents.png" alt="The Required documents screen. Edit a row and press Save, or press Retire."><p class="cap">The Required documents screen. Edit a row and press Save, or press Retire.</p>
 <table>
 <tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
 <tr><td>Category</td><td class="req">*</td><td>Must match the Category typed or picked when someone uploads a document, ignoring capitals and spaces. Cannot be changed afterwards.</td><td><code>Design</code></td></tr>
@@ -156,6 +163,7 @@ li { margin: 2px 0; }
 
 <h2 class="pb">3. Client and contacts &nbsp;<span class="meta">/clients/new</span></h2>
 <p><b>What it is.</b> The person or company we work for. A client owns properties, proposals and projects. Needs <code>client:create</code> (System Administrator, Project Manager).</p>
+<img class="shot" src="guide-images/client-new.png" alt="The New client screen"><p class="cap">The New client screen</p>
 <table>
 <tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
 <tr><td>First name</td><td class="req">*</td><td>For a person, their first name. <b>For a company, type the registered name here</b> and leave the other name parts blank. Up to 100 characters.</td><td><code>Salim</code></td></tr>
@@ -185,6 +193,7 @@ li { margin: 2px 0; }
 
 <h2>4. Property &nbsp;<span class="meta">/properties/new</span></h2>
 <p><b>What it is.</b> The plot. Each property belongs to one client for good. Needs <code>property:create</code>. You can also arrive here from a proposal with "Add new property"; the form is then pre-filled and you return to the proposal on save.</p>
+<img class="shot" src="guide-images/property-new.png" alt="The New property screen"><p class="cap">The New property screen</p>
 <table>
 <tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
 <tr><td>Client</td><td class="req">*</td><td>Search by name, reference, CR/Civil ID or phone. Cannot be changed later.</td><td><code>Salim Hamad Said Al Balushi</code></td></tr>
@@ -207,6 +216,7 @@ li { margin: 2px 0; }
 
 <h2 class="pb">5. Proposal &nbsp;<span class="meta">/proposals/new</span></h2>
 <p><b>What it is.</b> The enquiry stage, before there is a project. A sketch number is created the moment you save. A client or property is not required to start. Needs <code>proposal:create</code> (Planning Team, Project Manager, System Administrator).</p>
+<img class="shot" src="guide-images/proposal-new.png" alt="The New proposal screen"><p class="cap">The New proposal screen</p>
 <h3>5.1 Create</h3>
 <table>
 <tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
@@ -254,6 +264,7 @@ li { margin: 2px 0; }
 
 <h2 class="pb">6. Project &nbsp;<span class="meta">/projects/new or from convert</span></h2>
 <p>Normally a project comes from a converted proposal. You can also create one directly (needs <code>project:create</code>). The creator is added automatically as a team member.</p>
+<img class="shot" src="guide-images/project-new.png" alt="The New project screen"><p class="cap">The New project screen</p>
 <table>
 <tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
 <tr><td>Client</td><td class="req">*</td><td>Search.</td><td><code>Salim Hamad Said Al Balushi</code></td></tr>
@@ -282,6 +293,7 @@ li { margin: 2px 0; }
 
 <h2 class="pb">7. Planning &nbsp;<span class="meta">/projects/[id]/planning</span></h2>
 <p>Needs <code>planning:create</code> / <code>planning:edit</code> (Planning Team, Project Manager). Three cards.</p>
+<img class="shot" src="guide-images/planning.png" alt="The Planning page: activities, milestones and submissions"><p class="cap">The Planning page: activities, milestones and submissions</p>
 <h3>7.1 Activities (tasks)</h3>
 <p>Tick "Add standard activities" for template names, or use the form (button <b>Add activity</b>).</p>
 <table>
