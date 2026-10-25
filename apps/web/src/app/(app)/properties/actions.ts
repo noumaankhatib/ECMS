@@ -59,7 +59,11 @@ export async function createProperty(_state: FormState, form: FormData): Promise
   if (!result.ok) return result.state;
 
   await refresh('/properties');
-  await returnToProposal(form, { clientId, propertyId: result.value.id });
+  await returnToProposal(form, {
+    clientId,
+    propertyId: result.value.id,
+    property: result.value,
+  });
   redirect(`/properties/${result.value.id}`);
 }
 

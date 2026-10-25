@@ -14,7 +14,7 @@ import { PropertyNameField } from '@/components/property-name-field';
 import { Breadcrumb, Card, CardBody, PageHead } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requirePermission } from '@/lib/session';
-import type { Client } from '@/lib/types';
+import type { Client, Proposal } from '@/lib/types';
 
 import { createProperty } from '../actions';
 import { PROPERTY_PREFILL_FIELDS } from '../prefill-fields';
@@ -52,9 +52,15 @@ export default async function NewPropertyPage({
   // The wilayat list and the villages already under each, for the place fields.
   const wilayats = await api.get<WilayatWithVillages[]>('/wilayats').catch(() => []);
 
-  const preselectedClient = params.clientId
+  // Opened from a proposal: carry over what it already knows.
+  const proposal = params.forProposal
+    ? await api.get<Proposal>(`/proposals/${params.forProposal}`).catch(() => null)
+    : null;
+  const clientIdToUse = params.clientId || proposal?.clientId || '';
+
+  const preselectedClient = clientIdToUse
     ? await api
-        .get<Client>(`/clients/${params.clientId}`)
+        .get<Client>(`/clients/${clientIdToUse}`)
         .then((c) => ({
           id: c.id,
           label: formatClientName(c),
@@ -121,11 +127,13 @@ export default async function NewPropertyPage({
               <Field
                 label="Survey reference (Krookie / Land ID)"
                 name="surveyReference"
+                defaultValue={proposal?.surveyReference}
                 hint="The Krookie's own serial — also the government land-registry number. Leave blank if not yet known; unique among live properties once set."
               />
               <Field
                 label="Title deed reference"
                 name="titleDeedReference"
+                defaultValue={proposal?.titleDeedReference}
                 hint="The Mulkia's deed reference."
               />
               <Field
@@ -135,7 +143,17 @@ export default async function NewPropertyPage({
               />
               <Field label="Owner national ID" name="ownerNationalId" />
               <Field label="Block number" name="blockNumber" />
-              <Field label="Plot area (sqm)" name="plotArea" type="number" />
+              <Field
+                label="Plot area (sqm)"
+                name="plotArea"
+                type="number"
+                defaultValue={proposal?.approxAreaSqm}
+                {...(proposal?.approxAreaSqm
+                  ? {
+                      hint: "Filled from the proposal's approximate area — correct it to the deed's figure.",
+                    }
+                  : {})}
+              />
               <Select
                 label="Type of land use"
                 name="landUseType"
