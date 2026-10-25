@@ -40,6 +40,10 @@ export class ImpactService {
       where: { id },
       include: {
         contacts: { select: { id: true, name: true, archivedAt: true } },
+        // A proposal can point at the client without a property yet (or at a
+        // different property); those would otherwise be missed here and the
+        // delete would then fail on proposal.client_id.
+        proposals: { select: { id: true, propertyId: true } },
         properties: {
           select: {
             id: true,
@@ -69,6 +73,11 @@ export class ImpactService {
       }),
     );
 
+    const underProperty = new Set(c.properties.flatMap((p) => p.proposals.map((pr) => pr.id)));
+    const looseProposalNodes = await Promise.all(
+      c.proposals.filter((pr) => !underProperty.has(pr.id)).map((pr) => this.buildProposal(pr.id)),
+    );
+
     return {
       id,
       type: 'client',
@@ -83,6 +92,7 @@ export class ImpactService {
           children: [] as ImpactNode[],
         })),
         ...propertyNodes,
+        ...looseProposalNodes,
       ],
     };
   }

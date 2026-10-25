@@ -22,9 +22,14 @@ export async function archiveItems(items: AdminDeleteItem[]): Promise<FormState>
 export async function hardDeleteItems(
   items: AdminDeleteItem[],
   confirmName: string,
+  root: AdminDeleteItem,
 ): Promise<FormState> {
-  const result = await attempt(() => api.post('/admin/hard-delete', { items, confirmName }));
-  if (!result.ok) return result.state;
+  const result = await attempt(() => api.post('/admin/hard-delete', { items, confirmName, root }));
+  if (!result.ok) {
+    // There is no form to highlight here, so say what was actually wrong.
+    const reason = result.state.fields?.[0]?.reason;
+    return reason ? { ...result.state, error: reason } : result.state;
+  }
   revalidatePath('/admin/data', 'layout');
   redirect('/admin/data');
 }

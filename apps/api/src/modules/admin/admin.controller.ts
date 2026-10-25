@@ -51,7 +51,8 @@ export class AdminController {
     @Body(new ZodValidationPipe(adminHardDeleteSchema)) body: AdminHardDelete,
     @Req() req: Request,
   ): Promise<void> {
-    const root = body.items[0];
+    // The name asked for is the page's root record, which need not be selected.
+    const root = body.root ?? body.items[0];
     if (!root)
       throw appError('VALIDATION_FAILED', {
         fields: [{ field: 'items', reason: 'At least one item required.' }],

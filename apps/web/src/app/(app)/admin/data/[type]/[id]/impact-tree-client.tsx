@@ -259,7 +259,10 @@ export function ImpactTreeClient({ tree }: { tree: ImpactTree; type: string }) {
   function handleHardDeleteConfirm(name: string) {
     setError(null);
     startTransition(async () => {
-      const result = await hardDeleteItems(selectedItems, name);
+      const result = await hardDeleteItems(selectedItems, name, {
+        type: tree.root.type,
+        id: tree.root.id,
+      });
       if (result?.error) {
         setError(result.error);
         setShowConfirm(false);

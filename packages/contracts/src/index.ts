@@ -2260,6 +2260,9 @@ export const ADMIN_ENTITY_TYPES = [
 
 export type AdminEntityType = (typeof ADMIN_ENTITY_TYPES)[number];
 
+const ADMIN_MEMBER_ID =
+  /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}:[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+
 export interface ImpactNode {
   id: string;
   type: AdminEntityType;
@@ -2275,7 +2278,8 @@ export interface ImpactTree {
 
 export const adminDeleteItemSchema = z.object({
   type: z.enum(ADMIN_ENTITY_TYPES),
-  id: z.string().uuid(),
+  // A project member has no id of its own: it is "<projectId>:<userId>".
+  id: z.union([z.string().uuid(), z.string().regex(ADMIN_MEMBER_ID, 'Invalid UUID')]),
 });
 export type AdminDeleteItem = z.infer<typeof adminDeleteItemSchema>;
 
@@ -2287,6 +2291,8 @@ export type AdminArchive = z.infer<typeof adminArchiveSchema>;
 export const adminHardDeleteSchema = z
   .object({
     items: z.array(adminDeleteItemSchema).min(1),
+    /** The record the person was shown and asked to name; defaults to the first item. */
+    root: adminDeleteItemSchema.optional(),
     confirmName: z.string().min(1),
   })
   .strict();
