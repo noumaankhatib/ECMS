@@ -221,12 +221,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       <ProjectContext project={project} session={session} />
 
       {closed ? (
-        <div className="alert" style={{ marginBottom: 'var(--space-4)' }} role="status">
+        <div className="alert u-mb-4"  role="status">
           This project is closed. It is kept as the record of the work and cannot be changed.
         </div>
       ) : null}
 
-      <div className="row" style={{ marginBottom: 'var(--space-4)' }}>
+      <div className="row u-mb-4" >
         {(project.type === 'PLANNING' || project.type === 'BOTH') &&
         session.can('planning:view', id) ? (
           <Link href={`/projects/${id}/planning`} className="button button--secondary">
@@ -323,7 +323,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
               </DetailItem>
               {project.description ? (
                 <DetailItem label="Description" wide>
-                  <span style={{ whiteSpace: 'pre-wrap' }}>{project.description}</span>
+                  <span className="u-pre-wrap">{project.description}</span>
                 </DetailItem>
               ) : null}
             </DetailGroup>
@@ -368,7 +368,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                 ))}
               </div>
               {(offersComplete || overrideOnly) && readiness ? (
-                <div style={{ marginTop: 'var(--space-3)' }}>
+                <div className="u-mt-3">
                   <ReadinessList
                     readiness={readiness.project}
                     title="Before marking complete"
@@ -383,7 +383,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                   ) : null}
                 </div>
               ) : null}
-              <p className="hint" style={{ marginTop: 'var(--space-3)' }}>
+              <p className="hint u-mt-3" >
                 Only the moves that are legal from{' '}
                 <strong>{project.status.toLowerCase().replace('_', ' ')}</strong> are offered. The
                 server checks again regardless.
@@ -424,7 +424,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                   ))}
                 </tbody>
               </table>
-              <p className="hint" style={{ marginTop: 'var(--space-3)' }}>
+              <p className="hint u-mt-3" >
                 Closing requires no open issues, no missing required documents, and every item above
                 ticked. The server checks this again regardless.
               </p>
@@ -461,7 +461,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                           <Badge>{WORKSTREAM_LABEL[workstream.status] ?? workstream.status}</Badge>
                         </td>
                         <td className="right">
-                          <div className="row" style={{ justifyContent: 'flex-end' }}>
+                          <div className="row u-justify-end" >
                             {mayEdit
                               ? (WORKSTREAM_NEXT[workstream.status] ?? [])
                                   .filter((next) =>
@@ -557,7 +557,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
         <Card>
           <CardHead title="Team">
-            <span className="muted" style={{ fontSize: 13 }}>
+            <span className="muted u-text-sm" >
               Membership is what grants access to this project
             </span>
           </CardHead>

@@ -973,7 +973,7 @@ export default async function DashboardPage() {
                             ))}
                           </ul>
                         ) : (
-                          <p className="muted" style={{ fontSize: 13 }}>
+                          <p className="muted u-text-sm" >
                             Nothing yet.
                           </p>
                         )}
@@ -992,7 +992,7 @@ export default async function DashboardPage() {
                             ))}
                           </ul>
                         ) : (
-                          <p className="muted" style={{ fontSize: 13 }}>
+                          <p className="muted u-text-sm" >
                             Nothing yet.
                           </p>
                         )}

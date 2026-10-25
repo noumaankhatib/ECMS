@@ -181,7 +181,7 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
                   ))}
                 </div>
               ) : null}
-              <p className="hint" style={{ marginTop: 'var(--space-3)' }}>
+              <p className="hint u-mt-3">
                 Only the moves that are legal from{' '}
                 <strong>{(STATUS_LABEL[proposal.status] ?? proposal.status).toLowerCase()}</strong>{' '}
                 are offered. The server checks again regardless.
@@ -381,12 +381,12 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
               <DetailGroup title="Brief">
                 {proposal.requirements ? (
                   <DetailItem label="Requirements" wide>
-                    <span style={{ whiteSpace: 'pre-wrap' }}>{proposal.requirements}</span>
+                    <span className="u-pre-wrap">{proposal.requirements}</span>
                   </DetailItem>
                 ) : null}
                 {proposal.notes ? (
                   <DetailItem label="Notes" wide>
-                    <span style={{ whiteSpace: 'pre-wrap' }}>{proposal.notes}</span>
+                    <span className="u-pre-wrap">{proposal.notes}</span>
                   </DetailItem>
                 ) : null}
               </DetailGroup>

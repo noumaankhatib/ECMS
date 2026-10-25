@@ -136,7 +136,7 @@ export default async function PlanningPage({ params }: { params: Promise<{ id: s
                     </td>
                     <td className="right">
                       {mayEdit ? (
-                        <div className="row" style={{ justifyContent: 'flex-end' }}>
+                        <div className="row u-justify-end">
                           <ActionButton
                             action={setActivityDone.bind(
                               null,
@@ -225,7 +225,7 @@ export default async function PlanningPage({ params }: { params: Promise<{ id: s
                     </td>
                     <td className="right">
                       {mayEdit ? (
-                        <div className="row" style={{ justifyContent: 'flex-end' }}>
+                        <div className="row u-justify-end">
                           {!milestone.achievedDate ? (
                             <ActionButton
                               action={markMilestoneReached.bind(

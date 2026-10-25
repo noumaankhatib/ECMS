@@ -46,7 +46,7 @@ export async function UserWorkSections({
   const overdue = (due: string | null): boolean => Boolean(due && due.slice(0, 10) < today);
 
   return (
-    <div className="grid-2 grid-2--even grid-2--fill" style={{ marginBottom: 'var(--space-5)' }}>
+    <div className="grid-2 grid-2--even grid-2--fill u-mb-5" >
       {projects ? (
         <Card accent="blue">
           <CardHead title="Projects">

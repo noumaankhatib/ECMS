@@ -65,9 +65,7 @@ export default async function WilayatsPage() {
                   </td>
                   <td className="ref-meta">
                     {wilayat.villages.length > 0 ? (
-                      <span className="cell-sub" style={{ marginTop: 0 }}>
-                        {wilayat.villages.join(', ')}
-                      </span>
+                      <span className="cell-sub u-mt-0">{wilayat.villages.join(', ')}</span>
                     ) : (
                       <span className="faint">—</span>
                     )}

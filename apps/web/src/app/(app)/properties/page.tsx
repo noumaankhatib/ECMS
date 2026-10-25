@@ -68,7 +68,7 @@ export default async function PropertiesPage({
           placeholder="Search by name, reference, town, postcode, plot number or Land ID"
           aria-label="Search properties"
         />
-        <label className="row" style={{ gap: 'var(--space-1)', fontSize: 14 }}>
+        <label className="row u-gap-1 u-text-md">
           <input
             type="checkbox"
             name="archived"

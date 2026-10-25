@@ -104,7 +104,7 @@ export default async function IssuePage({
                     />
                   ))}
                 </div>
-                <p className="hint" style={{ marginTop: 'var(--space-3)' }}>
+                <p className="hint u-mt-3" >
                   Only the moves legal from{' '}
                   <strong>{(STATUS_LABEL[issue.status] ?? issue.status).toLowerCase()}</strong> are
                   offered. The server checks again regardless.
@@ -177,10 +177,10 @@ export default async function IssuePage({
                 </Value></DetailItem>
               <DetailItem label="Due"><DateText value={issue.dueDate} /></DetailItem>
               {issue.description ? (
-                <DetailItem label="Description" wide><span style={{ whiteSpace: 'pre-wrap' }}>{issue.description}</span></DetailItem>
+                <DetailItem label="Description" wide><span className="u-pre-wrap">{issue.description}</span></DetailItem>
               ) : null}
               {issue.closureNotes ? (
-                <DetailItem label="Closure notes" wide><span style={{ whiteSpace: 'pre-wrap' }}>{issue.closureNotes}</span></DetailItem>
+                <DetailItem label="Closure notes" wide><span className="u-pre-wrap">{issue.closureNotes}</span></DetailItem>
               ) : null}
             </DetailGroup>
           </CardBody>

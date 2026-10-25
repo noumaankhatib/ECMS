@@ -45,7 +45,7 @@ export default function AppError({
               </p>
             ) : null}
           </div>
-          <div className="row" style={{ marginTop: 'var(--space-4)' }}>
+          <div className="row u-mt-4">
             <button type="button" className="button" onClick={() => reset()}>
               Try again
             </button>

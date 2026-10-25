@@ -50,19 +50,19 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
         <div className="stack">
           <Card>
             <CardHead title="Roles">
-              <span className="muted" style={{ fontSize: 13 }}>
+              <span className="muted u-text-sm" >
                 What kind of work they do
               </span>
             </CardHead>
             <CardBody>
-              <div className="row" style={{ marginBottom: 'var(--space-3)' }}>
+              <div className="row u-mb-3" >
                 {user.roles.length === 0 ? (
                   <span className="muted">
                     No role. They can sign in but will not be able to do anything.
                   </span>
                 ) : (
                   user.roles.map((role) => (
-                    <span key={role} className="row" style={{ gap: 'var(--space-1)' }}>
+                    <span key={role} className="row u-gap-1" >
                       <Badge>{roleName.get(role) ?? role}</Badge>
                       {mayAdminRoles ? (
                         <ActionButton

@@ -174,7 +174,7 @@ export default async function ModificationsPage({
                           <Badge>{STATUS_LABEL[modification.status]}</Badge>
                         </td>
                         <td className="right">
-                          <div className="row" style={{ justifyContent: 'flex-end' }}>
+                          <div className="row u-justify-end">
                             {available.map((candidate) => (
                               <ActionButton
                                 key={candidate.action}

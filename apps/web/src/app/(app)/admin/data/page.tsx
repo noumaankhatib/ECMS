@@ -155,7 +155,7 @@ export default async function AdminDataPage({
         ))}
       </div>
 
-      <form className="row" style={{ marginBottom: 'var(--space-4)' }}>
+      <form className="row u-mb-4">
         <input type="hidden" name="tab" value={tab} />
         <input
           type="search"
@@ -227,8 +227,7 @@ export default async function AdminDataPage({
                     <td className="right">
                       <Link
                         href={`/admin/data/${entityType}/${item.id}`}
-                        className="button button--secondary"
-                        style={{ fontSize: 13 }}
+                        className="button button--secondary u-text-sm"
                       >
                         View impact
                       </Link>

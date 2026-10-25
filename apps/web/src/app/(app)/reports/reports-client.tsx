@@ -63,11 +63,11 @@ export function ReportsClient({
       </p>
 
       {visible.length === 0 ? (
-        <p className="muted" style={{ marginTop: 'var(--space-4)' }}>
+        <p className="muted u-mt-4">
           You do not currently hold a view permission on any exportable register.
         </p>
       ) : (
-        <div className="report-grid" style={{ marginTop: 'var(--space-4)' }}>
+        <div className="report-grid u-mt-4">
           {visible.map((card) => {
             const Icon = ICONS[card.key];
             return (

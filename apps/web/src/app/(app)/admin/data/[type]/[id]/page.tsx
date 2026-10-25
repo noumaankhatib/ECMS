@@ -41,7 +41,7 @@ export default async function ImpactTreePage({
         description={`${typeLabel} — impact tree showing all linked records`}
       />
 
-      <div className="summary-banner" style={{ marginBottom: 'var(--space-4)' }}>
+      <div className="summary-banner u-mb-4">
         <div>
           <span className="summary-banner__value">{tree.totalCount}</span>
           <span className="summary-banner__label"> total records linked</span>
@@ -54,7 +54,7 @@ export default async function ImpactTreePage({
 
       <Card>
         <CardHead title="Linked records">
-          <Link href="/admin/data" className="button button--secondary" style={{ fontSize: 13 }}>
+          <Link href="/admin/data" className="button button--secondary u-text-sm">
             ← Back to browser
           </Link>
         </CardHead>

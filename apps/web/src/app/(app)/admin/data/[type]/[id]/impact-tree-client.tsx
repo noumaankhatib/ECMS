@@ -283,24 +283,18 @@ export function ImpactTreeClient({ tree }: { tree: ImpactTree; type: string }) {
         }}
       >
         <div className="row" style={{ gap: 8 }}>
-          <button
-            type="button"
-            className="button button--secondary"
-            onClick={selectAll}
-            style={{ fontSize: 13 }}
-          >
+          <button type="button" className="button button--secondary u-text-sm" onClick={selectAll}>
             Select all
           </button>
           <button
             type="button"
-            className="button button--secondary"
+            className="button button--secondary u-text-sm"
             onClick={deselectAll}
-            style={{ fontSize: 13 }}
           >
             Deselect all
           </button>
         </div>
-        <span style={{ fontSize: 14 }}>
+        <span className="u-text-md">
           <strong>{selected.size}</strong> of <strong>{tree.totalCount}</strong> records selected
         </span>
       </div>

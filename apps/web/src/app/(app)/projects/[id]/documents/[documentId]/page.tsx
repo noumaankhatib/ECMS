@@ -61,7 +61,7 @@ export default async function DocumentPage({
             <DetailItem label="Archived">This document is archived. The file is kept, only hidden from ordinary lists.</DetailItem>
           ) : null}
           {document.description ? (
-            <DetailItem label="Description" wide><span style={{ whiteSpace: 'pre-wrap' }}>{document.description}</span></DetailItem>
+            <DetailItem label="Description" wide><span className="u-pre-wrap">{document.description}</span></DetailItem>
           ) : null}
         </DetailGroup>
       </CardBody>

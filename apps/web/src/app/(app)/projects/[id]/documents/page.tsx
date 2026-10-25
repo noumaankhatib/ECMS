@@ -143,7 +143,7 @@ export default async function DocumentsPage({
                         </Badge>
                       </td>
                       <td className="right">
-                        <div className="row" style={{ justifyContent: 'flex-end' }}>
+                        <div className="row u-justify-end">
                           {document.uploadStatus === 'ACTIVE' ? (
                             <a
                               href={`/projects/${id}/documents/${document.id}/content`}

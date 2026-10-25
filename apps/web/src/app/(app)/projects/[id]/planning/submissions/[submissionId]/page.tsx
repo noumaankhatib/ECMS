@@ -168,7 +168,7 @@ export default async function SubmissionPage({
                     />
                   ) : null}
                 </div>
-                <p className="hint" style={{ marginTop: 'var(--space-3)' }}>
+                <p className="hint u-mt-3" >
                   Only the moves legal from{' '}
                   <strong>{STATUS_LABEL[submission.status].toLowerCase()}</strong> are offered. The
                   server checks again regardless.
@@ -369,7 +369,7 @@ export default async function SubmissionPage({
               <DetailItem label="Pending with"><Value>{submission.pendingWith}</Value></DetailItem>
               <DetailItem label="Permit reference"><Value>{submission.permitReference}</Value></DetailItem>
               {submission.notes ? (
-                <DetailItem label="Notes" wide><span style={{ whiteSpace: 'pre-wrap' }}>{submission.notes}</span></DetailItem>
+                <DetailItem label="Notes" wide><span className="u-pre-wrap">{submission.notes}</span></DetailItem>
               ) : null}
             </DetailGroup>
           </CardBody>

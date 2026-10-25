@@ -194,7 +194,7 @@ export default async function PropertyPage({ params }: { params: Promise<{ id: s
               </DetailItem>
               {property.notes ? (
                 <DetailItem label="Notes" wide>
-                  <span style={{ whiteSpace: 'pre-wrap' }}>{property.notes}</span>
+                  <span className="u-pre-wrap">{property.notes}</span>
                 </DetailItem>
               ) : null}
             </DetailGroup>

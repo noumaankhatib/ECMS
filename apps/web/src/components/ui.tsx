@@ -214,7 +214,7 @@ export function Pagination({
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   if (pageCount <= 1) {
     return (
-      <p className="muted" style={{ fontSize: 13 }}>
+      <p className="muted u-text-sm" >
         {total} {total === 1 ? 'record' : 'records'}
       </p>
     );

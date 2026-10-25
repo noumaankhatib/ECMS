@@ -62,12 +62,12 @@ export default async function EditContactPage({
               <Field label="Email" name="email" type="email" defaultValue={contact.email} />
               <Field label="Phone" name="phone" defaultValue={contact.phone} />
             </div>
-            <label className="row" style={{ gap: 'var(--space-2)', fontSize: 14 }}>
+            <label className="row u-gap-2 u-text-md" >
               <input
                 type="checkbox"
                 name="isPrimary"
                 defaultChecked={contact.isPrimary}
-                style={{ width: 'auto' }}
+                className="u-w-auto"
               />
               Main point of contact
               <span className="hint">Naming a new one replaces the current primary.</span>

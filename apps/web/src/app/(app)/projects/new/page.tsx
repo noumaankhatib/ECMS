@@ -69,18 +69,18 @@ export default async function NewProjectPage() {
                 endName="targetEndDate"
               />
             </div>
-            <fieldset className="stack" style={{ gap: 'var(--space-2)' }}>
+            <fieldset className="stack u-gap-2">
               <legend>Documents received</legend>
-              <label className="row" style={{ gap: 'var(--space-2)', fontSize: 14 }}>
-                <input type="checkbox" name="mulkiyaReceived" style={{ width: 'auto' }} />
+              <label className="row u-gap-2 u-text-md">
+                <input type="checkbox" name="mulkiyaReceived" className="u-w-auto" />
                 Mulkiya (title deed)
               </label>
-              <label className="row" style={{ gap: 'var(--space-2)', fontSize: 14 }}>
-                <input type="checkbox" name="idCardReceived" style={{ width: 'auto' }} />
+              <label className="row u-gap-2 u-text-md">
+                <input type="checkbox" name="idCardReceived" className="u-w-auto" />
                 ID card
               </label>
-              <label className="row" style={{ gap: 'var(--space-2)', fontSize: 14 }}>
-                <input type="checkbox" name="agreementReceived" style={{ width: 'auto' }} />
+              <label className="row u-gap-2 u-text-md">
+                <input type="checkbox" name="agreementReceived" className="u-w-auto" />
                 Agreement
               </label>
             </fieldset>

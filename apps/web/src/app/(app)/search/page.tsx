@@ -45,7 +45,7 @@ export default async function SearchPage({
     <>
       <PageHead title="Search" description={q ? `Results for "${q}"` : 'Across every register.'} />
 
-      <form className="row" style={{ marginBottom: 'var(--space-4)' }}>
+      <form className="row u-mb-4">
         <input
           type="search"
           name="q"
@@ -71,7 +71,7 @@ export default async function SearchPage({
         {[...byType.entries()].map(([type, items]) => (
           <Card key={type}>
             <CardBody>
-              <h3 style={{ marginTop: 0 }}>{TYPE_LABEL[type]}</h3>
+              <h3 className="u-mt-0">{TYPE_LABEL[type]}</h3>
               <ul className="stack">
                 {items.map((item) => (
                   <li key={item.id}>

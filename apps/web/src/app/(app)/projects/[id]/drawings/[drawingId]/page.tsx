@@ -156,7 +156,7 @@ export default async function DrawingPage({
                           <DateText value={revision.createdAt} />
                         </td>
                         <td className="right">
-                          <div className="row" style={{ justifyContent: 'flex-end' }}>
+                          <div className="row u-justify-end" >
                             {available.map((candidate) => (
                               <ActionButton
                                 key={candidate.action}

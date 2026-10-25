@@ -99,7 +99,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
               <DetailItem label="Projects">{projects.total}</DetailItem>
               {client.notes ? (
                 <DetailItem label="Notes" wide>
-                  <span style={{ whiteSpace: 'pre-wrap' }}>{client.notes}</span>
+                  <span className="u-pre-wrap">{client.notes}</span>
                 </DetailItem>
               ) : null}
             </DetailGroup>
@@ -109,9 +109,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
         <Card>
           <CardHead title="Contacts">
             {session.can('client:edit') && !archived ? (
-              <span className="muted" style={{ fontSize: 13 }}>
-                Add one below
-              </span>
+              <span className="muted u-text-sm">Add one below</span>
             ) : null}
           </CardHead>
           {contacts.length === 0 ? (
@@ -192,7 +190,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
               </summary>
               <CardBody>
                 {suggestSelfAsContact ? (
-                  <p className="hint" style={{ marginTop: 0 }}>
+                  <p className="hint u-mt-0">
                     Pre-filled from {clientName}&apos;s own details — edit or just confirm.
                   </p>
                 ) : null}
@@ -218,11 +216,11 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
                         : {})}
                     />
                   </div>
-                  <label className="row" style={{ gap: 'var(--space-2)', fontSize: 14 }}>
+                  <label className="row u-gap-2 u-text-md">
                     <input
                       type="checkbox"
                       name="isPrimary"
-                      style={{ width: 'auto' }}
+                      className="u-w-auto"
                       defaultChecked={suggestSelfAsContact}
                     />
                     Main point of contact

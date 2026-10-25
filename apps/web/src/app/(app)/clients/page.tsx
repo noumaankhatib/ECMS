@@ -80,7 +80,7 @@ export default async function ClientsPage({
           placeholder="Search by name, reference, CR/Civil ID or phone"
           aria-label="Search clients"
         />
-        <label className="row" style={{ gap: 'var(--space-1)', fontSize: 14 }}>
+        <label className="row u-gap-1 u-text-md">
           <input
             type="checkbox"
             name="archived"

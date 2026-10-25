@@ -90,32 +90,32 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
                 endDefaultValue={forDateInput(project.targetEndDate)}
               />
             </div>
-            <fieldset className="stack" style={{ gap: 'var(--space-2)' }}>
+            <fieldset className="stack u-gap-2">
               <legend>Documents received</legend>
-              <label className="row" style={{ gap: 'var(--space-2)', fontSize: 14 }}>
+              <label className="row u-gap-2 u-text-md">
                 <input
                   type="checkbox"
                   name="mulkiyaReceived"
                   defaultChecked={project.mulkiyaReceived}
-                  style={{ width: 'auto' }}
+                  className="u-w-auto"
                 />
                 Mulkiya (title deed)
               </label>
-              <label className="row" style={{ gap: 'var(--space-2)', fontSize: 14 }}>
+              <label className="row u-gap-2 u-text-md">
                 <input
                   type="checkbox"
                   name="idCardReceived"
                   defaultChecked={project.idCardReceived}
-                  style={{ width: 'auto' }}
+                  className="u-w-auto"
                 />
                 ID card
               </label>
-              <label className="row" style={{ gap: 'var(--space-2)', fontSize: 14 }}>
+              <label className="row u-gap-2 u-text-md">
                 <input
                   type="checkbox"
                   name="agreementReceived"
                   defaultChecked={project.agreementReceived}
-                  style={{ width: 'auto' }}
+                  className="u-w-auto"
                 />
                 Agreement
               </label>
@@ -128,7 +128,7 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
                   name="supervisionWorkstreamVersion"
                   value={supervision.version}
                 />
-                <fieldset className="stack" style={{ gap: 'var(--space-2)' }}>
+                <fieldset className="stack u-gap-2">
                   <legend>Supervision details</legend>
                   {canSeeUsers ? (
                     <EntityCombobox
@@ -138,21 +138,21 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
                       defaultValue={engineer}
                     />
                   ) : null}
-                  <label className="row" style={{ gap: 'var(--space-2)', fontSize: 14 }}>
+                  <label className="row u-gap-2 u-text-md">
                     <input
                       type="checkbox"
                       name="krookieReceived"
                       defaultChecked={supervision.krookieReceived}
-                      style={{ width: 'auto' }}
+                      className="u-w-auto"
                     />
                     Krookie (survey reference)
                   </label>
-                  <label className="row" style={{ gap: 'var(--space-2)', fontSize: 14 }}>
+                  <label className="row u-gap-2 u-text-md">
                     <input
                       type="checkbox"
                       name="approvedDrawingsReceived"
                       defaultChecked={supervision.approvedDrawingsReceived}
-                      style={{ width: 'auto' }}
+                      className="u-w-auto"
                     />
                     Approved drawings
                     <span className="hint">If not done by our company.</span>

@@ -186,7 +186,7 @@ export default async function SiteVisitPage({
               <DetailItem label="Date"><DateText value={visit.visitDate} /></DetailItem>
               <DetailItem label="Attendees"><Value>{visit.attendees}</Value></DetailItem>
               {visit.notes ? (
-                <DetailItem label="Notes" wide><span style={{ whiteSpace: 'pre-wrap' }}>{visit.notes}</span></DetailItem>
+                <DetailItem label="Notes" wide><span className="u-pre-wrap">{visit.notes}</span></DetailItem>
               ) : null}
             </DetailGroup>
           </CardBody>

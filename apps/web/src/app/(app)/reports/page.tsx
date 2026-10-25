@@ -105,7 +105,7 @@ export default async function ReportsPage() {
       />
 
       {!summary.projects && !summary.proposals && !summary.issues ? null : (
-        <div className="grid-2 grid-2--fill" style={{ marginBottom: 'var(--space-5)' }}>
+        <div className="grid-2 grid-2--fill u-mb-5" >
           {summary.projects ? (
             <Card accent="blue">
               <CardHead title="Project status" />

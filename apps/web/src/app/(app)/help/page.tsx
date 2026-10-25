@@ -19,7 +19,7 @@ export default async function HelpPage() {
               organisation&apos;s ECMS workspace — the Users &amp; Roles page under Settings shows
               who holds the System Administrator role.
             </p>
-            <p className="muted" style={{ fontSize: 13 }}>
+            <p className="muted u-text-sm" >
               A support request should include the request ID shown on the error you saw, if any —
               it lets whoever looks into it find the exact event in the record.
             </p>

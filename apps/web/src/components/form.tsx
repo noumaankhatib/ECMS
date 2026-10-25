@@ -402,7 +402,7 @@ export function DateRangeFields({
           />
           <select
             aria-label="Duration unit"
-            style={{ width: 'auto' }}
+            className="u-w-auto"
             value={durationUnit}
             onChange={(event) => {
               const unit = event.target.value as DurationUnit;
@@ -595,7 +595,7 @@ export function CategoryField({
           defaultValue={startsAsOther ? defaultValue : ''}
           placeholder="Type the category"
           required={required ?? false}
-          style={{ marginTop: 'var(--space-2)' }}
+          className="u-mt-2"
         />
       ) : (
         <input type="hidden" name={name} value={choice} />
@@ -625,7 +625,7 @@ export function ErrorBanner({ state }: { state: FormState }) {
         </ul>
       ) : null}
       {state.requestId ? (
-        <div className="hint mono" style={{ marginTop: 'var(--space-2)' }}>
+        <div className="hint mono u-mt-2" >
           Reference {state.requestId}
         </div>
       ) : null}
