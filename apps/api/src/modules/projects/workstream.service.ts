@@ -81,6 +81,11 @@ export class WorkstreamService {
       const data: Prisma.WorkstreamUpdateManyMutationInput = { version: { increment: 1 } };
       if (input.name !== undefined) data.name = input.name;
       if (input.notes !== undefined) data.notes = input.notes;
+      if (input.krookieReceived !== undefined) data.krookieReceived = input.krookieReceived;
+      if (input.approvedDrawingsReceived !== undefined) {
+        data.approvedDrawingsReceived = input.approvedDrawingsReceived;
+      }
+      if (input.siteEngineerId !== undefined) data.siteEngineerId = input.siteEngineerId;
 
       const { count } = await tx.workstream.updateMany({
         where: { id, version: input.version },
@@ -95,8 +100,18 @@ export class WorkstreamService {
         entityType: 'Workstream',
         entityId: id,
         projectId: before.projectId,
-        before: { name: before.name },
-        after: { name: after.name },
+        before: {
+          name: before.name,
+          krookieReceived: before.krookieReceived,
+          approvedDrawingsReceived: before.approvedDrawingsReceived,
+          siteEngineerId: before.siteEngineerId,
+        },
+        after: {
+          name: after.name,
+          krookieReceived: after.krookieReceived,
+          approvedDrawingsReceived: after.approvedDrawingsReceived,
+          siteEngineerId: after.siteEngineerId,
+        },
       });
 
       return after;

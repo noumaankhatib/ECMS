@@ -829,6 +829,10 @@ export const updateWorkstreamSchema = z
   .object({
     name: z.string().trim().min(1).max(200).optional(),
     notes: optionalText(5000),
+    /** Supervision workstream only; the same checklist the project is created with. */
+    krookieReceived: z.boolean().optional(),
+    approvedDrawingsReceived: z.boolean().optional(),
+    siteEngineerId: z.string().uuid().nullish(),
     version: z.number().int().min(1),
   })
   .strict();

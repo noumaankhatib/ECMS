@@ -49,6 +49,18 @@ export async function updateProject(_state: FormState, form: FormData): Promise<
       agreementReceived: form.get('agreementReceived') === 'on',
       version: Number(form.get('version')),
     });
+
+    // The supervision details live on the workstream, not the project. Only
+    // present when the edit form showed them.
+    const workstreamId = String(form.get('supervisionWorkstreamId') ?? '');
+    if (workstreamId) {
+      await api.patch(`/projects/${id}/workstreams/${workstreamId}`, {
+        krookieReceived: form.get('krookieReceived') === 'on',
+        approvedDrawingsReceived: form.get('approvedDrawingsReceived') === 'on',
+        siteEngineerId: await nullableText(form, 'siteEngineerId'),
+        version: Number(form.get('supervisionWorkstreamVersion')),
+      });
+    }
   });
 
   if (result.error) return result;
