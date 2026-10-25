@@ -1,6 +1,7 @@
 import { PROPOSAL_STATUSES } from '@ecms/contracts';
 import Link from 'next/link';
 
+import { FilterBar } from '@/components/filter-bar';
 import { Badge, Card, CodeTag, DateText, Empty, PageHead, Pagination } from '@/components/ui';
 import { api } from '@/lib/api';
 import { loadProjectCodes } from '@/lib/project-codes';
@@ -73,7 +74,7 @@ export default async function ProposalsPage({
         ) : null}
       </PageHead>
 
-      <form className="filter-bar">
+      <FilterBar>
         <input
           type="search"
           name="search"
@@ -96,7 +97,7 @@ export default async function ProposalsPage({
         <button type="submit" className="button button--secondary">
           Search
         </button>
-      </form>
+      </FilterBar>
 
       <Card>
         {page.items.length === 0 ? (
@@ -156,7 +157,8 @@ export default async function ProposalsPage({
                       ) : null}
                     </td>
                     <td data-label="Architect" className="nowrap">
-                      {proposal.assignedArchitectId && architectName.get(proposal.assignedArchitectId) ? (
+                      {proposal.assignedArchitectId &&
+                      architectName.get(proposal.assignedArchitectId) ? (
                         <Link href={`/users/${proposal.assignedArchitectId}`}>
                           {architectName.get(proposal.assignedArchitectId)}
                         </Link>
@@ -176,7 +178,8 @@ export default async function ProposalsPage({
                       ) : null}
                     </td>
                     <td data-label="Project" className="mono">
-                      {proposal.convertedProjectId && projectCode.get(proposal.convertedProjectId) ? (
+                      {proposal.convertedProjectId &&
+                      projectCode.get(proposal.convertedProjectId) ? (
                         <Link href={`/projects/${proposal.convertedProjectId}`}>
                           {projectCode.get(proposal.convertedProjectId)}
                         </Link>

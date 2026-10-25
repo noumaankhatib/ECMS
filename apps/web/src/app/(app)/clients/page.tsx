@@ -1,6 +1,7 @@
 import { formatClientName } from '@ecms/contracts';
 import Link from 'next/link';
 
+import { FilterBar } from '@/components/filter-bar';
 import { ActionButton } from '@/components/form';
 import { RowMenu } from '@/components/row-menu';
 import { Card, DateText, Empty, PageHead, Pagination } from '@/components/ui';
@@ -71,7 +72,7 @@ export default async function ClientsPage({
         </p>
       </div>
 
-      <form className="filter-bar">
+      <FilterBar>
         <input
           type="search"
           name="search"
@@ -91,7 +92,7 @@ export default async function ClientsPage({
         <button type="submit" className="button button--secondary">
           Filters
         </button>
-      </form>
+      </FilterBar>
 
       <Card>
         {result.items.length === 0 ? (

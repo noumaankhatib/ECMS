@@ -1,6 +1,7 @@
 import { ROLE_DEFINITIONS } from '@ecms/contracts';
 import Link from 'next/link';
 
+import { FilterBar } from '@/components/filter-bar';
 import { Badge, Card, DateText, Empty, PageHead, Pagination } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requirePermission } from '@/lib/session';
@@ -42,7 +43,7 @@ export default async function UsersPage({
         ) : null}
       </PageHead>
 
-      <form className="filter-bar">
+      <FilterBar>
         <input
           type="search"
           name="search"
@@ -53,7 +54,7 @@ export default async function UsersPage({
         <button type="submit" className="button button--secondary">
           Search
         </button>
-      </form>
+      </FilterBar>
 
       <Card>
         {page.items.length === 0 ? (

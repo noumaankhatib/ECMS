@@ -4203,17 +4203,18 @@ tbody tr.readiness-row:hover {
   box-shadow: var(--shadow);
 }
 .filter-bar input[type='search'] {
-  flex: 1 1 280px;
+  /* Takes whatever room the filters leave, so there is no gap before the button. */
+  flex: 1 1 320px;
   width: auto;
   min-width: 200px;
-  max-width: 460px;
 }
 .filter-bar select {
   width: auto;
   min-width: 150px;
 }
-.filter-bar .button {
-  margin-left: auto;
+.filter-bar[aria-busy='true'] {
+  opacity: 0.75;
+  transition: opacity 0.15s;
 }
 @media (max-width: 720px) {
   .filter-bar input[type='search'],

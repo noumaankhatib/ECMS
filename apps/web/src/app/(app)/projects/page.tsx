@@ -1,6 +1,7 @@
 import { PROJECT_STATUSES } from '@ecms/contracts';
 import Link from 'next/link';
 
+import { FilterBar } from '@/components/filter-bar';
 import { ProjectListTable } from '@/components/project-list-table';
 import { Card, Empty, PageHead, Pagination } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -43,7 +44,6 @@ export default async function ProjectsPage({
 
   const page = await api.get<ApiPage<Project>>(`/projects?${query.toString()}`);
 
-
   function buildHref(targetPage: number): string {
     const q = new URLSearchParams();
     if (params.search) q.set('search', params.search);
@@ -66,7 +66,7 @@ export default async function ProjectsPage({
         ) : null}
       </PageHead>
 
-      <form className="filter-bar">
+      <FilterBar>
         <input
           type="search"
           name="search"
@@ -74,11 +74,7 @@ export default async function ProjectsPage({
           placeholder="Search by code, name, client, plot or manager"
           aria-label="Search projects"
         />
-        <select
-          name="status"
-          defaultValue={params.status ?? ''}
-          aria-label="Filter by status"
-        >
+        <select name="status" defaultValue={params.status ?? ''} aria-label="Filter by status">
           <option value="">Any status</option>
           {PROJECT_STATUSES.map((status) => (
             <option key={status} value={status}>
@@ -93,7 +89,7 @@ export default async function ProjectsPage({
         <button type="submit" className="button button--secondary">
           Search
         </button>
-      </form>
+      </FilterBar>
 
       <Card>
         {page.items.length === 0 ? (

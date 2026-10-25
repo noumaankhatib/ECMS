@@ -1,14 +1,9 @@
 import { PROJECT_STATUSES, type WorkstreamStats } from '@ecms/contracts';
 import Link from 'next/link';
 
+import { FilterBar } from '@/components/filter-bar';
 import { ProjectListTable } from '@/components/project-list-table';
-import {
-  Card,
-  CardBody,
-  Empty,
-  PageHead,
-  Pagination,
-} from '@/components/ui';
+import { Card, CardBody, Empty, PageHead, Pagination } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
 import type { Page as ApiPage, Project } from '@/lib/types';
@@ -54,7 +49,6 @@ export default async function PlanningPage({
     api.get<WorkstreamStats>('/insights/workstream-stats?type=PLANNING'),
   ]);
 
-
   function buildHref(targetPage: number): string {
     const q = new URLSearchParams();
     if (params.search) q.set('search', params.search);
@@ -89,7 +83,7 @@ export default async function PlanningPage({
         </CardBody>
       </Card>
 
-      <form className="filter-bar">
+      <FilterBar>
         <input
           type="search"
           name="search"
@@ -97,11 +91,7 @@ export default async function PlanningPage({
           placeholder="Search by code, name, client, plot or manager"
           aria-label="Search planning projects"
         />
-        <select
-          name="status"
-          defaultValue={params.status ?? ''}
-          aria-label="Filter by status"
-        >
+        <select name="status" defaultValue={params.status ?? ''} aria-label="Filter by status">
           <option value="">Any status</option>
           {PROJECT_STATUSES.map((status) => (
             <option key={status} value={status}>
@@ -116,7 +106,7 @@ export default async function PlanningPage({
         <button type="submit" className="button button--secondary">
           Search
         </button>
-      </form>
+      </FilterBar>
 
       <Card>
         {page.items.length === 0 ? (
@@ -129,7 +119,7 @@ export default async function PlanningPage({
           <ProjectListTable
             items={page.items}
             rowHref={(project) => `/projects/${project.id}/planning`}
-            
+
             canClient={session.can('client:view')}
             canProperty={session.can('property:view')}
             canPeople={session.can('user:view')}

@@ -2,6 +2,7 @@ import { ISSUE_STATUSES, WORKSTREAM_TYPES } from '@ecms/contracts';
 import Link from 'next/link';
 
 import { ProjectContext } from '@/components/context-strip';
+import { FilterBar } from '@/components/filter-bar';
 import {
   Badge,
   Breadcrumb,
@@ -88,12 +89,8 @@ export default async function IssuesPage({
 
       <ProjectContext project={project} session={session} />
 
-      <form className="filter-bar">
-        <select
-          name="status"
-          defaultValue={status ?? ''}
-          aria-label="Filter by status"
-        >
+      <FilterBar>
+        <select name="status" defaultValue={status ?? ''} aria-label="Filter by status">
           <option value="">Any status</option>
           {ISSUE_STATUSES.map((s) => (
             <option key={s} value={s}>
@@ -118,7 +115,7 @@ export default async function IssuesPage({
         <button type="submit" className="button button--secondary">
           Filter
         </button>
-      </form>
+      </FilterBar>
 
       <Card>
         {issues.items.length === 0 ? (

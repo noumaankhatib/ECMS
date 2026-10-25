@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { FilterBar } from '@/components/filter-bar';
 import { Card, Empty, PageHead, Pagination, Value } from '@/components/ui';
 import { api } from '@/lib/api';
 import { loadClientNames } from '@/lib/client-names';
@@ -59,7 +60,7 @@ export default async function PropertiesPage({
         ) : null}
       </PageHead>
 
-      <form className="filter-bar">
+      <FilterBar>
         <input
           type="search"
           name="search"
@@ -79,7 +80,7 @@ export default async function PropertiesPage({
         <button type="submit" className="button button--secondary">
           Search
         </button>
-      </form>
+      </FilterBar>
 
       <Card>
         {page.items.length === 0 ? (
