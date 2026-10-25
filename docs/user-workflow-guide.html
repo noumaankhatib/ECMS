@@ -96,7 +96,7 @@ img.shot{display:block;width:100%;max-height:150mm;object-fit:contain;object-pos
 <table>
 <tr><th>Order</th><th>Screen</th><th>Who can open it</th><th>Why it comes first</th></tr>
 <tr><td>1</td><td>Users</td><td>System Administrator</td><td>Everyone else needs an account and a role.</td></tr>
-<tr><td>2</td><td>Wilayats</td><td>System Administrator, Project Manager</td><td>Property form pick list. Starts empty.</td></tr>
+<tr><td>2</td><td>Wilayats</td><td>System Administrator, Project Manager</td><td>Property form pick list. Comes pre-loaded with Oman's wilayats.</td></tr>
 <tr><td>3</td><td>Sketch types</td><td>System Administrator, Project Manager</td><td>Proposal form "Type of sketch".</td></tr>
 <tr><td>4</td><td>Planning templates</td><td>System Administrator, Project Manager</td><td>Standard activities / milestones on the planning page.</td></tr>
 <tr><td>5</td><td>Required documents</td><td>System Administrator, Document Controller</td><td>Drives the document checklist that blocks Close.</td></tr>
@@ -118,14 +118,14 @@ img.shot{display:block;width:100%;max-height:150mm;object-fit:contain;object-pos
 
 <h3>2.2 Wilayats &nbsp;<span class="meta">/wilayats</span></h3>
 <p><b>What it is.</b> The list of wilayats offered on the property form. Picking from it keeps spelling identical everywhere, which makes searching and duplicate detection (plot number plus wilayat) reliable.</p>
-<img class="shot" src="guide-images/wilayats.png" alt="The Wilayats screen. The Villages recorded column fills in as properties are saved; you never type villages here."><p class="cap">The Wilayats screen. The Villages recorded column fills in as properties are saved; you never type villages here.</p>
+<img class="shot" src="guide-images/wilayats.png" alt="The Wilayats screen (a new install lists all 62 pre-loaded names; this test copy shows three). The Villages recorded column fills in as properties are saved; you never type villages here."><p class="cap">The Wilayats screen. The Villages recorded column fills in as properties are saved; you never type villages here.</p>
 <table>
 <tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
 <tr><td>Name</td><td class="req">*</td><td>The wilayat exactly as it should always be spelled. Unique. Up to 100 characters.</td><td><code>Seeb</code></td></tr>
 <tr><td>Order</td><td></td><td>Position in the drop-down. Lower comes first.</td><td><code>1</code></td></tr>
 </table>
-<p>Add for the story: <code>Seeb</code> (1), <code>Bawshar</code> (2), <code>Muscat</code> (3). Edit changes Name or Order; Retire hides it from new forms but properties that already use it are unaffected.</p>
-<div class="box warn"><b>Trap.</b> The list is <b>empty on a new system</b>. If you skip this, staff can still type a wilayat on the property form, but it saves as typed and the form says "Ask an administrator to add it under Setup &rarr; Wilayats." Villages need no setup: they are suggested from villages already recorded under that wilayat.</div>
+<p>A new system comes <b>pre-loaded with 62 wilayats</b> across all governorates (Muscat, Muttrah, Bawshar, Seeb, Al Amerat, Quriyat, Salalah, Sohar, Nizwa, Sur and so on). For the story nothing needs adding: <code>Seeb</code> is already there. Add a name only if one is missing, or if your office spells one differently. Edit changes Name or Order; Retire hides it from new forms but properties that already use it are unaffected.</p>
+<div class="box warn"><b>Trap.</b> The pre-loaded spellings are only a starting point (for example <code>Seeb</code>, <code>Quriyat</code>). Check them against the spelling your office uses and rename before properties are entered, because properties keep the spelling they were saved with. A wilayat that is not on the list can still be typed on the property form, but it saves as typed and the form says "Ask an administrator to add it under Setup &rarr; Wilayats." Villages need no setup: they are suggested from villages already recorded under that wilayat.</div>
 
 <h3>2.3 Sketch types &nbsp;<span class="meta">/sketch-types</span></h3>
 <p><b>What it is.</b> The kinds of sketch a client can ask for. Staff choose one in "Type of sketch" on a proposal. Ten are pre-loaded: Villa GF only, Villa G+1, Villa G+1 with penthouse, Twin villa, Farm house, Extension, Industrial, Residential-commercial, Plot division, Krookie division.</p>
@@ -382,7 +382,7 @@ img.shot{display:block;width:100%;max-height:150mm;object-fit:contain;object-pos
 <tr><td>Register drawing (drawing:create)</td><td>Drawing number <span class="req">*</span> (unique in the project), Title <span class="req">*</span></td><td><code>A-101</code>, <code>Ground floor plan</code></td></tr>
 <tr><td>Upload revision (on the drawing)</td><td>Revision code <span class="req">*</span> (unique per drawing), File, Notes</td><td><code>P1</code>, PDF file, <code>Issued for approval</code></td></tr>
 </table>
-<p>Revision moves: Submit and Start review (drawing:create), then Approve, Reject or Return for revision (drawing:approve: Director, System Administrator). A file must be uploaded <b>with</b> the revision; it cannot be added later and a revision without one cannot be approved. A revision with no file that you do not want must be <b>Rejected</b> or <b>Returned for revision</b>: while it sits under review it blocks completing the supervision workstream. Approved revisions never change. To change a drawing, upload the next revision (<code>P2</code>).</p>
+<p>Revision moves: Submit and Start review (drawing:create), then Approve, Reject or Return for revision (drawing:approve: Director, System Administrator). <b>The person who uploaded a revision cannot approve it</b>; someone else must. They may still reject or return their own. A file must be uploaded <b>with</b> the revision; it cannot be added later and a revision without one cannot be approved. A revision with no file that you do not want must be <b>Rejected</b> or <b>Returned for revision</b>: while it sits under review it blocks completing the supervision workstream. Approved revisions never change. To change a drawing, upload the next revision (<code>P2</code>).</p>
 <h3>9.2 Documents &nbsp;<span class="meta">/projects/[id]/documents</span></h3>
 <table>
 <tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
@@ -402,7 +402,7 @@ img.shot{display:block;width:100%;max-height:150mm;object-fit:contain;object-pos
 <tr><td>Site visit observation</td><td></td><td>If raised from one.</td><td>(blank)</td></tr>
 <tr><td>What the client is asking for</td><td class="req">*</td><td>The change request in words.</td><td><code>Enlarge majlis by 12 sqm</code></td></tr>
 </table>
-<p>Moves: Submit and Start review (planning:edit), then Approve, Reject or Return for revision (planning:approve). Pending modifications and unapproved drawings block completing the supervision workstream.</p>
+<p>Moves: Submit and Start review (planning:edit), then Approve, Reject or Return for revision (planning:approve). <b>The person who recorded a modification cannot approve it.</b> Pending modifications and unapproved drawings block completing the supervision workstream.</p>
 
 <h2 class="pb">10. Complete and close a project</h2>
 <h3>10.1 Complete each workstream</h3>
@@ -461,7 +461,7 @@ img.shot{display:block;width:100%;max-height:150mm;object-fit:contain;object-pos
 <tr><td>Override duplicate warning</td><td>Yes</td><td>Yes</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
 <tr><td>Users, roles, data management</td><td>Yes</td><td>View users</td><td>View users</td><td>No</td><td>No</td><td>No</td></tr>
 </table>
-<p class="meta">Project-level roles see only projects they are members of. Only submissions block self-approval; drawings and modifications do not.</p>
+<p class="meta">Project-level roles see only projects they are members of. Submissions, drawing revisions and modifications all block self-approval: whoever created the record cannot approve it.</p>
 
 <h3>12.2 Statuses at a glance</h3>
 <table>
@@ -482,7 +482,7 @@ img.shot{display:block;width:100%;max-height:150mm;object-fit:contain;object-pos
 <tr><td>"Another property already uses this survey reference (Land ID)."</td><td>Survey reference is unique with no override. Check for a duplicate property.</td></tr>
 <tr><td>"That property does not belong to the named client."</td><td>Pick a property owned by that client.</td></tr>
 <tr><td>"A permit reference is required to approve this submission."</td><td>Type the Permit reference in the Approve card.</td></tr>
-<tr><td>"You cannot approve a submission you created yourself."</td><td>Ask another approver.</td></tr>
+<tr><td>"You cannot approve a submission (or drawing revision, or modification) you created yourself."</td><td>Ask another approver.</td></tr>
 <tr><td>Drawing: "This revision has no drawing file..."</td><td>Upload a new revision with the file, then approve that one.</td></tr>
 <tr><td>"This cannot be completed yet &mdash; some conditions are not met."</td><td>Follow the readiness list's <i>Go there</i> links, or ask a Director for an override.</td></tr>
 <tr><td>"The handover checklist must be complete before this project can be closed."</td><td>Tick all six items, close issues, upload missing documents.</td></tr>
