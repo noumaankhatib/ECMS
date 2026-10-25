@@ -6,6 +6,7 @@ Engineering Consultancy Management System.
 
 | Document                                                   | What it is                                                                                                                                                                                                       | Read it when                                                                                 |
 | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| [`user-workflow-guide.html`](user-workflow-guide.html) · [`ECMS-user-workflow-guide.pdf`](ECMS-user-workflow-guide.pdf) | Day-to-day guide for staff: every screen and field in order, with an example value for each, from Setup through to closing a project. The HTML is the source; the PDF is printed from it | You are training or onboarding someone, or need to know what to type in a field |
 | [`architecture-discussion.md`](architecture-discussion.md) | The Phase 1 architecture analysis: PRD breakdown, structural lessons taken from the UIFP reference, security gap analysis, target architecture, domain boundaries, concurrency design, and the decision register | You need the reasoning behind a decision, or you are taking the open questions to the client |
 | [`PROGRESS.md`](PROGRESS.md)                               | What has been built, what was verified at each step, and the bugs found along the way                                                                                                                            | You want the current state, or a record of why something was decided                         |
 | [`phase-1-plan.md`](phase-1-plan.md)                       | What is being built first, in what order, and what "done" means. Includes the decisions already taken                                                                                                            | You are working on the current phase                                                         |
@@ -94,8 +95,9 @@ ever offers the moves legal from the current status, and the server re-checks re
 | `CONVERTED`       | _(terminal — reached only via convert, never a status edit)_ |
 
 **Convert to project.** `POST /proposals/:id/convert`, allowed only `WON → CONVERTED`, needs
-`proposal:convert`. Refuses if `propertyId` is not set — a project always needs a real property, never
-one silently invented from the free-text intake fields. When it succeeds, inside one transaction: a
+`proposal:convert`. Refuses unless all three are present: `propertyId` (a project always needs a real property, never
+one silently invented from the free-text intake fields), `surveyReference` (the Krookie serial) and
+`requirements`. When it succeeds, inside one transaction: a
 project number is reserved (`SequenceService`), the `Project` row is created carrying `clientId`/
 `propertyId` across, its workstreams open per `projectType`, and the proposal is marked `CONVERTED` with
 the link recorded both ways.

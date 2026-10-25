@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>ECMS User Workflow Guide</title>
+<style>
+@page { size: A4; margin: 16mm 14mm; }
+body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 9.5pt; line-height: 1.4; color: #1a1a1a; }
+h1 { font-size: 22pt; margin: 0 0 4px; color: #0b3d5c; }
+h2 { font-size: 14pt; color: #0b3d5c; border-bottom: 2px solid #0b3d5c; padding-bottom: 3px; margin-top: 26px; page-break-after: avoid; }
+h2.pb { page-break-before: always; margin-top: 0; }
+h3 { font-size: 11pt; color: #0b3d5c; margin: 16px 0 4px; page-break-after: avoid; }
+p { margin: 4px 0 6px; }
+table { border-collapse: collapse; width: 100%; margin: 6px 0 10px; page-break-inside: auto; }
+tr { page-break-inside: avoid; }
+th { background: #0b3d5c; color: #fff; text-align: left; padding: 4px 6px; font-size: 8.8pt; }
+td { border: 1px solid #c9d3da; padding: 4px 6px; vertical-align: top; font-size: 8.8pt; }
+tr:nth-child(even) td { background: #f4f7f9; }
+code { background: #eef2f5; padding: 0 3px; border-radius: 2px; font-size: 8.8pt; font-family: "DejaVu Sans Mono", monospace; }
+.box { border-left: 4px solid #2e7d9a; background: #eaf4f8; padding: 6px 10px; margin: 8px 0; }
+.warn { border-left-color: #c77700; background: #fff4e0; }
+.state { border-left-color: #2e7d32; background: #eaf6ea; }
+.meta { color: #555; font-size: 9pt; }
+.cover { text-align: center; padding-top: 70px; page-break-after: always; }
+.cover h1 { font-size: 30pt; }
+ul, ol { margin: 4px 0 8px 18px; padding: 0; }
+li { margin: 2px 0; }
+.req { color: #b00020; font-weight: bold; }
+</style></head><body>
+
+<div class="cover">
+<h1>ECMS User Workflow Guide</h1>
+<p style="font-size:13pt">Every screen, every field, with the exact value to type</p>
+<p class="meta">Engineering Consultancy Management System (Kashif)<br>Version 1.0 &middot; October 2026</p>
+<div style="text-align:left; max-width:420px; margin:50px auto 0;">
+<p><b>How to read this guide</b></p>
+<ul>
+<li>Each stage is one screen. Do the stages in order the first time.</li>
+<li>Every field has a meaning, whether it is required (<span class="req">*</span>), and an example value.</li>
+<li>One running story is used throughout, so the example in one stage feeds the next.</li>
+<li>Green boxes show the state after you save. Orange boxes are traps.</li>
+</ul></div>
+</div>
+
+<h2 style="margin-top:0">Contents</h2>
+<ol>
+<li>Before you start (roles, conventions, the example story)</li>
+<li>Setup before onboarding: Users, Wilayats, Sketch types, Planning templates, Required documents</li>
+<li>Client and contacts</li>
+<li>Property</li>
+<li>Proposal: create, status moves, convert</li>
+<li>Project: create, edit, team, activate</li>
+<li>Planning: activities, milestones, submissions</li>
+<li>Supervision: agreement, site visit, observation, instruction</li>
+<li>Drawings, documents, issues, modifications</li>
+<li>Complete and close a project</li>
+<li>Admin tools after go-live (data management)</li>
+<li>Reference: who can do what, statuses, "Why can't I...?"</li>
+</ol>
+
+<h2 class="pb">1. Before you start</h2>
+<h3>1.1 Conventions on every form</h3>
+<table>
+<tr><th>You see</th><th>Meaning</th></tr>
+<tr><td>Red <span class="req">*</span> after a label</td><td>Required. The form will not save without it.</td></tr>
+<tr><td>Blank "Reference" / "Project code"</td><td>Leave it blank to get an automatic number (for example <code>CL-2026-001</code>). Only type one if you must match an existing number.</td></tr>
+<tr><td>Date boxes <code>DD</code> <code>MM</code> <code>YYYY</code></td><td>Type the three parts, or use the calendar button. Example: <code>01</code> <code>12</code> <code>2026</code>.</td></tr>
+<tr><td>"Or calculate target end date from a duration"</td><td>Type a number and pick Days / Months / Years. The end date is filled for you from the start date.</td></tr>
+<tr><td>Search box ("Type to search...")</td><td>Type part of a name, reference, CR/Civil ID or phone, then click the result.</td></tr>
+<tr><td>Status buttons (Activate, Approve...)</td><td>Only moves that are legal from the current status are shown, and only if your role allows it. You cannot type a status.</td></tr>
+<tr><td>"Someone else changed this record. Reload and try again."</td><td>Two people edited the same record. Reload the page and repeat your change.</td></tr>
+<tr><td>Archive</td><td>Hides a record but keeps history. Nothing is deleted from the normal screens.</td></tr>
+</table>
+
+<h3>1.2 Roles</h3>
+<table>
+<tr><th>Role</th><th>Typical person</th><th>Main abilities</th></tr>
+<tr><td>System Administrator</td><td>IT / office admin</td><td>Everything, including users, setup lists, data management.</td></tr>
+<tr><td>Management / Director</td><td>Directors</td><td>View everything. Approve submissions and drawings. Override a completion gate with a written reason. Override a duplicate warning. Cannot edit.</td></tr>
+<tr><td>Project Manager</td><td>Project managers</td><td>Create clients, properties, proposals (including convert) and projects; manage the project team; close projects. Maintain Wilayats, Sketch types and Planning templates.</td></tr>
+<tr><td>Planning Team</td><td>Architects / planners</td><td>Proposals, planning work, drawings. Can approve submissions (not their own).</td></tr>
+<tr><td>Supervision Team</td><td>Site engineers</td><td>Site visits, issues, supervision work.</td></tr>
+<tr><td>Document Controller</td><td>Document staff</td><td>Upload, edit and archive project documents. Maintain the Required documents list.</td></tr>
+<tr><td>Client / External Stakeholder</td><td>Reserved</td><td>Has no permissions yet. Do not assign.</td></tr>
+</table>
+<p>A user's role says <i>what kind of work</i> they do. <i>Where</i> they can do it comes from project membership: a Project Manager, Planning, Supervision or Document Controller user only sees projects they have been added to.</p>
+
+<h3>1.3 The example story used in this guide</h3>
+<div class="box">
+<b>Mr Salim Hamad Said Al Balushi</b> wants a two-storey villa on <b>Plot 102/8, Al Khoud, Seeb</b>. His son <b>Khalid</b> is the contact. We win the proposal, convert it to a project named <b>Salim Hamad Said Al Balushi &ndash; Plot 102/8 &ndash; Al Khoud, Seeb</b> (planning and supervision), submit to <b>Muscat Municipality</b>, get a permit, supervise construction, then hand over and close.
+</div>
+<p>Staff in the story: <code>admin</code> (System Administrator), <code>fatima.alharthy</code> (Planning Team, assigned architect), <code>omar.saidi</code> (Project Manager), <code>yusuf.rashdi</code> (Supervision Team, site engineer), <code>huda.kindi</code> (Planning Team, second approver), <code>director1</code> (Director).</p>
+
+<h2 class="pb">2. Setup before onboarding (one time)</h2>
+<p>Do this once, before the first client is entered. The later stages draw on these lists. Every Setup screen is in the left menu under <b>Setup</b>; you only see the entries your role may open.</p>
+<table>
+<tr><th>Order</th><th>Screen</th><th>Who can open it</th><th>Why it comes first</th></tr>
+<tr><td>1</td><td>Users</td><td>System Administrator</td><td>Everyone else needs an account and a role.</td></tr>
+<tr><td>2</td><td>Wilayats</td><td>System Administrator, Project Manager</td><td>Property form pick list. Starts empty.</td></tr>
+<tr><td>3</td><td>Sketch types</td><td>System Administrator, Project Manager</td><td>Proposal form "Type of sketch".</td></tr>
+<tr><td>4</td><td>Planning templates</td><td>System Administrator, Project Manager</td><td>Standard activities / milestones on the planning page.</td></tr>
+<tr><td>5</td><td>Required documents</td><td>System Administrator, Document Controller</td><td>Drives the document checklist that blocks Close.</td></tr>
+</table>
+
+<h3>2.1 Users &nbsp;<span class="meta">/users/new</span></h3>
+<p><b>What it is.</b> One account per person. They can sign in as soon as you save. Tell them the password by a route other than email (the system sends no mail).</p>
+<table>
+<tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
+<tr><td>Username</td><td class="req">*</td><td>What they sign in with. Lowercase letters, numbers, dots, underscores or hyphens. 3 to 50 characters. Cannot be changed later.</td><td><code>fatima.alharthy</code></td></tr>
+<tr><td>Full name</td><td class="req">*</td><td>Shown on records, approvals and the audit trail. Up to 200 characters.</td><td><code>Fatima Al Harthy</code></td></tr>
+<tr><td>Email address</td><td></td><td>Optional. Only an alternate way to sign in, since no email is ever sent. Cannot be changed later.</td><td><code>fatima@example.com</code></td></tr>
+<tr><td>Password</td><td class="req">*</td><td>At least 12 characters. Length matters more than symbols, so a passphrase is fine.</td><td><code>blue-camel-river-42</code></td></tr>
+<tr><td>Role</td><td class="req">*</td><td>What kind of work they do (see section 1.2). One role at creation; add more on the user page with "Grant role".</td><td>Planning Team</td></tr>
+</table>
+<div class="box state"><b>After save:</b> the user page opens. The account is Active. Create the six story users now.</div>
+<div class="box warn"><b>Traps.</b> A user with no role can sign in but can do nothing. Disable (do not delete) people who leave; their history is kept. You cannot disable your own account. Setting a new password ends all of that person's sessions.</div>
+
+<h3>2.2 Wilayats &nbsp;<span class="meta">/wilayats</span></h3>
+<p><b>What it is.</b> The list of wilayats offered on the property form. Picking from it keeps spelling identical everywhere, which makes searching and duplicate detection (plot number plus wilayat) reliable.</p>
+<table>
+<tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
+<tr><td>Name</td><td class="req">*</td><td>The wilayat exactly as it should always be spelled. Unique. Up to 100 characters.</td><td><code>Seeb</code></td></tr>
+<tr><td>Order</td><td></td><td>Position in the drop-down. Lower comes first.</td><td><code>1</code></td></tr>
+</table>
+<p>Add for the story: <code>Seeb</code> (1), <code>Bawshar</code> (2), <code>Muscat</code> (3). Edit changes Name or Order; Retire hides it from new forms but properties that already use it are unaffected.</p>
+<div class="box warn"><b>Trap.</b> The list is <b>empty on a new system</b>. If you skip this, staff can still type a wilayat on the property form, but it saves as typed and the form says "Ask an administrator to add it under Setup &rarr; Wilayats." Villages need no setup: they are suggested from villages already recorded under that wilayat.</div>
+
+<h3>2.3 Sketch types &nbsp;<span class="meta">/sketch-types</span></h3>
+<p><b>What it is.</b> The kinds of sketch a client can ask for. Staff choose one in "Type of sketch" on a proposal. Ten are pre-loaded: Villa GF only, Villa G+1, Villa G+1 with penthouse, Twin villa, Farm house, Extension, Industrial, Residential-commercial, Plot division, Krookie division.</p>
+<table>
+<tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
+<tr><td>Code</td><td class="req">*</td><td>Internal key. Upper-case letters, digits and underscores only. Up to 50 characters. <b>Never editable afterwards.</b></td><td><code>VILLA_G_PLUS_2</code></td></tr>
+<tr><td>Label</td><td class="req">*</td><td>What staff see and pick. Editable later.</td><td><code>Villa G+2</code></td></tr>
+<tr><td>Sort order</td><td></td><td>Position in the drop-down.</td><td><code>35</code></td></tr>
+</table>
+<div class="box warn"><b>Trap.</b> Retiring a type removes it from new proposals but existing proposals keep it, shown as "(retired &mdash; kept for this proposal)".</div>
+
+<h3>2.4 Planning templates &nbsp;<span class="meta">/planning-templates</span></h3>
+<p><b>What it is.</b> Ready-made activity and milestone names. On a project's planning page, "Add standard activities" and "Add standard milestones" show these as tick lists, so staff do not retype them. Pre-loaded: 10 activities (Site survey, Soil test coordination, Concept layout, Client presentation, Architectural drawings, Structural design, MEP design, BOQ preparation, Municipality submission pack, Final drawing set) and 5 milestones (Concept approved, Client approval, Authority submission, Permit received, Planning complete).</p>
+<table>
+<tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
+<tr><td>Type</td><td class="req">*</td><td>Activity (a task) or Milestone (a checkpoint). Cannot be changed afterwards.</td><td>Milestone</td></tr>
+<tr><td>Name</td><td class="req">*</td><td>Up to 200 characters. Unique within its type.</td><td><code>Civil defence approval</code></td></tr>
+<tr><td>Order</td><td></td><td>Position in the tick list.</td><td><code>45</code></td></tr>
+</table>
+<p>Templates are only suggestions. Changing or retiring one never changes projects that already used it.</p>
+
+<h3>2.5 Required documents &nbsp;<span class="meta">/required-documents</span></h3>
+<p><b>What it is.</b> The checklist of document categories a project must have. The Documents page shows a tick or cross per row, and a project <b>cannot be closed</b> while a required category is missing. Pre-loaded, all "Any project": Design, Tests, Authority, Contract, Construction, Completion.</p>
+<table>
+<tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
+<tr><td>Category</td><td class="req">*</td><td>Must match the Category typed or picked when someone uploads a document, ignoring capitals and spaces. Cannot be changed afterwards.</td><td><code>Design</code></td></tr>
+<tr><td>Label</td><td class="req">*</td><td>What staff see on the checklist. Up to 200 characters.</td><td><code>Design drawings</code></td></tr>
+<tr><td>Applies to</td><td></td><td>Planning, Supervision, or Any project. A Supervision row applies only to projects that run supervision.</td><td>Any project</td></tr>
+<tr><td>Sort order</td><td></td><td>Position on the checklist.</td><td><code>10</code></td></tr>
+</table>
+<div class="box warn"><b>Trap.</b> A category spelled <code>Designs</code> will not satisfy <code>Design</code>. Staff should pick from the drop-down on upload rather than typing. Retire a row to stop requiring it.</div>
+
+<h2 class="pb">3. Client and contacts &nbsp;<span class="meta">/clients/new</span></h2>
+<p><b>What it is.</b> The person or company we work for. A client owns properties, proposals and projects. Needs <code>client:create</code> (System Administrator, Project Manager).</p>
+<table>
+<tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
+<tr><td>First name</td><td class="req">*</td><td>For a person, their first name. <b>For a company, type the registered name here</b> and leave the other name parts blank. Up to 100 characters.</td><td><code>Salim</code></td></tr>
+<tr><td>Middle name</td><td></td><td>Father's name (or husband's name for a married woman).</td><td><code>Hamad</code></td></tr>
+<tr><td>Grandfather name</td><td></td><td>Third name part.</td><td><code>Said</code></td></tr>
+<tr><td>Surname</td><td></td><td>Family or tribe name. The full name shown everywhere is the four parts joined.</td><td><code>Al Balushi</code></td></tr>
+<tr><td>Mobile number</td><td></td><td>Digits with optional +, at least 8 digits. Used to find duplicates.</td><td><code>+96891234567</code></td></tr>
+<tr><td>Type</td><td></td><td>Individual or Company.</td><td>Individual</td></tr>
+<tr><td>Reference</td><td></td><td>Leave blank for an automatic number. Unique among live clients.</td><td>(blank) &rarr; <code>CL-2026-001</code></td></tr>
+<tr><td>CR number</td><td></td><td>Commercial Registration, for companies.</td><td>(blank for Salim)</td></tr>
+<tr><td>ID Card # (Civil ID)</td><td></td><td>Civil ID or passport number, for individuals.</td><td><code>12345678</code></td></tr>
+<tr><td>Notes</td><td></td><td>Free text, up to 5000 characters.</td><td><code>Prefers WhatsApp contact</code></td></tr>
+</table>
+<h3>3.1 Duplicate warning</h3>
+<p>On Save the system looks for the same CR number or Civil ID (a hard stop) or a similar name or the same phone (a warning only). If it finds a match you may open the existing client instead. Only a Director or System Administrator can override a hard stop, and they must give a reason of at least 5 characters, which is stored in the audit trail.</p>
+<h3>3.2 Contacts (add on the client page)</h3>
+<table>
+<tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
+<tr><td>Name</td><td class="req">*</td><td>Unique within this client.</td><td><code>Khalid Salim Al Balushi</code></td></tr>
+<tr><td>Position</td><td></td><td>Relationship or job title.</td><td><code>Son</code></td></tr>
+<tr><td>Designation, Place of work</td><td></td><td>Optional extra details.</td><td><code>Engineer</code>, <code>PDO</code></td></tr>
+<tr><td>ID number</td><td></td><td>Unique across all contacts.</td><td><code>87654321</code></td></tr>
+<tr><td>Email, Phone</td><td></td><td>Contact details.</td><td><code>+96899887766</code></td></tr>
+<tr><td>Primary</td><td></td><td>Tick for the main contact. Only one per client.</td><td>Ticked</td></tr>
+</table>
+<div class="box state"><b>After save:</b> client <code>CL-2026-001</code> exists. A client cannot be archived while it still has live properties or any project.</div>
+
+<h2>4. Property &nbsp;<span class="meta">/properties/new</span></h2>
+<p><b>What it is.</b> The plot. Each property belongs to one client for good. Needs <code>property:create</code>. You can also arrive here from a proposal with "Add new property"; the form is then pre-filled and you return to the proposal on save.</p>
+<table>
+<tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
+<tr><td>Client</td><td class="req">*</td><td>Search by name, reference, CR/Civil ID or phone. Cannot be changed later.</td><td><code>Salim Hamad Said Al Balushi</code></td></tr>
+<tr><td>Name</td><td class="req">*</td><td>How you will recognise the plot in lists. Click the "Suggestion" link to use "Plot {no} &ndash; {village}, {wilayat}".</td><td><code>Plot 102/8 &ndash; Al Khoud, Seeb</code></td></tr>
+<tr><td>Reference</td><td></td><td>Blank for automatic.</td><td>(blank) &rarr; <code>PR-2026-001</code></td></tr>
+<tr><td>Postal address, Address line 2, Postcode</td><td></td><td>The mailing address only. The plot's own location is Wilayat and Village below.</td><td><code>PO Box 123</code>, <code>PC 111</code></td></tr>
+<tr><td>Plot number</td><td></td><td>The Krookie's plot number. With Wilayat it is used for duplicate detection.</td><td><code>102/8</code></td></tr>
+<tr><td>Wilayat</td><td></td><td>Pick from the list (set up in 2.2).</td><td><code>Seeb</code></td></tr>
+<tr><td>Village</td><td></td><td>Type or pick from suggestions already used in that wilayat.</td><td><code>Al Khoud</code></td></tr>
+<tr><td>Survey reference (Krookie / Land ID)</td><td></td><td>The Krookie's serial, also the land-registry number. Unique among live properties; dashes and spaces are ignored when comparing. <b>No override.</b> Needed before a proposal can convert.</td><td><code>KR-2026-004417</code></td></tr>
+<tr><td>Title deed reference</td><td></td><td>The Mulkia deed number.</td><td><code>MK-77412</code></td></tr>
+<tr><td>Owner name, Owner national ID</td><td></td><td>Per the title deed. Filled from the client; change if the deed owner is someone else.</td><td><code>Salim Hamad Said Al Balushi</code>, <code>12345678</code></td></tr>
+<tr><td>Block number</td><td></td><td>Block as on the deed.</td><td><code>5</code></td></tr>
+<tr><td>Plot area (sqm)</td><td></td><td>Positive number. Use the deed's figure.</td><td><code>600</code></td></tr>
+<tr><td>Type of land use</td><td></td><td>Residential, Commercial, Agricultural, Industrial, Mixed use, Government.</td><td>Residential</td></tr>
+<tr><td>Easting, Northing, Projection type</td><td></td><td>Look up on omanreal.com. <b>All three together or none.</b> The point must fall inside Oman. Projections: Clarke 1880 Zone 39 or 40, UTM Zone 39N or 40N.</td><td><code>625400</code>, <code>2590100</code>, UTM Zone 40N</td></tr>
+<tr><td>Notes</td><td></td><td>Free text.</td><td><code>Corner plot</code></td></tr>
+</table>
+<div class="box state"><b>After save:</b> property <code>PR-2026-001</code> is live and linked to the client. If a same-plot, same-wilayat property exists, you get an exact-match warning that only a Director or System Administrator can override.</div>
+
+<h2 class="pb">5. Proposal &nbsp;<span class="meta">/proposals/new</span></h2>
+<p><b>What it is.</b> The enquiry stage, before there is a project. A sketch number is created the moment you save. A client or property is not required to start. Needs <code>proposal:create</code> (Planning Team, Project Manager, System Administrator).</p>
+<h3>5.1 Create</h3>
+<table>
+<tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
+<tr><td>Client</td><td></td><td>Attach now if known. Choosing one fills Contact name and phone.</td><td><code>Salim Hamad Said Al Balushi</code></td></tr>
+<tr><td>Contact picker</td><td></td><td>Choose a saved contact of that client.</td><td><code>Khalid Salim Al Balushi</code></td></tr>
+<tr><td>Contact name</td><td class="req">*</td><td>Who we speak to.</td><td><code>Khalid Salim Al Balushi</code></td></tr>
+<tr><td>Contact phone</td><td></td><td>8+ digits.</td><td><code>+96899887766</code></td></tr>
+<tr><td>Who is submitting?</td><td></td><td>Self (client deals with us) or Other (someone submits on their behalf).</td><td>Self</td></tr>
+<tr><td>Submitted by, Relationship to client</td><td></td><td>Needed only when Other, for example agent, relative, contractor.</td><td>(blank for Self)</td></tr>
+<tr><td>Property</td><td></td><td>Must belong to the same client and not be archived. Required before convert.</td><td><code>Plot 102/8 &ndash; Al Khoud, Seeb</code></td></tr>
+<tr><td>Type of sketch</td><td></td><td>From the Sketch types list (2.3).</td><td>Villa G+1</td></tr>
+<tr><td>Eventual project type</td><td></td><td>Planning, Supervision, or Planning and supervision. Decides which workstreams the project opens with.</td><td>Planning and supervision</td></tr>
+<tr><td>Approx. area (sqm)</td><td></td><td>Rough size; copied to the property form later.</td><td><code>600</code></td></tr>
+<tr><td>Source</td><td></td><td>How the enquiry arrived.</td><td><code>Referral</code></td></tr>
+<tr><td>Assigned architect</td><td></td><td>A Planning or Project Manager user.</td><td>Fatima Al Harthy</td></tr>
+<tr><td>Survey reference (Krookie)</td><td class="req">*</td><td>The Krookie serial. Required to create, and again to convert.</td><td><code>KR-2026-004417</code></td></tr>
+<tr><td>Title deed reference (Mulkiya)</td><td></td><td>Optional; not checked at convert.</td><td><code>MK-77412</code></td></tr>
+<tr><td>Received, Due</td><td></td><td>Dates. A Due date in the past shows an "Overdue" badge. Due becomes the project's target end date on convert.</td><td><code>01/11/2026</code>, <code>30/11/2026</code></td></tr>
+<tr><td>Requirements</td><td class="req">*</td><td>The client's brief in plain words. Copied to the project description on convert.</td><td><code>G+1 villa, 5 bedrooms, majlis, maid room, 2-car garage</code></td></tr>
+<tr><td>Notes</td><td></td><td>Internal notes.</td><td><code>Client wants a modern facade</code></td></tr>
+</table>
+<div class="box state"><b>After save:</b> status <b>New</b>, sketch number <code>26-SB-001</code>.</div>
+
+<h3>5.2 Move it forward</h3>
+<table>
+<tr><th>Button</th><th>From &rarr; To</th><th>When to use</th></tr>
+<tr><td>Move to concept</td><td>New &rarr; Concept (also On hold &rarr; Concept, shown as Resume)</td><td>Design work started.</td></tr>
+<tr><td>Send for client review</td><td>Concept &rarr; Client revision</td><td>Sketch shown to the client.</td></tr>
+<tr><td>Approve</td><td>Client revision &rarr; Approved</td><td>Client accepts the sketch.</td></tr>
+<tr><td>Mark won</td><td>Approved &rarr; Won</td><td>Client signs and wants to proceed.</td></tr>
+<tr><td>Put on hold</td><td>New, Concept, Client revision &rarr; On hold</td><td>Client paused.</td></tr>
+<tr><td>Mark lost</td><td>Any open status &rarr; Lost (final)</td><td>Client declined. Cannot be undone.</td></tr>
+</table>
+<h3>5.3 Convert to a project</h3>
+<p>Only a <b>Won</b> proposal can convert, by someone with <code>proposal:convert</code> (Project Manager, System Administrator). The "Ready to convert" card lists four checks. A form below it offers only the missing ones.</p>
+<table>
+<tr><th>Check</th><th>How to satisfy it</th></tr>
+<tr><td>Client attached</td><td>Search one, or "Add new client".</td></tr>
+<tr><td>Property attached</td><td>Search one, or "Add new property" (needs the client first).</td></tr>
+<tr><td>Survey reference (Krookie)</td><td>Type it, for example <code>KR-2026-004417</code>.</td></tr>
+<tr><td>Requirements</td><td>Type the brief.</td></tr>
+</table>
+<p>Press <b>Convert to project</b>. In one step the system creates a numbered project (<code>26.P.001</code> in our story, named "{client full name} &ndash; {property name}", here <code>Salim Hamad Said Al Balushi &ndash; Plot 102/8 &ndash; Al Khoud, Seeb</code>; you can rename it with Edit), adds you as Project Manager, opens the right workstreams, copies the requirements into the description and the due date into the target end date, and marks the proposal <b>Converted</b>.</p>
+<div class="box state"><b>After convert:</b> project status <b>Draft</b>. Proposal status <b>Converted</b> and read-only.</div>
+
+<h2 class="pb">6. Project &nbsp;<span class="meta">/projects/new or from convert</span></h2>
+<p>Normally a project comes from a converted proposal. You can also create one directly (needs <code>project:create</code>). The creator is added automatically as a team member.</p>
+<table>
+<tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
+<tr><td>Client</td><td class="req">*</td><td>Search.</td><td><code>Salim Hamad Said Al Balushi</code></td></tr>
+<tr><td>Property</td><td class="req">*</td><td>Must belong to that client. Neither may be archived.</td><td><code>Plot 102/8 &ndash; Al Khoud, Seeb</code></td></tr>
+<tr><td>Project code</td><td></td><td>Blank for automatic (<code>YY.P.NNN</code> planning, <code>YY.S.NNN</code> supervision). Unique.</td><td>(blank)</td></tr>
+<tr><td>Name</td><td class="req">*</td><td>Suggested as "{client} &ndash; {property}".</td><td><code>Salim Hamad Said Al Balushi &ndash; Plot 102/8 &ndash; Al Khoud, Seeb</code></td></tr>
+<tr><td>Type</td><td class="req">*</td><td>Planning, Supervision, or Planning and supervision. Decides the workstreams.</td><td>Planning and supervision</td></tr>
+<tr><td>Start date</td><td></td><td>Planned start.</td><td><code>01/12/2026</code></td></tr>
+<tr><td>Target end date</td><td></td><td>Cannot be before the start date. Or type a duration.</td><td><code>01/12/2027</code> (or 12 Months)</td></tr>
+<tr><td>Documents received</td><td></td><td>Tick Mulkiya (title deed), ID card, Agreement as they arrive.</td><td>Mulkiya, ID card</td></tr>
+<tr><td>Description</td><td></td><td>Scope in words.</td><td><code>G+1 villa, 5 bedrooms...</code></td></tr>
+</table>
+<h3>6.1 Edit a project (needs project:edit)</h3>
+<p>Same fields as above except client, property and status, which can never be changed. If the project has a Supervision workstream there is also a <b>Supervision details</b> block: <b>Assigned site engineer</b> (<code>Yusuf Al Rashdi</code>), <b>Krookie</b> received (tick), <b>Approved drawings</b> received (tick, "if not done by our company"). A planning-only project that later needs supervision is upgraded from <code>/supervision/new</code> with "Use this project", never by editing Type.</p>
+<h3>6.2 Add the team</h3>
+<p>On the project page, Team card. Needs <code>project:manage_members</code>.</p>
+<table>
+<tr><th>Field</th><th>Req.</th><th>Meaning</th><th>Example</th></tr>
+<tr><td>Person</td><td class="req">*</td><td>An active user. Cannot add the same person twice.</td><td>Fatima Al Harthy</td></tr>
+<tr><td>Role on this project</td><td class="req">*</td><td>What they do here. Their permissions still come from their own role.</td><td>Planning Team</td></tr>
+</table>
+<p>Add <code>fatima.alharthy</code> (Planning), <code>huda.kindi</code> (Planning), <code>yusuf.rashdi</code> (Supervision). A project must always keep at least one member. Without membership a project-level user gets "not found".</p>
+<h3>6.3 Activate</h3>
+<p>On the Status card press <b>Activate</b>. Draft &rarr; Active. The other moves are Put on hold (Active &rarr; On hold), Activate again to resume, Mark complete and Close (stage 10).</p>
+<div class="box state"><b>After activate:</b> status <b>Active</b>. Workstreams are Not started until someone presses Start on each.</div>
+
+<h2 class="pb">7. Planning &nbsp;<span class="meta">/projects/[id]/planning</span></h2>
+<p>Needs <code>planning:create</code> / <code>planning:edit</code> (Planning Team, Project Manager). Three cards.</p>
+<h3>7.1 Activities (tasks)</h3>
+<p>Tick "Add standard activities" for template names, or use the form (button <b>Add activity</b>).</p>
+<table>
+<tr><th>Field</th><th>Req.</th><th>Meaning</th><th>Example</th></tr>
+<tr><td>Name</td><td class="req">*</td><td>The task. Suggestions come from templates and earlier names.</td><td><code>Site survey</code></td></tr>
+<tr><td>Assignee</td><td></td><td>Who does it.</td><td>Fatima Al Harthy</td></tr>
+<tr><td>Due date</td><td></td><td>Deadline.</td><td><code>10/12/2026</code></td></tr>
+<tr><td>Description</td><td></td><td>Details.</td><td><code>Topographic survey of the plot</code></td></tr>
+</table>
+<p>Use <b>Mark done</b> when finished. Archive hides a wrong entry.</p>
+<h3>7.2 Milestones (checkpoints)</h3>
+<table>
+<tr><th>Field</th><th>Req.</th><th>Meaning</th><th>Example</th></tr>
+<tr><td>Name</td><td class="req">*</td><td>The checkpoint.</td><td><code>Concept approved</code></td></tr>
+<tr><td>Target date</td><td></td><td>Planned date.</td><td><code>20/12/2026</code></td></tr>
+</table>
+<p>Press <b>Mark reached</b> when it happens; today's date is recorded.</p>
+<h3>7.3 Submissions to an authority</h3>
+<table>
+<tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
+<tr><td>Reference</td><td></td><td>Blank for automatic (<code>{project code}-SUB-NN</code>). Edit it later when the authority issues its own number.</td><td>(blank) &rarr; <code>26.P.001-SUB-01</code></td></tr>
+<tr><td>Authority</td><td class="req">*</td><td>Who we submit to.</td><td><code>Muscat Municipality</code></td></tr>
+<tr><td>Department</td><td></td><td>Planning or Housing (default Planning).</td><td>Planning</td></tr>
+<tr><td>Pending with</td><td></td><td>Who holds it right now: client, authority, us.</td><td><code>Us</code></td></tr>
+<tr><td>Notes</td><td></td><td>Free text.</td><td><code>Resubmission pack v1</code></td></tr>
+</table>
+<h3>7.4 The submission page: status moves</h3>
+<table>
+<tr><th>Button</th><th>Who</th><th>Effect</th></tr>
+<tr><td>Submit</td><td>planning:edit</td><td>Draft &rarr; Submitted.</td></tr>
+<tr><td>Start review</td><td>planning:edit</td><td>Submitted &rarr; Under review.</td></tr>
+<tr><td>Approve</td><td>planning:approve, <b>not the person who created it</b></td><td>Under review &rarr; Approved. Needs a <b>Permit reference</b> (for example <code>MM/2027/0456</code>) unless one is already recorded.</td></tr>
+<tr><td>Reject</td><td>planning:approve</td><td>Under review &rarr; Rejected (final).</td></tr>
+<tr><td>Return for revision</td><td>planning:approve</td><td>Back to the team; press Submit again after fixing.</td></tr>
+<tr><td>Withdraw</td><td>planning:edit</td><td>Draft or Submitted &rarr; Withdrawn (final).</td></tr>
+<tr><td>Halt / Resume / Cancel</td><td>planning:edit</td><td>Pause, restart at the status before the pause, or cancel a halted submission.</td></tr>
+</table>
+<p>Other cards on the page:</p>
+<table>
+<tr><th>Card</th><th>Fields</th><th>Example</th></tr>
+<tr><td>Request clarification</td><td>Press Request clarification while Under review. Later fill <b>Response</b> and press Record response. Status does not change.</td><td><code>Authority asked for revised setback dimensions</code></td></tr>
+<tr><td>Reviews &rarr; Log review</td><td>Review date <span class="req">*</span>, Reviewer, Response due, Comments. Later fill Response on the row.</td><td><code>20/01/2027</code>, <code>Eng. Al Lawati</code>, <code>05/02/2027</code></td></tr>
+<tr><td>Meetings &rarr; Log meeting</td><td>Scheduled for (date and time), Attendees (names, comma-separated), Required (tick), Purpose. Later fill Outcome on the row.</td><td><code>25/01/2027 10:00</code>, <code>Eng. Al Lawati, Fatima Al Harthy</code>, ticked, <code>Discuss setback</code></td></tr>
+</table>
+<div class="box state"><b>Story:</b> <code>fatima.alharthy</code> creates and submits; <code>huda.kindi</code> starts review and approves with permit <code>MM/2027/0456</code>. Status <b>Approved</b>.</div>
+<div class="box warn"><b>Trap.</b> If Fatima tries to approve her own submission: "You cannot approve a submission you created yourself. Ask another approver to do it."</div>
+<p>When all submissions are decided, every milestone is reached and every activity is done, press <b>Start</b> then <b>Complete</b> on the Planning workstream (stage 10).</p>
+
+<h2 class="pb">8. Supervision &nbsp;<span class="meta">/projects/[id]/supervision</span></h2>
+<p>Needs <code>supervision:create</code> / <code>supervision:edit</code> (Supervision Team, Project Manager).</p>
+<h3>8.1 Supervision agreement</h3>
+<table>
+<tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
+<tr><td>Type</td><td class="req">*</td><td>Monthly or On call.</td><td>Monthly</td></tr>
+<tr><td>Visits allowed</td><td class="req">*</td><td>Whole number, at least 1. The dashboard warns when the quota nears.</td><td><code>4</code></td></tr>
+<tr><td>Amount</td><td class="req">*</td><td>Fee, 0 or more.</td><td><code>300</code></td></tr>
+<tr><td>Start date</td><td class="req">*</td><td>When it begins.</td><td><code>01/03/2027</code></td></tr>
+<tr><td>End date</td><td></td><td>Optional.</td><td><code>31/03/2027</code></td></tr>
+<tr><td>Notes</td><td></td><td>Free text.</td><td><code>OMR per month</code></td></tr>
+</table>
+<p><b>Renew</b> copies the terms and starts the day after the old end date; you may change visits, amount and dates. An agreement can be renewed only once.</p>
+<h3>8.2 Site visit, observations, instructions</h3>
+<table>
+<tr><th>Form</th><th>Fields</th><th>Example</th></tr>
+<tr><td>Record site visit</td><td>Visit date <span class="req">*</span>, Attendees (type names or add staff from the list), Notes</td><td><code>10/03/2027</code>, <code>Yusuf Al Rashdi, Khalid Al Balushi</code>, <code>Slab reinforcement inspected</code></td></tr>
+<tr><td>Record observation (on the visit)</td><td>Description <span class="req">*</span>, Category</td><td><code>Column reinforcement spacing exceeds drawing</code>, <code>Structural</code></td></tr>
+<tr><td>Issue instruction (on the visit)</td><td>Directive <span class="req">*</span>, Assignee, Due date. Press Mark actioned when done.</td><td><code>Correct spacing before pour</code>, Yusuf Al Rashdi, <code>12/03/2027</code></td></tr>
+</table>
+<h3>8.3 Issues</h3>
+<p>From an observation use "Raise issue", or create one from the project's Issues page (needs <code>issue:create</code>).</p>
+<table>
+<tr><th>Field</th><th>Req.</th><th>Meaning</th><th>Example</th></tr>
+<tr><td>Title</td><td class="req">*</td><td>Short summary.</td><td><code>Rebar spacing non-compliant</code></td></tr>
+<tr><td>Description</td><td></td><td>Details.</td><td><code>Spacing 250 mm vs 150 mm on drawing S-02</code></td></tr>
+<tr><td>Workstream</td><td class="req">*</td><td>Only when the project runs both: Planning or Supervision.</td><td>Supervision</td></tr>
+<tr><td>Severity</td><td class="req">*</td><td>Low, Medium, High, Critical.</td><td>High</td></tr>
+<tr><td>Priority</td><td class="req">*</td><td>Low, Medium, High.</td><td>High</td></tr>
+<tr><td>Owner, Due date</td><td></td><td>Who fixes it and by when.</td><td>Yusuf Al Rashdi, <code>15/03/2027</code></td></tr>
+</table>
+<p>Moves: Start work &rarr; Mark resolved &rarr; Close (needs <code>issue:close</code>); Reopen from Resolved or Closed. While editing, Closure notes can record how it was fixed. Open issues block project completion (supervision) and close.</p>
+
+<h2 class="pb">9. Drawings, documents, modifications</h2>
+<h3>9.1 Drawings &nbsp;<span class="meta">/projects/[id]/drawings</span></h3>
+<table>
+<tr><th>Step</th><th>Fields</th><th>Example</th></tr>
+<tr><td>Register drawing (drawing:create)</td><td>Drawing number <span class="req">*</span> (unique in the project), Title <span class="req">*</span></td><td><code>A-101</code>, <code>Ground floor plan</code></td></tr>
+<tr><td>Upload revision (on the drawing)</td><td>Revision code <span class="req">*</span> (unique per drawing), File, Notes</td><td><code>P1</code>, PDF file, <code>Issued for approval</code></td></tr>
+</table>
+<p>Revision moves: Submit and Start review (drawing:create), then Approve, Reject or Return for revision (drawing:approve: Director, System Administrator). A file must be uploaded <b>with</b> the revision; it cannot be added later and a revision without one cannot be approved. A revision with no file that you do not want must be <b>Rejected</b> or <b>Returned for revision</b>: while it sits under review it blocks completing the supervision workstream. Approved revisions never change. To change a drawing, upload the next revision (<code>P2</code>).</p>
+<h3>9.2 Documents &nbsp;<span class="meta">/projects/[id]/documents</span></h3>
+<table>
+<tr><th>Field</th><th>Req.</th><th>Meaning and rules</th><th>Example</th></tr>
+<tr><td>Category</td><td class="req">*</td><td>Pick "{category} &ndash; {label}" so it counts toward the checklist, or "Other..." for photos, reports and the like.</td><td><code>Design</code></td></tr>
+<tr><td>Title</td><td class="req">*</td><td>Up to 200 characters.</td><td><code>Concept design pack</code></td></tr>
+<tr><td>Description</td><td></td><td>Free text.</td><td><code>Rev A, client approved</code></td></tr>
+<tr><td>File</td><td class="req">*</td><td>Up to 50 MB.</td><td>a PDF</td></tr>
+</table>
+<p>The card at the top reads "Every required document has been uploaded" or "N required document(s) missing", with a tick or cross per category. Editing a document changes only its details; to replace the file upload a new document and archive the old one. Needs <code>document:create</code> / <code>edit</code> / <code>archive</code>.</p>
+<h3>9.3 Modifications (client change requests)</h3>
+<table>
+<tr><th>Field</th><th>Req.</th><th>Meaning</th><th>Example</th></tr>
+<tr><td>Impact area</td><td class="req">*</td><td>Architecture, Structural or MEP.</td><td>Architecture</td></tr>
+<tr><td>Cost impact</td><td></td><td>Free text.</td><td><code>+OMR 1,200</code></td></tr>
+<tr><td>Time impact</td><td></td><td>Free text.</td><td><code>+1 week</code></td></tr>
+<tr><td>Drawing revision</td><td></td><td>If raised against one.</td><td><code>A-101 P1</code></td></tr>
+<tr><td>Site visit observation</td><td></td><td>If raised from one.</td><td>(blank)</td></tr>
+<tr><td>What the client is asking for</td><td class="req">*</td><td>The change request in words.</td><td><code>Enlarge majlis by 12 sqm</code></td></tr>
+</table>
+<p>Moves: Submit and Start review (planning:edit), then Approve, Reject or Return for revision (planning:approve). Pending modifications and unapproved drawings block completing the supervision workstream.</p>
+
+<h2 class="pb">10. Complete and close a project</h2>
+<h3>10.1 Complete each workstream</h3>
+<p>On the project page, Workstreams table: <b>Start</b> (Not started &rarr; In progress), then <b>Complete</b>. Complete is disabled until the list below it shows everything met.</p>
+<table>
+<tr><th>Workstream</th><th>Must be true</th></tr>
+<tr><td>Planning</td><td>No submission still in progress (draft, submitted, under review, returned or halted). Every milestone reached. Every activity done.</td></tr>
+<tr><td>Supervision</td><td>No open supervision issue. No drawing revision awaiting a decision. No modification awaiting a decision.</td></tr>
+</table>
+<h3>10.2 Mark the project complete</h3>
+<p>Press <b>Mark complete</b> once every workstream is Completed. The "Before marking complete" list shows "N of M conditions met", with a <i>Go there</i> link for each gap. The actual end date is recorded.</p>
+<div class="box"><b>Director override.</b> A Director or System Administrator may open <b>Complete anyway&hellip;</b>, type a <b>Reason for overriding</b> (5 to 500 characters, for example <code>Client took over remaining snagging directly</code>) and confirm. The reason and the unmet conditions are written to the audit trail.</div>
+<h3>10.3 Handover checklist, then Close</h3>
+<p>When the status is Completed the Handover card appears. Press <b>Mark done</b> beside each item. Ticks are one-way.</p>
+<table>
+<tr><th>Item</th><th>Meaning</th></tr>
+<tr><td>Final inspection done</td><td>Final site inspection completed.</td></tr>
+<tr><td>Authority completion documents received</td><td>Completion certificate or equivalent.</td></tr>
+<tr><td>Mandatory tests received</td><td>Test reports in hand.</td></tr>
+<tr><td>As-built drawings received</td><td>Final as-built set.</td></tr>
+<tr><td>Warranties received</td><td>Warranty documents.</td></tr>
+<tr><td>Final report issued</td><td>Report delivered to the client.</td></tr>
+</table>
+<p>Close also needs <b>no open issues</b> and <b>no missing required documents</b> (stage 2.5). When all are clear the <b>Close</b> button turns on. The project manager (project:close) confirms "Closed is final".</p>
+<div class="box state"><b>After close:</b> status <b>Closed</b>. Nothing in the project can be changed again: no new submissions, drawings, documents, issues or team changes.</div>
+<div class="box warn"><b>No override for Close.</b> If it is disabled: "Close all issues, upload every required document and complete the handover checklist first."</div>
+
+<h2>11. Admin tools after go-live &nbsp;<span class="meta">/admin/data</span></h2>
+<p>For System Administrators only (<code>admin:data</code>). Use only to remove records entered by mistake.</p>
+<ol>
+<li>Pick a tab: Clients, Properties, Projects or Proposals. Search to find the record (archived ones are included) and press <b>View impact</b>.</li>
+<li>The impact tree shows everything linked to it, all pre-selected. Untick what you want to keep.</li>
+<li><b>Archive selected</b> hides records (only for clients, contacts, properties, activities, milestones, documents).</li>
+<li><b>Hard delete selected</b> is permanent. A window asks you to type the root record's exact name, for example <code>Salim Hamad Said Al Balushi</code>, before the delete button turns on.</li>
+</ol>
+<div class="box warn">Hard delete cannot be undone. Check the impact tree twice. Records that belong to a closed project are still removable here, so be certain.</div>
+
+<h2 class="pb">12. Reference</h2>
+<h3>12.1 Who can do what</h3>
+<table>
+<tr><th>Action</th><th>System Admin</th><th>Director</th><th>Project Manager</th><th>Planning</th><th>Supervision</th><th>Doc. Controller</th></tr>
+<tr><td>Create client / property</td><td>Yes</td><td>No</td><td>Yes</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>Create / edit proposal</td><td>Yes</td><td>No</td><td>Yes</td><td>Yes</td><td>No</td><td>No</td></tr>
+<tr><td>Convert proposal</td><td>Yes</td><td>No</td><td>Yes</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>Create project</td><td>Yes</td><td>No</td><td>Yes</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>Edit / close project (own projects)</td><td>Yes</td><td>No</td><td>Yes</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>Manage team</td><td>Yes</td><td>No</td><td>Yes</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>Planning work and submissions</td><td>Yes</td><td>View</td><td>Yes</td><td>Yes</td><td>View</td><td>View</td></tr>
+<tr><td>Approve submission / modification</td><td>Yes</td><td>Yes</td><td>No</td><td>Yes</td><td>No</td><td>No</td></tr>
+<tr><td>Approve drawing revision</td><td>Yes</td><td>Yes</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>Supervision work</td><td>Yes</td><td>View</td><td>Yes</td><td>View</td><td>Yes</td><td>View</td></tr>
+<tr><td>Issues (raise, edit, close)</td><td>Yes</td><td>View</td><td>Yes</td><td>View</td><td>Yes</td><td>View</td></tr>
+<tr><td>Documents (upload, edit)</td><td>Yes</td><td>View</td><td>Yes</td><td>View</td><td>View</td><td>Yes</td></tr>
+<tr><td>Archive document</td><td>Yes</td><td>No</td><td>No</td><td>No</td><td>No</td><td>Yes</td></tr>
+<tr><td>Override completion gate</td><td>Yes</td><td>Yes</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>Override duplicate warning</td><td>Yes</td><td>Yes</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
+<tr><td>Users, roles, data management</td><td>Yes</td><td>View users</td><td>View users</td><td>No</td><td>No</td><td>No</td></tr>
+</table>
+<p class="meta">Project-level roles see only projects they are members of. Only submissions block self-approval; drawings and modifications do not.</p>
+
+<h3>12.2 Statuses at a glance</h3>
+<table>
+<tr><th>Item</th><th>Path</th></tr>
+<tr><td>Proposal</td><td>New &rarr; Concept &rarr; Client revision &rarr; Approved &rarr; Won &rarr; <b>Converted</b>. Side exits: On hold, Lost.</td></tr>
+<tr><td>Project</td><td>Draft &rarr; Active &harr; On hold; Active &rarr; Completed &rarr; <b>Closed</b>.</td></tr>
+<tr><td>Workstream</td><td>Not started &rarr; In progress &harr; On hold; In progress &rarr; Completed.</td></tr>
+<tr><td>Submission, drawing revision, modification</td><td>Draft &rarr; Submitted &rarr; Under review &rarr; Approved / Rejected / Returned for revision (&rarr; Submitted again). Submissions can also be Withdrawn, Halted or Cancelled.</td></tr>
+<tr><td>Issue</td><td>Open &rarr; In progress &rarr; Resolved &rarr; Closed; Reopen possible.</td></tr>
+</table>
+
+<h3>12.3 "Why can't I do this?"</h3>
+<table>
+<tr><th>You see</th><th>Cause and fix</th></tr>
+<tr><td>Button missing</td><td>Your role does not allow it, or the status does not permit it, or you are not on the project team.</td></tr>
+<tr><td>"Attach a property to this proposal before converting it." / "Add the Krookie survey reference..." / "Record the requirements..."</td><td>Fill the item in the "Ready to convert" card.</td></tr>
+<tr><td>"A record with the same official identity already exists."</td><td>Open the existing client or property. Only a Director or System Administrator can override, with a reason.</td></tr>
+<tr><td>"Another property already uses this survey reference (Land ID)."</td><td>Survey reference is unique with no override. Check for a duplicate property.</td></tr>
+<tr><td>"That property does not belong to the named client."</td><td>Pick a property owned by that client.</td></tr>
+<tr><td>"A permit reference is required to approve this submission."</td><td>Type the Permit reference in the Approve card.</td></tr>
+<tr><td>"You cannot approve a submission you created yourself."</td><td>Ask another approver.</td></tr>
+<tr><td>Drawing: "This revision has no drawing file..."</td><td>Upload a new revision with the file, then approve that one.</td></tr>
+<tr><td>"This cannot be completed yet &mdash; some conditions are not met."</td><td>Follow the readiness list's <i>Go there</i> links, or ask a Director for an override.</td></tr>
+<tr><td>"The handover checklist must be complete before this project can be closed."</td><td>Tick all six items, close issues, upload missing documents.</td></tr>
+<tr><td>"This project is closed."</td><td>Closed projects are read-only.</td></tr>
+<tr><td>"That change is not allowed from the current status."</td><td>The page is out of date. Reload and use the buttons shown.</td></tr>
+<tr><td>"This cannot be archived because other records depend on it."</td><td>Archive or move the dependent properties or projects first.</td></tr>
+<tr><td>"You do not have permission to do that."</td><td>Ask an administrator to check your role.</td></tr>
+<tr><td>"Something went wrong. Quote the requestId to support."</td><td>Note the request id on screen and report it.</td></tr>
+</table>
+
+<h3>12.4 Notes</h3>
+<ul>
+<li>On a proposal's Edit screen, Survey reference and Requirements are not marked required (they are on Create), but both must be filled before the proposal can convert.</li>
+<li>The land-use and projection lists on the property form are provisional and may change once confirmed with the client.</li>
+<li>Automatic codes in this guide (<code>CL-2026-001</code>, <code>26-SB-001</code>, <code>26.P.001</code>) show the pattern; your actual numbers continue from your own sequence.</li>
+<li>This guide was checked by running the whole story (setup, client, property, proposal, convert, team, planning and permit, supervision, drawing, documents, modification, completion, close) against a test copy of the system on 26 October 2026. Codes and statuses shown are what it produced.</li>
+<li>Everything you save, and every refused action, is recorded in an append-only audit trail.</li>
+</ul>
+</body></html>
