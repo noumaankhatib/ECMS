@@ -220,6 +220,7 @@ export class DrawingRevisionService {
     id: string,
     action: DrawingRevisionAction,
     input: DrawingRevisionTransition,
+    actorId: string,
   ): Promise<DrawingRevision> {
     await this.requireDrawing(this.prisma, projectId, drawingId);
 
@@ -227,9 +228,31 @@ export class DrawingRevisionService {
 
     const current = await this.prisma.drawingRevision.findUnique({
       where: { id },
-      select: { id: true, drawingId: true, status: true, fileId: true, uploadStatus: true },
+      select: {
+        id: true,
+        drawingId: true,
+        status: true,
+        fileId: true,
+        uploadStatus: true,
+        createdBy: true,
+      },
     });
     if (!current || current.drawingId !== drawingId) throw appError('NOT_FOUND');
+
+    if (action === 'approve' && current.createdBy === actorId) {
+      throw appError('FORBIDDEN', {
+        // Said to the person, not only logged: otherwise the refusal reads as a
+        // missing permission when the real cause is who created the record.
+        fields: [
+          {
+            field: 'status',
+            reason:
+              'You cannot approve a drawing revision you created yourself. Ask another approver to do it.',
+          },
+        ],
+        context: { revision_id: id, reason: 'self_approval' },
+      });
+    }
 
     const from = current.status as ApprovalStatus;
     if (!canTransitionApproval(from, target)) {

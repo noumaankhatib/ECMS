@@ -288,21 +288,39 @@ describe('modifications', () => {
     );
 
     let current = await inContext(() =>
-      modifications.transition(projectId, modification.id, 'submit', {
-        version: modification.version,
-      }),
+      modifications.transition(
+        projectId,
+        modification.id,
+        'submit',
+        {
+          version: modification.version,
+        },
+        owningPlanner,
+      ),
     );
     expect(current.status).toBe('SUBMITTED');
 
     current = await inContext(() =>
-      modifications.transition(projectId, modification.id, 'review', { version: current.version }),
+      modifications.transition(
+        projectId,
+        modification.id,
+        'review',
+        { version: current.version },
+        owningPlanner,
+      ),
     );
     expect(current.status).toBe('UNDER_REVIEW');
 
     current = await inContext(() =>
-      modifications.transition(projectId, modification.id, 'approve', {
-        version: current.version,
-      }),
+      modifications.transition(
+        projectId,
+        modification.id,
+        'approve',
+        {
+          version: current.version,
+        },
+        admin,
+      ),
     );
     expect(current.status).toBe('APPROVED');
   });
@@ -318,9 +336,15 @@ describe('modifications', () => {
 
     await expect(
       inContext(() =>
-        modifications.transition(projectId, modification.id, 'approve', {
-          version: modification.version,
-        }),
+        modifications.transition(
+          projectId,
+          modification.id,
+          'approve',
+          {
+            version: modification.version,
+          },
+          admin,
+        ),
       ),
     ).rejects.toMatchObject({ code: 'ILLEGAL_TRANSITION' });
 
@@ -402,5 +426,58 @@ describe('modifications', () => {
         ),
       ),
     ).rejects.toMatchObject({ code: 'ILLEGAL_TRANSITION' });
+  });
+  it('refuses to let the person who recorded a modification approve it', async () => {
+    const modification = await inContext(() =>
+      modifications.create(
+        projectId,
+        { requestText: 'Self-approval check', impactArea: 'MEP' },
+        owningPlanner,
+      ),
+    );
+    let current = await inContext(() =>
+      modifications.transition(
+        projectId,
+        modification.id,
+        'submit',
+        { version: modification.version },
+        owningPlanner,
+      ),
+    );
+    current = await inContext(() =>
+      modifications.transition(
+        projectId,
+        modification.id,
+        'review',
+        { version: current.version },
+        owningPlanner,
+      ),
+    );
+
+    await expect(
+      inContext(() =>
+        modifications.transition(
+          projectId,
+          modification.id,
+          'approve',
+          { version: current.version },
+          owningPlanner,
+        ),
+      ),
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      fields: [expect.objectContaining({ reason: expect.stringContaining('created yourself') })],
+    });
+
+    const approved = await inContext(() =>
+      modifications.transition(
+        projectId,
+        modification.id,
+        'approve',
+        { version: current.version },
+        admin,
+      ),
+    );
+    expect(approved.status).toBe('APPROVED');
   });
 });

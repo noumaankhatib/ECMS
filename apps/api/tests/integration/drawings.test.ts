@@ -273,19 +273,40 @@ describe('drawings', () => {
     );
 
     let current = await inContext(() =>
-      revisions.transition(projectId, drawing.id, revision.id, 'submit', {
-        version: revision.version,
-      }),
+      revisions.transition(
+        projectId,
+        drawing.id,
+        revision.id,
+        'submit',
+        {
+          version: revision.version,
+        },
+        owningPlanner,
+      ),
     );
     current = await inContext(() =>
-      revisions.transition(projectId, drawing.id, revision.id, 'review', {
-        version: current.version,
-      }),
+      revisions.transition(
+        projectId,
+        drawing.id,
+        revision.id,
+        'review',
+        {
+          version: current.version,
+        },
+        owningPlanner,
+      ),
     );
     current = await inContext(() =>
-      revisions.transition(projectId, drawing.id, revision.id, 'approve', {
-        version: current.version,
-      }),
+      revisions.transition(
+        projectId,
+        drawing.id,
+        revision.id,
+        'approve',
+        {
+          version: current.version,
+        },
+        director,
+      ),
     );
     expect(current.status).toBe('APPROVED');
 
@@ -320,20 +341,41 @@ describe('drawings', () => {
       revisions.create(projectId, drawing.id, { revisionCode: 'N1' }, owningPlanner),
     );
     let current = await inContext(() =>
-      revisions.transition(projectId, drawing.id, noFile.id, 'submit', { version: 1 }),
+      revisions.transition(
+        projectId,
+        drawing.id,
+        noFile.id,
+        'submit',
+        { version: 1 },
+        owningPlanner,
+      ),
     );
     current = await inContext(() =>
-      revisions.transition(projectId, drawing.id, noFile.id, 'review', {
-        version: current.version,
-      }),
+      revisions.transition(
+        projectId,
+        drawing.id,
+        noFile.id,
+        'review',
+        {
+          version: current.version,
+        },
+        owningPlanner,
+      ),
     );
 
     // Nothing to open, so nothing to approve — and the refusal says why.
     await expect(
       inContext(() =>
-        revisions.transition(projectId, drawing.id, noFile.id, 'approve', {
-          version: current.version,
-        }),
+        revisions.transition(
+          projectId,
+          drawing.id,
+          noFile.id,
+          'approve',
+          {
+            version: current.version,
+          },
+          director,
+        ),
       ),
     ).rejects.toMatchObject({
       code: 'CONFLICT',
@@ -352,19 +394,40 @@ describe('drawings', () => {
       ),
     );
     let walk = await inContext(() =>
-      revisions.transition(projectId, drawing.id, withFile.id, 'submit', {
-        version: withFile.version,
-      }),
+      revisions.transition(
+        projectId,
+        drawing.id,
+        withFile.id,
+        'submit',
+        {
+          version: withFile.version,
+        },
+        owningPlanner,
+      ),
     );
     walk = await inContext(() =>
-      revisions.transition(projectId, drawing.id, withFile.id, 'review', {
-        version: walk.version,
-      }),
+      revisions.transition(
+        projectId,
+        drawing.id,
+        withFile.id,
+        'review',
+        {
+          version: walk.version,
+        },
+        owningPlanner,
+      ),
     );
     walk = await inContext(() =>
-      revisions.transition(projectId, drawing.id, withFile.id, 'approve', {
-        version: walk.version,
-      }),
+      revisions.transition(
+        projectId,
+        drawing.id,
+        withFile.id,
+        'approve',
+        {
+          version: walk.version,
+        },
+        director,
+      ),
     );
     expect(walk.status).toBe('APPROVED');
   });
@@ -379,7 +442,14 @@ describe('drawings', () => {
 
     await expect(
       inContext(() =>
-        revisions.transition(projectId, drawing.id, revision.id, 'approve', { version: 1 }),
+        revisions.transition(
+          projectId,
+          drawing.id,
+          revision.id,
+          'approve',
+          { version: 1 },
+          director,
+        ),
       ),
     ).rejects.toMatchObject({ code: 'ILLEGAL_TRANSITION' });
   });
@@ -394,7 +464,14 @@ describe('drawings', () => {
 
     await expect(
       inContext(() =>
-        revisions.transition(projectId, drawing.id, revision.id, 'approve', { version: 1 }),
+        revisions.transition(
+          projectId,
+          drawing.id,
+          revision.id,
+          'approve',
+          { version: 1 },
+          director,
+        ),
       ),
     ).rejects.toMatchObject({ code: 'ILLEGAL_TRANSITION' });
 
@@ -417,7 +494,14 @@ describe('drawings', () => {
       revisions.create(projectId, drawing.id, { revisionCode: 'P1' }, owningPlanner),
     );
     await inContext(() =>
-      revisions.transition(projectId, drawing.id, revision.id, 'submit', { version: 1 }),
+      revisions.transition(
+        projectId,
+        drawing.id,
+        revision.id,
+        'submit',
+        { version: 1 },
+        owningPlanner,
+      ),
     );
 
     // The second caller read version 1 before 'submit' landed. 'review' is
@@ -426,7 +510,14 @@ describe('drawings', () => {
     // attempt would hit instead.
     await expect(
       inContext(() =>
-        revisions.transition(projectId, drawing.id, revision.id, 'review', { version: 1 }),
+        revisions.transition(
+          projectId,
+          drawing.id,
+          revision.id,
+          'review',
+          { version: 1 },
+          owningPlanner,
+        ),
       ),
     ).rejects.toMatchObject({ code: 'STALE_RECORD' });
   });
@@ -525,6 +616,65 @@ describe('drawings', () => {
         revisions.create(closingProject.id, drawing.id, { revisionCode: 'P1' }, admin),
       ),
     ).rejects.toMatchObject({ code: 'ILLEGAL_TRANSITION' });
+  });
+
+  it('refuses to let the person who created a revision approve it', async () => {
+    const drawing = await inContext(() =>
+      drawings.create(projectId, { number: 'A-591', title: 'Self-approval check' }, owningPlanner),
+    );
+    const revision = await inContext(() =>
+      revisions.create(projectId, drawing.id, { revisionCode: 'S1' }, owningPlanner),
+    );
+    let current = await inContext(() =>
+      revisions.transition(
+        projectId,
+        drawing.id,
+        revision.id,
+        'submit',
+        { version: 1 },
+        owningPlanner,
+      ),
+    );
+    current = await inContext(() =>
+      revisions.transition(
+        projectId,
+        drawing.id,
+        revision.id,
+        'review',
+        { version: current.version },
+        owningPlanner,
+      ),
+    );
+
+    await expect(
+      inContext(() =>
+        revisions.transition(
+          projectId,
+          drawing.id,
+          revision.id,
+          'approve',
+          { version: current.version },
+          owningPlanner,
+        ),
+      ),
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      fields: [expect.objectContaining({ reason: expect.stringContaining('created yourself') })],
+    });
+    expect((await revisions.byId(projectId, drawing.id, revision.id)).status).toBe('UNDER_REVIEW');
+
+    // Rejecting or returning your own work is not the conflict approving it is.
+    const returned = await inContext(() =>
+      revisions.transition(
+        projectId,
+        drawing.id,
+        revision.id,
+        'returnForRevision',
+        { version: current.version },
+        owningPlanner,
+      ),
+    );
+    expect(returned.status).toBe('RETURNED_FOR_REVISION');
   });
 
   it('holds every seeded drawing permission in the shared catalogue', async () => {

@@ -99,8 +99,9 @@ export class ModificationController {
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(modificationTransitionSchema)) body: ModificationTransition,
+    @Req() req: Request,
   ): Promise<Modification> {
-    return this.modifications.transition(projectId, id, 'submit', body);
+    return this.modifications.transition(projectId, id, 'submit', body, actorOf(req));
   }
 
   @Post(':id/review')
@@ -109,8 +110,9 @@ export class ModificationController {
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(modificationTransitionSchema)) body: ModificationTransition,
+    @Req() req: Request,
   ): Promise<Modification> {
-    return this.modifications.transition(projectId, id, 'review', body);
+    return this.modifications.transition(projectId, id, 'review', body, actorOf(req));
   }
 
   @Post(':id/approve')
@@ -119,8 +121,9 @@ export class ModificationController {
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(modificationTransitionSchema)) body: ModificationTransition,
+    @Req() req: Request,
   ): Promise<Modification> {
-    return this.modifications.transition(projectId, id, 'approve', body);
+    return this.modifications.transition(projectId, id, 'approve', body, actorOf(req));
   }
 
   @Post(':id/reject')
@@ -129,8 +132,9 @@ export class ModificationController {
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(modificationTransitionSchema)) body: ModificationTransition,
+    @Req() req: Request,
   ): Promise<Modification> {
-    return this.modifications.transition(projectId, id, 'reject', body);
+    return this.modifications.transition(projectId, id, 'reject', body, actorOf(req));
   }
 
   @Post(':id/return-for-revision')
@@ -139,7 +143,8 @@ export class ModificationController {
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(modificationTransitionSchema)) body: ModificationTransition,
+    @Req() req: Request,
   ): Promise<Modification> {
-    return this.modifications.transition(projectId, id, 'returnForRevision', body);
+    return this.modifications.transition(projectId, id, 'returnForRevision', body, actorOf(req));
   }
 }

@@ -150,14 +150,30 @@ export class ModificationService {
     id: string,
     action: ModificationAction,
     input: ModificationTransition,
+    actorId: string,
   ): Promise<Modification> {
     const target: ApprovalStatus = MODIFICATION_ACTIONS[action];
 
     const current = await this.prisma.modification.findUnique({
       where: { id },
-      select: { id: true, projectId: true, status: true },
+      select: { id: true, projectId: true, status: true, createdBy: true },
     });
     if (!current || current.projectId !== projectId) throw appError('NOT_FOUND');
+
+    if (action === 'approve' && current.createdBy === actorId) {
+      throw appError('FORBIDDEN', {
+        // Said to the person, not only logged: otherwise the refusal reads as a
+        // missing permission when the real cause is who created the record.
+        fields: [
+          {
+            field: 'status',
+            reason:
+              'You cannot approve a modification you created yourself. Ask another approver to do it.',
+          },
+        ],
+        context: { modification_id: id, reason: 'self_approval' },
+      });
+    }
 
     const from = current.status as ApprovalStatus;
     if (!canTransitionApproval(from, target)) {

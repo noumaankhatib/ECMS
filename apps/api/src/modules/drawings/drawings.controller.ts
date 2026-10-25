@@ -164,8 +164,9 @@ export class DrawingRevisionController {
     @Param('drawingId', ParseUUIDPipe) drawingId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(drawingRevisionTransitionSchema)) body: DrawingRevisionTransition,
+    @Req() req: Request,
   ): Promise<DrawingRevision> {
-    return this.revisions.transition(projectId, drawingId, id, 'submit', body);
+    return this.revisions.transition(projectId, drawingId, id, 'submit', body, actorOf(req));
   }
 
   @Post(':id/review')
@@ -175,8 +176,9 @@ export class DrawingRevisionController {
     @Param('drawingId', ParseUUIDPipe) drawingId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(drawingRevisionTransitionSchema)) body: DrawingRevisionTransition,
+    @Req() req: Request,
   ): Promise<DrawingRevision> {
-    return this.revisions.transition(projectId, drawingId, id, 'review', body);
+    return this.revisions.transition(projectId, drawingId, id, 'review', body, actorOf(req));
   }
 
   @Post(':id/approve')
@@ -186,8 +188,9 @@ export class DrawingRevisionController {
     @Param('drawingId', ParseUUIDPipe) drawingId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(drawingRevisionTransitionSchema)) body: DrawingRevisionTransition,
+    @Req() req: Request,
   ): Promise<DrawingRevision> {
-    return this.revisions.transition(projectId, drawingId, id, 'approve', body);
+    return this.revisions.transition(projectId, drawingId, id, 'approve', body, actorOf(req));
   }
 
   @Post(':id/reject')
@@ -197,8 +200,9 @@ export class DrawingRevisionController {
     @Param('drawingId', ParseUUIDPipe) drawingId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(drawingRevisionTransitionSchema)) body: DrawingRevisionTransition,
+    @Req() req: Request,
   ): Promise<DrawingRevision> {
-    return this.revisions.transition(projectId, drawingId, id, 'reject', body);
+    return this.revisions.transition(projectId, drawingId, id, 'reject', body, actorOf(req));
   }
 
   @Post(':id/return-for-revision')
@@ -208,7 +212,15 @@ export class DrawingRevisionController {
     @Param('drawingId', ParseUUIDPipe) drawingId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(drawingRevisionTransitionSchema)) body: DrawingRevisionTransition,
+    @Req() req: Request,
   ): Promise<DrawingRevision> {
-    return this.revisions.transition(projectId, drawingId, id, 'returnForRevision', body);
+    return this.revisions.transition(
+      projectId,
+      drawingId,
+      id,
+      'returnForRevision',
+      body,
+      actorOf(req),
+    );
   }
 }
