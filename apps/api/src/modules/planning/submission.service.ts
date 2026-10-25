@@ -71,10 +71,12 @@ export class SubmissionService {
     return this.prisma.$transaction(async (tx) => {
       await requireOpenProject(tx, projectId);
 
+      const reference = input.reference ?? (await this.nextReference(tx, projectId));
+
       const submission = await tx.submission.create({
         data: {
           projectId,
-          reference: input.reference,
+          reference,
           authorityName: input.authorityName,
           department: input.department ?? 'PLANNING',
           pendingWith: input.pendingWith ?? null,
@@ -93,6 +95,33 @@ export class SubmissionService {
 
       return submission;
     });
+  }
+
+  /**
+   * `<project code>-SUB-NN`, one past the highest NN already used on this
+   * project. Read inside the create's transaction; the reference is a label
+   * (no unique constraint) and stays editable, so a simultaneous create
+   * costs a duplicate label at worst.
+   */
+  private async nextReference(tx: Prisma.TransactionClient, projectId: string): Promise<string> {
+    const project = await tx.project.findUnique({
+      where: { id: projectId },
+      select: { code: true },
+    });
+    if (!project) throw appError('NOT_FOUND');
+
+    const existing = await tx.submission.findMany({
+      where: { projectId },
+      select: { reference: true },
+    });
+    const prefix = `${project.code}-SUB-`;
+    const highest = existing.reduce((max, { reference }) => {
+      if (!reference.startsWith(prefix)) return max;
+      const n = Number(reference.slice(prefix.length));
+      return Number.isInteger(n) && n > max ? n : max;
+    }, 0);
+
+    return `${prefix}${String(highest + 1).padStart(2, '0')}`;
   }
 
   /** Reference, authority and notes only — status moves through `transition`. */

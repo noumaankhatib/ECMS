@@ -336,11 +336,16 @@ export default async function PlanningPage({ params }: { params: Promise<{ id: s
               <ActionForm action={createSubmission} submitLabel="Add submission">
                 <input type="hidden" name="projectId" value={id} />
                 <div className="form-grid">
-                  <Field label="Reference" name="reference" required />
+                  <Field
+                    label="Reference"
+                    name="reference"
+                    hint="Leave blank to generate one (project code + SUB-NN). Edit it later when the authority issues its own number."
+                  />
                   <SuggestField
                     label="Authority"
                     name="authorityName"
                     required
+                    defaultValue={submissions.items[0]?.authorityName}
                     suggestions={[...submissions.items.map((s) => s.authorityName), ...AUTHORITIES]}
                   />
                   <Select

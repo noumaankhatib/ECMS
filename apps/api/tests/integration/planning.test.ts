@@ -276,6 +276,31 @@ describe('planning', () => {
     expect(entries).toBe(1);
   });
 
+  it('generates a reference when none is given, and keeps one that is typed', async () => {
+    const { code } = await prisma.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { code: true },
+    });
+    const create = (reference?: string) =>
+      inContext(() =>
+        submissions.create(
+          projectId,
+          { ...(reference ? { reference } : {}), authorityName: 'Local Planning Authority' },
+          owningManager,
+        ),
+      );
+
+    const first = await create();
+    const second = await create();
+    const typed = await create('AUTH-9999');
+    const third = await create();
+
+    expect(first.reference).toBe(`${code}-SUB-01`);
+    expect(second.reference).toBe(`${code}-SUB-02`);
+    expect(typed.reference).toBe('AUTH-9999');
+    expect(third.reference).toBe(`${code}-SUB-03`);
+  });
+
   it('moves a submission from DRAFT to SUBMITTED, and no further without a reviewer', async () => {
     const submission = await inContext(() =>
       submissions.create(

@@ -1402,7 +1402,8 @@ export type SubmissionDepartment = (typeof SUBMISSION_DEPARTMENTS)[number];
 
 export const createSubmissionSchema = z
   .object({
-    reference: z.string().trim().min(1, 'A reference is required').max(100),
+    /** Left out, the server generates `<project code>-SUB-NN`. */
+    reference: z.string().trim().min(1, 'A reference is required').max(100).optional(),
     authorityName: z.string().trim().min(1, 'The authority is required').max(200),
     department: z.enum(SUBMISSION_DEPARTMENTS).optional(),
     pendingWith: z.string().trim().max(100).optional(),

@@ -82,7 +82,8 @@ export async function createSubmission(_state: FormState, form: FormData): Promi
 
   const result = await runAction(async () => {
     await api.post(`/projects/${projectId}/planning/submissions`, {
-      reference: await text(form, 'reference'),
+      // Blank means "generate one" — the create contract takes it absent.
+      reference: (await nullableText(form, 'reference')) ?? undefined,
       authorityName: await text(form, 'authorityName'),
       department: form.get('department') || undefined,
       // The create contract accepts the field absent but not null, so a blank
@@ -207,10 +208,7 @@ export async function respondClarification(_state: FormState, form: FormData): P
  * created exactly as if typed in by hand; names already on the project are
  * skipped so applying twice cannot duplicate anything.
  */
-export async function applyPlanningTemplate(
-  _state: FormState,
-  form: FormData,
-): Promise<FormState> {
+export async function applyPlanningTemplate(_state: FormState, form: FormData): Promise<FormState> {
   const projectId = String(form.get('projectId'));
   const kind = String(form.get('kind'));
   const names = form.getAll('item').map(String);
