@@ -186,6 +186,12 @@ export const PERMISSIONS = [
    *  conditions are not all met. Held by System Administrator and Director
    *  only, and always carries a written reason kept in the audit trail. */
   'workflow:override_gate',
+
+  /** Approving a drawing revision, submission or modification that the same
+   *  person created. Ordinarily nobody may approve their own work; this lets
+   *  System Administrator and Director do it, and only with a written reason
+   *  kept in the audit trail beside the approval. */
+  'approval:override_self',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -785,6 +791,23 @@ export const gateOverrideSchema = z
   .strict();
 
 export type GateOverride = z.infer<typeof gateOverrideSchema>;
+
+/**
+ * Sent only when approving something the caller created themselves
+ * (`approval:override_self`). Longer than a gate reason on purpose: it is the
+ * only record of why the usual second pair of eyes was skipped.
+ */
+export const selfApprovalOverrideSchema = z
+  .object({
+    reason: z
+      .string()
+      .trim()
+      .min(10, 'Explain why you are approving your own work (at least 10 characters)')
+      .max(500),
+  })
+  .strict();
+
+export type SelfApprovalOverride = z.infer<typeof selfApprovalOverrideSchema>;
 
 /** A reason may accompany any transition, and is kept in the audit trail. */
 export const projectTransitionSchema = z
@@ -1446,6 +1469,7 @@ export const submissionTransitionSchema = z
     /** An approval decision's own comment — "why this move, right now" — the
      *  same role `reason` plays on `ProjectTransition`. */
     reason: optionalText(1000),
+    override: selfApprovalOverrideSchema.optional(),
   })
   .strict();
 
@@ -1800,6 +1824,7 @@ export const drawingRevisionTransitionSchema = z
   .object({
     version: z.number().int().min(1),
     reason: optionalText(1000),
+    override: selfApprovalOverrideSchema.optional(),
   })
   .strict();
 
@@ -1874,6 +1899,7 @@ export const modificationTransitionSchema = z
   .object({
     version: z.number().int().min(1),
     reason: optionalText(1000),
+    override: selfApprovalOverrideSchema.optional(),
   })
   .strict();
 

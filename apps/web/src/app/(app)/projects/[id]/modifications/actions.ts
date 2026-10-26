@@ -35,6 +35,24 @@ const ACTION_PATHS: Record<ModificationAction, string> = {
   returnForRevision: 'return-for-revision',
 };
 
+/** As `approveRevisionWithOverride`: approving a modification you created. */
+export async function approveModificationWithOverride(
+  _state: FormState,
+  form: FormData,
+): Promise<FormState> {
+  const projectId = String(form.get('projectId'));
+  const id = String(form.get('modificationId'));
+  const reason = String(form.get('reason') ?? '');
+
+  return runAction(async () => {
+    await api.post(`/projects/${projectId}/modifications/${id}/approve`, {
+      version: Number(form.get('version')),
+      override: { reason },
+    });
+    await refresh(`/projects/${projectId}/modifications`);
+  });
+}
+
 export async function transitionModification(
   projectId: string,
   id: string,

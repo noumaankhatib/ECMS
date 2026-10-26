@@ -104,23 +104,44 @@ test.describe('Phase 3 through the browser', () => {
     await row.getByRole('button', { name: 'Start review' }).click();
     await expect(row.getByText('Under review', { exact: true })).toBeVisible();
 
-    // Separation of duties: whoever uploaded a revision can never approve it,
-    // however senior. The refusal says so, and the revision stays under review.
-    await row.getByRole('button', { name: 'Approve' }).click();
-    await expect(row.locator('.action-button__error')).toContainText('created yourself');
-    await expect(row.getByText('Under review', { exact: true })).toBeVisible();
-    await expect(row.getByText('Approved', { exact: true })).toHaveCount(0);
+    // Separation of duties: whoever uploaded a revision is not offered a plain
+    // Approve. A System Administrator may approve their own work, but only by
+    // writing down why.
+    await expect(row.getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0);
+    await row.getByText('Approve with a reason…').click();
+    await row
+      .getByLabel('Why are you approving your own work?')
+      .fill('Only approver is away; client deadline today.');
+    await row.getByRole('button', { name: 'Approve with this reason' }).click();
+    await expect(row.getByText('Approved', { exact: true })).toBeVisible();
+  });
 
-    // A different person who holds drawing:approve can.
+  test('a different approver approves ordinarily, with no reason needed', async ({ page }) => {
+    await signIn(page, ADMIN);
+    await page.goto(`/projects/${projectId}/drawings`);
+    await page.getByLabel('Drawing number').fill('A-102');
+    await page.getByLabel('Title').fill('First floor plan');
+    await page.getByRole('button', { name: 'Register drawing' }).click();
+    await page.waitForURL(/\/drawings\/[0-9a-f-]{36}$/);
+
+    await page.getByLabel('Revision code').fill('P1');
+    await page.setInputFiles('input[name="file"]', fixturePath);
+    await page.getByRole('button', { name: 'Upload revision' }).click();
+    const row = page.getByRole('row', { name: /P1/ });
+    await row.getByRole('button', { name: 'Submit' }).click();
+    await expect(row.getByText('Submitted', { exact: true })).toBeVisible();
+    await row.getByRole('button', { name: 'Start review' }).click();
+    await expect(row.getByText('Under review', { exact: true })).toBeVisible();
+
     await createUser(page, DIRECTOR, `Approving Director ${tag}`, 'DIRECTOR');
     // Signing in as someone else needs the first session gone, or /login
     // redirects straight past the form.
     await page.context().clearCookies();
     await signIn(page, DIRECTOR);
     await page.goto(`/projects/${projectId}/drawings`);
-    await page.getByRole('link', { name: 'A-101' }).click();
+    await page.getByRole('link', { name: 'A-102' }).click();
     const directorRow = page.getByRole('row', { name: /P1/ });
-    await directorRow.getByRole('button', { name: 'Approve' }).click();
+    await directorRow.getByRole('button', { name: 'Approve', exact: true }).click();
     await expect(directorRow.getByText('Approved', { exact: true })).toBeVisible();
   });
 

@@ -14,6 +14,7 @@ import type { DrawingRevision, Prisma } from '@prisma/client';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { DRIVE_ADAPTER, type DriveAdapter } from '../../shared/drive/drive-adapter';
 import { appError } from '../../shared/errors/app-error';
+import { guardSelfApproval } from '../access/self-approval';
 import { AuditService } from '../audit';
 
 import { requireOpenProject } from './project-guard';
@@ -239,20 +240,17 @@ export class DrawingRevisionService {
     });
     if (!current || current.drawingId !== drawingId) throw appError('NOT_FOUND');
 
-    if (action === 'approve' && current.createdBy === actorId) {
-      throw appError('FORBIDDEN', {
-        // Said to the person, not only logged: otherwise the refusal reads as a
-        // missing permission when the real cause is who created the record.
-        fields: [
-          {
-            field: 'status',
-            reason:
-              'You cannot approve a drawing revision you created yourself. Ask another approver to do it.',
-          },
-        ],
-        context: { revision_id: id, reason: 'self_approval' },
-      });
-    }
+    // Nobody approves their own work — unless they hold the override and say why.
+    const selfApproval =
+      action === 'approve'
+        ? await guardSelfApproval(this.prisma, {
+            actorId,
+            createdBy: current.createdBy,
+            override: input.override,
+            what: 'drawing revision',
+            context: { revision_id: id },
+          })
+        : undefined;
 
     const from = current.status as ApprovalStatus;
     if (!canTransitionApproval(from, target)) {
@@ -316,7 +314,11 @@ export class DrawingRevisionService {
         entityId: id,
         projectId,
         before: { status: from },
-        after: { status: target, reason: input.reason ?? null },
+        after: {
+          status: target,
+          reason: input.reason ?? null,
+          ...(selfApproval ? { selfApprovalOverride: selfApproval } : {}),
+        },
       });
 
       return tx.drawingRevision.findUniqueOrThrow({ where: { id } });

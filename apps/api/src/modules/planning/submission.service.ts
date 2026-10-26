@@ -16,6 +16,7 @@ import type { Prisma, Submission } from '@prisma/client';
 
 import { PrismaService } from '../../shared/database/prisma.service';
 import { appError } from '../../shared/errors/app-error';
+import { guardSelfApproval } from '../access/self-approval';
 import { AuditService } from '../audit';
 
 import { requireOpenProject } from './project-guard';
@@ -197,20 +198,17 @@ export class SubmissionService {
     });
     if (!current || current.projectId !== projectId) throw appError('NOT_FOUND');
 
-    if (action === 'approve' && current.createdBy === actorId) {
-      throw appError('FORBIDDEN', {
-        // Said to the person, not only logged: otherwise the refusal reads as a
-        // missing permission when the real cause is who created the record.
-        fields: [
-          {
-            field: 'status',
-            reason:
-              'You cannot approve a submission you created yourself. Ask another approver to do it.',
-          },
-        ],
-        context: { submission_id: id, reason: 'self_approval' },
-      });
-    }
+    // Nobody approves their own work — unless they hold the override and say why.
+    const selfApproval =
+      action === 'approve'
+        ? await guardSelfApproval(this.prisma, {
+            actorId,
+            createdBy: current.createdBy,
+            override: input.override,
+            what: 'submission',
+            context: { submission_id: id },
+          })
+        : undefined;
 
     const from = current.status as SubmissionStatus;
     if (!canTransitionSubmission(from, target)) {
@@ -269,7 +267,11 @@ export class SubmissionService {
         entityId: id,
         projectId,
         before: { status: from },
-        after: { status: target, reason: input.reason ?? null },
+        after: {
+          status: target,
+          reason: input.reason ?? null,
+          ...(selfApproval ? { selfApprovalOverride: selfApproval } : {}),
+        },
       });
 
       return tx.submission.findUniqueOrThrow({ where: { id } });

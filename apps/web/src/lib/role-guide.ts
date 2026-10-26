@@ -77,6 +77,12 @@ const SPECIAL: Readonly<Record<string, Entry>> = {
     detail:
       'Save a client or property whose official identity already exists, with a written reason.',
   },
+  'approval:override_self': {
+    area: 'Safeguards',
+    action: 'Approve own work with a reason',
+    detail:
+      'Approve a drawing revision, submission or modification you created yourself, with a written reason kept in the audit trail.',
+  },
   'workflow:override_gate': {
     area: 'Safeguards',
     action: 'Override completion checks',

@@ -7,6 +7,7 @@ import {
 
 import { ProjectContext } from '@/components/context-strip';
 import { ActionButton, ActionForm, Field, Select, TextArea } from '@/components/form';
+import { OverrideForm } from '@/components/readiness';
 import {
   Badge,
   Breadcrumb,
@@ -29,7 +30,7 @@ import type {
   SiteVisit,
 } from '@/lib/types';
 
-import { createModification, transitionModification } from './actions';
+import { approveModificationWithOverride, createModification, transitionModification } from './actions';
 
 export const metadata = { title: 'Modifications — ECMS' };
 
@@ -112,6 +113,8 @@ export default async function ModificationsPage({
     : [[], []];
   const mayEdit = session.can('planning:edit', id) && !closed;
   const mayApprove = session.can('planning:approve', id) && !closed;
+  // Approving what you recorded yourself needs the override and a reason.
+  const mayOverrideSelf = session.can('approval:override_self');
 
   const ordered = [...modifications.items].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -175,20 +178,52 @@ export default async function ModificationsPage({
                         </td>
                         <td className="right">
                           <div className="row u-justify-end">
-                            {available.map((candidate) => (
-                              <ActionButton
-                                key={candidate.action}
-                                action={transitionModification.bind(
-                                  null,
-                                  id,
-                                  modification.id,
-                                  candidate.action,
-                                  modification.version,
-                                )}
-                                label={candidate.label}
-                                variant={candidate.variant ?? 'secondary'}
-                              />
-                            ))}
+                            {available.map((candidate) => {
+                              const ownWork =
+                                candidate.action === 'approve' &&
+                                modification.createdBy === session.user.id;
+
+                              if (ownWork && mayOverrideSelf) {
+                                return (
+                                  <OverrideForm
+                                    key={candidate.action}
+                                    id={`approve-${modification.id}`}
+                                    action={approveModificationWithOverride}
+                                    hidden={{
+                                      projectId: id,
+                                      modificationId: modification.id,
+                                      version: modification.version,
+                                    }}
+                                    label="Approve with a reason…"
+                                    submitLabel="Approve with this reason"
+                                    reasonLabel="Why are you approving your own work?"
+                                    hint="You recorded this modification, so another approver would normally approve it. Your reason is kept in the audit trail."
+                                    minLength={10}
+                                  />
+                                );
+                              }
+
+                              return (
+                                <ActionButton
+                                  key={candidate.action}
+                                  action={transitionModification.bind(
+                                    null,
+                                    id,
+                                    modification.id,
+                                    candidate.action,
+                                    modification.version,
+                                  )}
+                                  label={candidate.label}
+                                  variant={candidate.variant ?? 'secondary'}
+                                  {...(ownWork
+                                    ? {
+                                        disabledReason:
+                                          'You recorded this modification, so another approver must approve it.',
+                                      }
+                                    : {})}
+                                />
+                              );
+                            })}
                           </div>
                         </td>
                       </tr>

@@ -144,10 +144,15 @@ export async function approveSubmission(_state: FormState, form: FormData): Prom
   const projectId = String(form.get('projectId'));
   const id = String(form.get('id'));
 
+  // Present only when the creator is approving their own submission with the
+  // override (`approval:override_self`); the API checks that and audits it.
+  const overrideReason = await text(form, 'reason');
+
   const result = await runAction(async () => {
     await api.post(`/projects/${projectId}/planning/submissions/${id}/approve`, {
       version: Number(form.get('version')),
       permitReference: await text(form, 'permitReference'),
+      ...(overrideReason ? { override: { reason: overrideReason } } : {}),
     });
   });
 

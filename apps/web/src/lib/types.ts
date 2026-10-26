@@ -320,6 +320,9 @@ export interface DrawingRevision {
   supersededAt: string | null;
   version: number;
   createdAt: string;
+  /** Who uploaded it. Nobody but a holder of `approval:override_self` may
+   *  approve their own work, so the page needs to know. */
+  createdBy: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -410,6 +413,7 @@ export interface Modification {
   status: ApprovalStatus;
   version: number;
   createdAt: string;
+  createdBy: string | null;
 }
 
 // ---------------------------------------------------------------------------

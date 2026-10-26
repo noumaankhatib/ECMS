@@ -39,6 +39,29 @@ const ACTION_PATHS: Record<DrawingRevisionAction, string> = {
   returnForRevision: 'return-for-revision',
 };
 
+/**
+ * Approves a revision its own uploader created. Only offered to holders of
+ * `approval:override_self`; the API checks that again, and keeps the reason in
+ * the audit trail beside the approval.
+ */
+export async function approveRevisionWithOverride(
+  _state: FormState,
+  form: FormData,
+): Promise<FormState> {
+  const projectId = String(form.get('projectId'));
+  const drawingId = String(form.get('drawingId'));
+  const id = String(form.get('revisionId'));
+  const reason = String(form.get('reason') ?? '');
+
+  return runAction(async () => {
+    await api.post(`/projects/${projectId}/drawings/${drawingId}/revisions/${id}/approve`, {
+      version: Number(form.get('version')),
+      override: { reason },
+    });
+    await refresh(`/projects/${projectId}/drawings/${drawingId}`);
+  });
+}
+
 export async function transitionRevision(
   projectId: string,
   drawingId: string,

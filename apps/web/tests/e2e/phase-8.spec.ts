@@ -96,21 +96,40 @@ test.describe('Phase 8 through the browser', () => {
     await page.getByRole('button', { name: 'Start review' }).click();
     await expect(page.getByRole('cell', { name: 'Under review' })).toBeVisible();
 
-    // Separation of duties: the person who recorded the modification cannot
-    // approve it, and the refusal explains why.
-    await page.getByRole('button', { name: 'Approve' }).click();
-    await expect(page.locator('.action-button__error')).toContainText('created yourself');
-    await expect(page.getByRole('cell', { name: 'Under review' })).toBeVisible();
+    // Separation of duties: whoever recorded it is not offered a plain Approve.
+    // A System Administrator may approve their own work, but only by writing
+    // down why.
+    await expect(page.getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0);
+    await page.getByText('Approve with a reason…').click();
+    await page
+      .getByLabel('Why are you approving your own work?')
+      .fill('Client signed the change on site; no other approver available.');
+    await page.getByRole('button', { name: 'Approve with this reason' }).click();
+    await expect(page.getByRole('cell', { name: 'Approved' })).toBeVisible();
+  });
 
-    // A different person who holds the approval permission can.
+  test('a different approver approves ordinarily, with no reason needed', async ({ page }) => {
+    await signIn(page, ADMIN);
+    await page.goto(`/projects/${projectId}/modifications`);
+    await page.locator('#impactArea').selectOption('MEP');
+    await page.locator('#requestText').fill(`Second change ${tag}`);
+    await page.getByRole('button', { name: 'Record modification' }).click();
+
+    const row = page.getByRole('row', { name: new RegExp(`Second change ${tag}`) });
+    await row.getByRole('button', { name: 'Submit' }).click();
+    await expect(row.getByRole('cell', { name: 'Submitted' })).toBeVisible();
+    await row.getByRole('button', { name: 'Start review' }).click();
+    await expect(row.getByRole('cell', { name: 'Under review' })).toBeVisible();
+
     await createUser(page, DIRECTOR, `Approving Director ${tag}`, 'DIRECTOR');
     // Signing in as someone else needs the first session gone, or /login
     // redirects straight past the form.
     await page.context().clearCookies();
     await signIn(page, DIRECTOR);
     await page.goto(`/projects/${projectId}/modifications`);
-    await page.getByRole('button', { name: 'Approve' }).click();
-    await expect(page.getByRole('cell', { name: 'Approved' })).toBeVisible();
+    const directorRow = page.getByRole('row', { name: new RegExp(`Second change ${tag}`) });
+    await directorRow.getByRole('button', { name: 'Approve', exact: true }).click();
+    await expect(directorRow.getByRole('cell', { name: 'Approved' })).toBeVisible();
   });
 
   test("THE CRITICAL TEST: a non-member gets nothing for this project's modifications", async ({

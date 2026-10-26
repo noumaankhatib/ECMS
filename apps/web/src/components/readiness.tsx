@@ -1,5 +1,6 @@
 import type { GateReadiness } from '@ecms/contracts';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 
 import type { FormState } from '@/lib/form-state';
 
@@ -74,27 +75,37 @@ export function OverrideForm({
   action,
   hidden,
   label = 'Complete anyway…',
+  submitLabel = 'Complete anyway',
+  reasonLabel = 'Reason for overriding',
+  hint = 'Recorded in the audit trail, together with the conditions that were not met.',
+  minLength = 5,
+  children,
 }: {
   /** Unique on the page — there may be one per workstream. */
   id: string;
   action: (state: FormState, form: FormData) => Promise<FormState>;
   hidden: Record<string, string | number>;
   label?: string;
+  submitLabel?: string;
+  reasonLabel?: string;
+  hint?: string;
+  minLength?: number;
+  /** Extra fields the action needs besides the reason (a permit reference). */
+  children?: ReactNode;
 }) {
   const fieldId = `${id}-reason`;
   return (
     <details className="override">
       <summary>{label}</summary>
-      <ActionForm action={action} submitLabel="Complete anyway">
+      <ActionForm action={action} submitLabel={submitLabel}>
         {Object.entries(hidden).map(([name, value]) => (
           <input key={name} type="hidden" name={name} value={value} />
         ))}
+        {children}
         <div className="field field--wide">
-          <label htmlFor={fieldId}>Reason for overriding</label>
-          <textarea id={fieldId} name="reason" required minLength={5} maxLength={500} />
-          <span className="hint">
-            Recorded in the audit trail, together with the conditions that were not met.
-          </span>
+          <label htmlFor={fieldId}>{reasonLabel}</label>
+          <textarea id={fieldId} name="reason" required minLength={minLength} maxLength={500} />
+          <span className="hint">{hint}</span>
         </div>
       </ActionForm>
     </details>

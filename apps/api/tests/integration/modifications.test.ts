@@ -480,4 +480,65 @@ describe('modifications', () => {
     );
     expect(approved.status).toBe('APPROVED');
   });
+
+  it('lets an administrator approve a modification they recorded, but only with a written reason', async () => {
+    const modification = await inContext(() =>
+      modifications.create(
+        projectId,
+        { requestText: 'Administrator override check', impactArea: 'MEP' },
+        admin,
+      ),
+    );
+    let current = await inContext(() =>
+      modifications.transition(
+        projectId,
+        modification.id,
+        'submit',
+        { version: modification.version },
+        admin,
+      ),
+    );
+    current = await inContext(() =>
+      modifications.transition(
+        projectId,
+        modification.id,
+        'review',
+        { version: current.version },
+        admin,
+      ),
+    );
+
+    // Without a reason it is refused, as for anyone else.
+    await expect(
+      inContext(() =>
+        modifications.transition(
+          projectId,
+          modification.id,
+          'approve',
+          { version: current.version },
+          admin,
+        ),
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    const approved = await inContext(() =>
+      modifications.transition(
+        projectId,
+        modification.id,
+        'approve',
+        {
+          version: current.version,
+          override: { reason: 'Client signed the change on site; approver unreachable.' },
+        },
+        admin,
+      ),
+    );
+    expect(approved.status).toBe('APPROVED');
+
+    const entry = await prisma.auditEntry.findFirst({
+      where: { entityId: modification.id, action: 'STATUS_CHANGED', outcome: 'SUCCEEDED' },
+      orderBy: { occurredAt: 'desc' },
+    });
+    expect(JSON.stringify(entry?.after)).toContain('Client signed the change');
+  });
 });

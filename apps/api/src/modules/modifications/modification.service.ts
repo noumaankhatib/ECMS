@@ -14,6 +14,7 @@ import type { Modification, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../shared/database/prisma.service';
 import { appError } from '../../shared/errors/app-error';
+import { guardSelfApproval } from '../access/self-approval';
 import { AuditService } from '../audit';
 
 import { requireOpenProject } from './project-guard';
@@ -160,20 +161,17 @@ export class ModificationService {
     });
     if (!current || current.projectId !== projectId) throw appError('NOT_FOUND');
 
-    if (action === 'approve' && current.createdBy === actorId) {
-      throw appError('FORBIDDEN', {
-        // Said to the person, not only logged: otherwise the refusal reads as a
-        // missing permission when the real cause is who created the record.
-        fields: [
-          {
-            field: 'status',
-            reason:
-              'You cannot approve a modification you created yourself. Ask another approver to do it.',
-          },
-        ],
-        context: { modification_id: id, reason: 'self_approval' },
-      });
-    }
+    // Nobody approves their own work — unless they hold the override and say why.
+    const selfApproval =
+      action === 'approve'
+        ? await guardSelfApproval(this.prisma, {
+            actorId,
+            createdBy: current.createdBy,
+            override: input.override,
+            what: 'modification',
+            context: { modification_id: id },
+          })
+        : undefined;
 
     const from = current.status as ApprovalStatus;
     if (!canTransitionApproval(from, target)) {
@@ -211,7 +209,11 @@ export class ModificationService {
         entityId: id,
         projectId,
         before: { status: from },
-        after: { status: target, reason: input.reason ?? null },
+        after: {
+          status: target,
+          reason: input.reason ?? null,
+          ...(selfApproval ? { selfApprovalOverride: selfApproval } : {}),
+        },
       });
 
       return tx.modification.findUniqueOrThrow({ where: { id } });

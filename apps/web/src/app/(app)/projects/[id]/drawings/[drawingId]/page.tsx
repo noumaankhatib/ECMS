@@ -5,12 +5,13 @@ import {
 } from '@ecms/contracts';
 
 import { ActionButton, ActionForm, Field, FileField, TextArea } from '@/components/form';
+import { OverrideForm } from '@/components/readiness';
 import { Badge, Breadcrumb, Card, CardBody, CardHead, DateText, DetailGroup, DetailItem, Empty, PageHead, Value } from '@/components/ui';
 import { api } from '@/lib/api';
 import { requireSession } from '@/lib/session';
 import type { Drawing, DrawingRevision, Page as ApiPage, Project } from '@/lib/types';
 
-import { createRevision, transitionRevision } from './actions';
+import { approveRevisionWithOverride, createRevision, transitionRevision } from './actions';
 
 export const metadata = { title: 'Drawing — ECMS' };
 
@@ -81,6 +82,8 @@ export default async function DrawingPage({
   const closed = project.status === 'CLOSED';
   const mayCreate = session.can('drawing:create', id) && !closed;
   const mayApprove = session.can('drawing:approve', id) && !closed;
+  // Approving what you uploaded yourself needs the override and a reason.
+  const mayOverrideSelf = session.can('approval:override_self');
 
   const ordered = [...revisions.items].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -157,28 +160,60 @@ export default async function DrawingPage({
                         </td>
                         <td className="right">
                           <div className="row u-justify-end" >
-                            {available.map((candidate) => (
-                              <ActionButton
-                                key={candidate.action}
-                                action={transitionRevision.bind(
-                                  null,
-                                  id,
-                                  drawingId,
-                                  revision.id,
-                                  candidate.action,
-                                  revision.version,
-                                )}
-                                label={candidate.label}
-                                variant={candidate.variant ?? 'secondary'}
-                                {...(candidate.action === 'approve' &&
-                                (!revision.fileId || revision.uploadStatus !== 'ACTIVE')
-                                  ? {
-                                      disabledReason:
-                                        'No drawing file on this revision, and one cannot be added later. Upload a new revision with the file.',
-                                    }
-                                  : {})}
-                              />
-                            ))}
+                            {available.map((candidate) => {
+                              const noFile = !revision.fileId || revision.uploadStatus !== 'ACTIVE';
+                              const ownWork =
+                                candidate.action === 'approve' &&
+                                revision.createdBy === session.user.id;
+
+                              if (ownWork && !noFile && mayOverrideSelf) {
+                                return (
+                                  <OverrideForm
+                                    key={candidate.action}
+                                    id={`approve-${revision.id}`}
+                                    action={approveRevisionWithOverride}
+                                    hidden={{
+                                      projectId: id,
+                                      drawingId,
+                                      revisionId: revision.id,
+                                      version: revision.version,
+                                    }}
+                                    label="Approve with a reason…"
+                                    submitLabel="Approve with this reason"
+                                    reasonLabel="Why are you approving your own work?"
+                                    hint="You uploaded this revision, so another approver would normally approve it. Your reason is kept in the audit trail."
+                                    minLength={10}
+                                  />
+                                );
+                              }
+
+                              return (
+                                <ActionButton
+                                  key={candidate.action}
+                                  action={transitionRevision.bind(
+                                    null,
+                                    id,
+                                    drawingId,
+                                    revision.id,
+                                    candidate.action,
+                                    revision.version,
+                                  )}
+                                  label={candidate.label}
+                                  variant={candidate.variant ?? 'secondary'}
+                                  {...(candidate.action === 'approve' && noFile
+                                    ? {
+                                        disabledReason:
+                                          'No drawing file on this revision, and one cannot be added later. Upload a new revision with the file.',
+                                      }
+                                    : ownWork
+                                      ? {
+                                          disabledReason:
+                                            'You uploaded this revision, so another approver must approve it.',
+                                        }
+                                      : {})}
+                                />
+                              );
+                            })}
                           </div>
                         </td>
                       </tr>

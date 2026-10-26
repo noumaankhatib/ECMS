@@ -685,4 +685,104 @@ describe('drawings', () => {
     expect(grants.project.has('drawing:create')).toBe(true);
     expect(rows.length).toBeGreaterThan(0);
   });
+
+  /** A revision made by `creator`, submitted and under review, ready to approve. */
+  async function revisionUnderReview(creator: string, number: string) {
+    const drawing = await inContext(() =>
+      drawings.create(projectId, { number, title: 'Override check' }, creator),
+    );
+    const revision = await inContext(() =>
+      revisions.create(projectId, drawing.id, { revisionCode: 'O1' }, creator),
+    );
+    let current = await inContext(() =>
+      revisions.transition(projectId, drawing.id, revision.id, 'submit', { version: 1 }, creator),
+    );
+    current = await inContext(() =>
+      revisions.transition(
+        projectId,
+        drawing.id,
+        revision.id,
+        'review',
+        { version: current.version },
+        creator,
+      ),
+    );
+    // Approval needs the file to be on record.
+    await prisma.drawingRevision.update({
+      where: { id: revision.id },
+      data: { fileId: `file-${revision.id}`, uploadStatus: 'ACTIVE' },
+    });
+    return { drawing, revision, version: current.version };
+  }
+
+  async function approvalAudit(revisionId: string) {
+    const rows = await prisma.auditEntry.findMany({
+      where: { entityId: revisionId, action: 'STATUS_CHANGED', outcome: 'SUCCEEDED' },
+      orderBy: { occurredAt: 'desc' },
+    });
+    return rows[0]?.after as { status?: string; selfApprovalOverride?: { reason: string } } | null;
+  }
+
+  it('lets a System Administrator approve their own revision with a written reason, and audits it', async () => {
+    const { drawing, revision, version } = await revisionUnderReview(admin, 'A-701');
+    const approved = await inContext(() =>
+      revisions.transition(
+        projectId,
+        drawing.id,
+        revision.id,
+        'approve',
+        { version, override: { reason: 'The only approver is away; client deadline today.' } },
+        admin,
+      ),
+    );
+    expect(approved.status).toBe('APPROVED');
+
+    const entry = await approvalAudit(revision.id);
+    expect(entry?.status).toBe('APPROVED');
+    expect(entry?.selfApprovalOverride?.reason).toContain('client deadline');
+  });
+
+  it('still refuses a creator who has no override authority, even if they send a reason', async () => {
+    const { drawing, revision, version } = await revisionUnderReview(owningPlanner, 'A-702');
+    await expect(
+      inContext(() =>
+        revisions.transition(
+          projectId,
+          drawing.id,
+          revision.id,
+          'approve',
+          { version, override: { reason: 'Please let me approve my own drawing.' } },
+          owningPlanner,
+        ),
+      ),
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      fields: [expect.objectContaining({ reason: expect.stringContaining('Director or System') })],
+    });
+    expect((await revisions.byId(projectId, drawing.id, revision.id)).status).toBe('UNDER_REVIEW');
+  });
+
+  it('ignores an override sent by a different approver: it is not recorded', async () => {
+    const { drawing, revision, version } = await revisionUnderReview(owningPlanner, 'A-703');
+    const approved = await inContext(() =>
+      revisions.transition(
+        projectId,
+        drawing.id,
+        revision.id,
+        'approve',
+        { version, override: { reason: 'Not needed, but sent anyway.' } },
+        director,
+      ),
+    );
+    expect(approved.status).toBe('APPROVED');
+    expect((await approvalAudit(revision.id))?.selfApprovalOverride).toBeUndefined();
+  });
+
+  it('keeps the override a Director/Administrator-only authority in the permission matrix', async () => {
+    const rows = await prisma.rolePermission.findMany({
+      where: { permission: 'approval:override_self' },
+    });
+    expect(rows.map((r) => r.roleCode).sort()).toEqual(['DIRECTOR', 'SYSTEM_ADMINISTRATOR']);
+    expect(rows.every((r) => r.scope === 'GLOBAL')).toBe(true);
+  });
 });

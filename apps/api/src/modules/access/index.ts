@@ -17,3 +17,4 @@ export { UserService } from './user.service';
 export { Public } from './public.decorator';
 export { RequirePermission, RequirePermissionAnywhere } from './require-permission.decorator';
 export type { AuthenticatedUser, LoginResult } from './auth.types';
+export { guardSelfApproval } from './self-approval';

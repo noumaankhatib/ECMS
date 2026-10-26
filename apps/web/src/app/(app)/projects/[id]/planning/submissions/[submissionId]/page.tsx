@@ -5,6 +5,7 @@ import {
 } from '@ecms/contracts';
 
 import { ActionButton, ActionForm, DateField, Field, TextArea } from '@/components/form';
+import { OverrideForm } from '@/components/readiness';
 import { SuggestField } from '@/components/suggest-field';
 import { Badge, Breadcrumb, Card, CardBody, CardHead, DateText, DetailGroup, DetailItem, Empty, PageHead, Value } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -105,8 +106,15 @@ export default async function SubmissionPage({
   const mayEdit = session.can('planning:edit', id) && !closed;
   // Self-approval is refused by the server; exclude it here so the form is
   // never shown to someone who created the submission.
-  const mayApprove =
-    session.can('planning:approve', id) && !closed && session.user.id !== submission.createdBy;
+  const isOwn = session.user.id === submission.createdBy;
+  const mayApprove = session.can('planning:approve', id) && !closed && !isOwn;
+  // The creator may still approve with the override, by saying why.
+  const mayApproveOwn =
+    session.can('planning:approve', id) &&
+    !closed &&
+    isOwn &&
+    session.can('approval:override_self') &&
+    canTransitionSubmission(submission.status, 'APPROVED');
 
   const available = ACTIONS.filter(
     (candidate) =>
@@ -173,6 +181,37 @@ export default async function SubmissionPage({
                   <strong>{STATUS_LABEL[submission.status].toLowerCase()}</strong> are offered. The
                   server checks again regardless.
                 </p>
+              </CardBody>
+            </Card>
+          ) : null}
+
+          {mayApproveOwn ? (
+            <Card>
+              <CardHead title="Approve your own submission" />
+              <CardBody>
+                <p className="hint u-mb-3">
+                  You created this submission, so another approver would normally approve it. You
+                  may approve it yourself by writing down why; that is kept in the audit trail.
+                </p>
+                <OverrideForm
+                  id="approve-own"
+                  action={approveSubmission}
+                  hidden={{ projectId: id, id: submissionId, version: submission.version }}
+                  label="Approve with a reason…"
+                  submitLabel="Approve with this reason"
+                  reasonLabel="Why are you approving your own work?"
+                  hint="Kept in the audit trail beside the approval."
+                  minLength={10}
+                >
+                  <div className="form-grid">
+                    <Field
+                      label="Permit reference"
+                      name="permitReference"
+                      defaultValue={submission.permitReference}
+                      hint="Required unless one is already on record."
+                    />
+                  </div>
+                </OverrideForm>
               </CardBody>
             </Card>
           ) : null}

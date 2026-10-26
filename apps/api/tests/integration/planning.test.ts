@@ -843,4 +843,53 @@ describe('planning', () => {
     expect(grants.project.has('planning:create')).toBe(true);
     expect(rows.length).toBeGreaterThan(0);
   });
+
+  it('lets an administrator approve a submission they created, but only with a written reason', async () => {
+    const submission = await inContext(() =>
+      submissions.create(
+        projectId,
+        { reference: 'SUB-OVR', authorityName: 'Local Planning Authority' },
+        admin,
+      ),
+    );
+    let current = await inContext(() =>
+      submissions.transition(projectId, submission.id, 'submit', { version: 1 }, admin),
+    );
+    current = await inContext(() =>
+      submissions.transition(
+        projectId,
+        submission.id,
+        'review',
+        { version: current.version },
+        admin,
+      ),
+    );
+
+    await expect(
+      inContext(() =>
+        submissions.transition(
+          projectId,
+          submission.id,
+          'approve',
+          { version: current.version, permitReference: 'PERMIT-OVR-1' },
+          admin,
+        ),
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    const approved = await inContext(() =>
+      submissions.transition(
+        projectId,
+        submission.id,
+        'approve',
+        {
+          version: current.version,
+          permitReference: 'PERMIT-OVR-1',
+          override: { reason: 'Authority approved in writing; no second approver on the team.' },
+        },
+        admin,
+      ),
+    );
+    expect(approved.status).toBe('APPROVED');
+  });
 });
