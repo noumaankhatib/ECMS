@@ -73,7 +73,11 @@ function messageFor(error: ApiError): string {
     case 'DUPLICATE_SUSPECTED':
       return 'A record with the same official identity already exists. Review the match below before saving.';
     case 'VALIDATION_FAILED':
-      return 'Please check the highlighted fields.';
+      // Nothing on the page is highlighted; the list under this line names each
+      // field and what to change in it.
+      return error.fields.length > 1
+        ? 'Some details need fixing before this can be saved:'
+        : 'One detail needs fixing before this can be saved:';
     default:
       return error.message;
   }

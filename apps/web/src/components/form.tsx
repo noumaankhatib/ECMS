@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { useFormStatus } from 'react-dom';
 
+import { describeIssue } from '@/lib/field-messages';
 import type { FormState } from '@/lib/form-state';
 
 import { CalendarIcon } from './icons';
@@ -619,9 +620,15 @@ export function ErrorBanner({ state }: { state: FormState }) {
       {state.error}
       {state.fields && state.fields.length > 0 ? (
         <ul>
-          {state.fields.map((field) => (
-            <li key={field.field}>{field.reason}</li>
-          ))}
+          {state.fields.map((issue) => {
+            const { label, text } = describeIssue(issue);
+            return (
+              <li key={`${issue.field}-${issue.reason}`}>
+                {label ? <strong>{label}: </strong> : null}
+                {text}
+              </li>
+            );
+          })}
         </ul>
       ) : null}
       {state.requestId ? (
