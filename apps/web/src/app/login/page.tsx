@@ -15,7 +15,6 @@ export default async function LoginPage() {
     <main className="login">
       <section className="login__aside" aria-label="About ECMS">
         <div className="login__aside-grid" aria-hidden="true" />
-        <BuildingScene />
         <div className="login__aside-content">
           <div className="login__logo">
             <BrandMark />
@@ -45,6 +44,9 @@ export default async function LoginPage() {
               Reports
             </li>
           </ul>
+        </div>
+        <div className="login__scene" aria-hidden="true">
+          <BuildingScene />
         </div>
       </section>
 
@@ -139,27 +141,27 @@ function Panes({
 }
 
 const FRONT = [
-  [0, 250],
-  [250, 150],
-  [0, 440],
-  [250, 440],
+  [30, 160],
+  [220, 98],
+  [30, 352],
+  [220, 352],
 ] as const satisfies readonly [Pt, Pt, Pt, Pt];
 const SIDE = [
-  [250, 150],
-  [380, 96],
-  [250, 440],
-  [380, 440],
+  [220, 98],
+  [310, 62],
+  [220, 352],
+  [310, 352],
 ] as const satisfies readonly [Pt, Pt, Pt, Pt];
 
 /**
- * A lit glass tower in perspective with a wireframe of the next one rising
- * behind it. Drawn, not photographed: decorative only, no content in it.
+ * A lit glass tower in perspective, a wireframe of the next one beside it and
+ * a low outline beyond — all standing on one ground line. Drawn, not
+ * photographed; decorative only.
  */
 function BuildingScene() {
   return (
     <svg
-      className="login__scene"
-      viewBox="0 0 640 440"
+      viewBox="0 0 700 352"
       preserveAspectRatio="xMinYMax meet"
       aria-hidden="true"
       focusable="false"
@@ -178,35 +180,31 @@ function BuildingScene() {
           <stop offset="1" stopColor="#3157d5" stopOpacity="0.18" />
         </linearGradient>
         <linearGradient id="login-lit" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#ffd9a0" stopOpacity="0.95" />
-          <stop offset="1" stopColor="#f0a24b" stopOpacity="0.75" />
-        </linearGradient>
-        <linearGradient id="login-fade" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#172338" stopOpacity="0" />
-          <stop offset="1" stopColor="#172338" stopOpacity="0.7" />
+          <stop offset="0" stopColor="#ffd9a0" stopOpacity="0.9" />
+          <stop offset="1" stopColor="#f0a24b" stopOpacity="0.7" />
         </linearGradient>
       </defs>
 
       <g className="login__scene-wire" fill="none" stroke="#8fb1ff" strokeWidth="1">
-        <path d="M420 440V120L520 70L620 120V440" />
-        <path d="M520 70V440M420 120L620 120M420 180H620M420 240H620M420 300H620M420 360H620" />
-        <path d="M420 120L620 240M620 120L420 240M420 240L620 360M620 240L420 360" />
-        <path d="M470 440V95M570 440V95" strokeDasharray="4 6" />
+        <path d="M360 352V150L440 104L520 150V352" />
+        <path d="M360 150H520M360 200H520M360 250H520M360 300H520M440 104V352M440 104V64" />
+        <path d="M360 200L520 250M520 200L360 250M360 250L520 300M520 250L360 300" />
+        <path className="is-dashed" d="M400 352V128M480 352V128" strokeDasharray="4 6" />
+        <path d="M562 352V262H624V352M562 262L593 240L624 262M562 300H624" />
       </g>
 
-      <polygon points="250,150 380,96 380,440 250,440" fill="url(#login-side)" />
-      <polygon points="0,250 250,150 250,440 0,440" fill="url(#login-front)" />
-      <Panes face={FRONT} cols={6} rows={9} seed={1} />
-      <Panes face={SIDE} cols={3} rows={9} seed={4} />
+      <polygon points="220,98 310,62 310,352 220,352" fill="url(#login-side)" />
+      <polygon points="30,160 220,98 220,352 30,352" fill="url(#login-front)" />
+      <Panes face={FRONT} cols={5} rows={10} seed={1} />
+      <Panes face={SIDE} cols={2} rows={10} seed={4} />
       <path
-        d="M0 250L250 150L380 96"
+        d="M30 160L220 98L310 62"
         fill="none"
         stroke="#c7d8ff"
         strokeOpacity="0.55"
         strokeWidth="1.5"
       />
-      <path d="M250 150V440" stroke="#c7d8ff" strokeOpacity="0.35" strokeWidth="1.5" />
-      <rect x="0" y="330" width="640" height="110" fill="url(#login-fade)" />
+      <path d="M220 98V352" stroke="#c7d8ff" strokeOpacity="0.35" strokeWidth="1.5" />
     </svg>
   );
 }

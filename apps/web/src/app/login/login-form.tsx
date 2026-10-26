@@ -76,7 +76,7 @@ export function LoginForm() {
             aria-pressed={reveal}
             aria-label={reveal ? 'Hide characters' : 'Show characters'}
           >
-            {reveal ? <EyeOffIcon /> : <EyeIcon />}
+            {reveal ? <EyeOffIcon key="hide" /> : <EyeIcon key="show" />}
           </button>
         </div>
       </div>
