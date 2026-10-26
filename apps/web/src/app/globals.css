@@ -2593,19 +2593,16 @@ select:disabled {
   background-size: 64px 64px;
   animation: login-grid-drift 90s linear infinite;
 }
-.login__motif {
+.login__scene {
   position: absolute;
   left: 0;
-  right: 0;
   bottom: 0;
-  width: 100%;
-  height: 42%;
-  overflow: visible;
-  color: rgb(147 176 255 / 28%);
+  width: min(100%, 760px);
+  height: 46%;
+  animation: login-fade 1400ms var(--login-ease) 200ms both;
 }
-.login__motif > * {
-  stroke-dasharray: 1;
-  animation: login-draw 2400ms var(--login-ease) 300ms both;
+.login__scene-wire {
+  opacity: 0.35;
 }
 .login__aside-content {
   position: relative;
@@ -2957,13 +2954,10 @@ input#password {
   .login,
   .login__aside,
   .login__aside-grid,
-  .login__motif > *,
+  .login__scene,
   .login__card,
   .login .alert {
     animation: none;
-  }
-  .login__motif > * {
-    stroke-dasharray: none;
   }
   .login__card:hover {
     transform: none;
