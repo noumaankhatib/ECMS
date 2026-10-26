@@ -76,7 +76,12 @@ function messageFor(error: ApiError): string {
     case 'INVALID_CREDENTIALS':
       return 'Username, email or password is incorrect.';
     case 'FORBIDDEN':
-      return 'You do not have permission to do that. If you think you should, ask an administrator to check your role.';
+      // A refusal that comes with its own reason ("you cannot approve what you
+      // created") is a rule, not a missing permission; blaming the role would
+      // send the person to the wrong place.
+      return error.fields.length > 0
+        ? 'You are not allowed to do that:'
+        : 'You do not have permission to do that. If you think you should, ask an administrator to check your role.';
     case 'NOT_FOUND':
       return 'This record no longer exists — it may have been archived or removed by someone else. Go back to the list and refresh it.';
     case 'VALIDATION_FAILED':

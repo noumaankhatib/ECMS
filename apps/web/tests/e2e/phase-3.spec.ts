@@ -21,6 +21,7 @@ const PASSWORD = process.env['E2E_ADMIN_PASSWORD'] ?? 'correct-horse-battery';
 
 const tag = Math.random().toString(36).slice(2, 8).toUpperCase();
 const OUTSIDER = `outsider3.${tag.toLowerCase()}@ecms.local`;
+const DIRECTOR = `director3.${tag.toLowerCase()}@ecms.local`;
 
 const banner = (page: Page) => page.locator('div.alert');
 
@@ -71,7 +72,9 @@ test.describe('Phase 3 through the browser', () => {
     projectId = page.url().split('/').pop() ?? '';
 
     await expect(page.getByRole('link', { name: 'Drawings' })).toBeVisible();
-    await expect(page.getByRole('main').getByRole('link', { name: 'Documents', exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('main').getByRole('link', { name: 'Documents', exact: true }),
+    ).toBeVisible();
 
     await createUser(page, OUTSIDER, `Outsider ${tag}`, 'SUPERVISION');
   });
@@ -101,8 +104,24 @@ test.describe('Phase 3 through the browser', () => {
     await row.getByRole('button', { name: 'Start review' }).click();
     await expect(row.getByText('Under review', { exact: true })).toBeVisible();
 
+    // Separation of duties: whoever uploaded a revision can never approve it,
+    // however senior. The refusal says so, and the revision stays under review.
     await row.getByRole('button', { name: 'Approve' }).click();
-    await expect(row.getByText('Approved', { exact: true })).toBeVisible();
+    await expect(row.locator('.action-button__error')).toContainText('created yourself');
+    await expect(row.getByText('Under review', { exact: true })).toBeVisible();
+    await expect(row.getByText('Approved', { exact: true })).toHaveCount(0);
+
+    // A different person who holds drawing:approve can.
+    await createUser(page, DIRECTOR, `Approving Director ${tag}`, 'DIRECTOR');
+    // Signing in as someone else needs the first session gone, or /login
+    // redirects straight past the form.
+    await page.context().clearCookies();
+    await signIn(page, DIRECTOR);
+    await page.goto(`/projects/${projectId}/drawings`);
+    await page.getByRole('link', { name: 'A-101' }).click();
+    const directorRow = page.getByRole('row', { name: /P1/ });
+    await directorRow.getByRole('button', { name: 'Approve' }).click();
+    await expect(directorRow.getByText('Approved', { exact: true })).toBeVisible();
   });
 
   test('a revision with no file cannot be approved', async ({ page }) => {

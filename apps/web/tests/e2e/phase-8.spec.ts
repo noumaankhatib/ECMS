@@ -20,6 +20,7 @@ const PASSWORD = process.env['E2E_ADMIN_PASSWORD'] ?? 'correct-horse-battery';
 
 const tag = Math.random().toString(36).slice(2, 8).toUpperCase();
 const OUTSIDER = `outsider8.${tag.toLowerCase()}@ecms.local`;
+const DIRECTOR = `director8.${tag.toLowerCase()}@ecms.local`;
 
 async function createUser(page: Page, email: string, name: string, role: string): Promise<void> {
   await page.goto('/users/new');
@@ -95,6 +96,19 @@ test.describe('Phase 8 through the browser', () => {
     await page.getByRole('button', { name: 'Start review' }).click();
     await expect(page.getByRole('cell', { name: 'Under review' })).toBeVisible();
 
+    // Separation of duties: the person who recorded the modification cannot
+    // approve it, and the refusal explains why.
+    await page.getByRole('button', { name: 'Approve' }).click();
+    await expect(page.locator('.action-button__error')).toContainText('created yourself');
+    await expect(page.getByRole('cell', { name: 'Under review' })).toBeVisible();
+
+    // A different person who holds the approval permission can.
+    await createUser(page, DIRECTOR, `Approving Director ${tag}`, 'DIRECTOR');
+    // Signing in as someone else needs the first session gone, or /login
+    // redirects straight past the form.
+    await page.context().clearCookies();
+    await signIn(page, DIRECTOR);
+    await page.goto(`/projects/${projectId}/modifications`);
     await page.getByRole('button', { name: 'Approve' }).click();
     await expect(page.getByRole('cell', { name: 'Approved' })).toBeVisible();
   });
