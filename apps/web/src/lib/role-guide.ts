@@ -13,6 +13,8 @@ import type { PermissionScope, RoleDetail } from '@ecms/contracts';
 interface Entry {
   readonly area: string;
   readonly action: string;
+  /** The full sentence, shown as a tooltip when the label had to be short. */
+  readonly detail?: string;
 }
 
 const AREAS = [
@@ -64,14 +66,22 @@ const SPECIAL: Readonly<Record<string, Entry>> = {
   'work_template:admin': { area: 'Settings', action: 'Manage planning templates' },
   'wilayat:admin': { area: 'Settings', action: 'Manage the wilayat list' },
   'required_document:admin': { area: 'Settings', action: 'Manage required documents' },
-  'admin:data': { area: 'Settings', action: 'Archive or delete data (Data management)' },
+  'admin:data': {
+    area: 'Settings',
+    action: 'Archive or delete data',
+    detail: 'Use Data management to archive or permanently delete records.',
+  },
   'directory:override_duplicate': {
     area: 'Safeguards',
-    action: 'Save over a duplicate identity, with a written reason',
+    action: 'Override duplicate identity',
+    detail:
+      'Save a client or property whose official identity already exists, with a written reason.',
   },
   'workflow:override_gate': {
     area: 'Safeguards',
-    action: 'Complete a project before its conditions are met, with a written reason',
+    action: 'Override completion checks',
+    detail:
+      'Complete a project or workstream before its completion conditions are met, with a written reason.',
   },
 };
 
@@ -159,3 +169,12 @@ export function areasOf(roles: readonly Pick<RoleDetail, 'permissions'>[]): stri
 }
 
 export type { PermissionScope };
+
+/** Abilities that change records for good, approve work or bypass a check. */
+const SENSITIVE =
+  /^(archive|close|approve|convert|override|assign and remove|create and manage|manage the project team|archive or delete)/i;
+
+export function actionMeta(label: string): { sensitive: boolean; detail?: string } {
+  const detail = Object.values(SPECIAL).find((e) => e.action === label)?.detail;
+  return { sensitive: SENSITIVE.test(label), ...(detail ? { detail } : {}) };
+}

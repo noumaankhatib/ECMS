@@ -3,7 +3,7 @@
 import type { RoleDetail } from '@ecms/contracts';
 import { useState } from 'react';
 
-import { areasOf, compareCell, summariseRoles, type AreaLine } from '@/lib/role-guide';
+import { actionMeta, areasOf, compareCell, summariseRoles, type AreaLine } from '@/lib/role-guide';
 
 import { Select } from './form';
 
@@ -19,7 +19,20 @@ function AreaList({ lines }: { lines: readonly AreaLine[] }) {
       {lines.map((line) => (
         <div key={line.area} className="role-guide__row">
           <dt>{line.area}</dt>
-          <dd>{line.actions.join(' · ')}</dd>
+          <dd>
+            {line.actions.map((action) => {
+              const { sensitive, detail } = actionMeta(action);
+              return (
+                <span
+                  key={action}
+                  className={`role-chip${sensitive ? ' role-chip--sensitive' : ''}`}
+                  {...(detail ? { title: detail } : {})}
+                >
+                  {action}
+                </span>
+              );
+            })}
+          </dd>
         </div>
       ))}
     </dl>
@@ -40,6 +53,10 @@ export function RolePermissions({
   }
   return (
     <div className="role-guide__groups">
+      <p className="role-guide__legend">
+        <span className="role-chip role-chip--sensitive">Highlighted</span> abilities change records
+        for good, approve work or bypass a check.
+      </p>
       {summary.anywhere.length > 0 ? (
         <section>
           <h3 className="role-guide__heading">Anywhere in the portfolio</h3>
