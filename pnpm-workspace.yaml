@@ -10,6 +10,24 @@ allowBuilds:
   unrs-resolver: true
 
 # Force patched versions for transitive dependencies with known CVEs.
-# multer <2.3.0: DoS via crafted uploads (High) — CVE in @nestjs/platform-express@11.2.5
+# multer <2.5.0: DoS via a pending asynchronous fileFilter (High), in @nestjs/platform-express@11
+# body-parser <2.4.0: DoS via trailing bytes after a compressed body (High), in express@5
+# proxy-addr <2.0.8: IP spoofing via IPv4-mapped IPv6 trust subnet (Critical), in express@5
+# sharp <0.35.5: librsvg vulnerability (High), optional dependency of next
+# source-map-js <1.2.2: event-loop DoS via indexed source maps (High), in postcss
+# deepmerge-ts <8.0.0: stack exhaustion on recursive objects (High), in @prisma/config
+# qs <6.16.0: DoS and array-limit bypass (Moderate), in express@5
+# Development tooling only (never shipped): fast-uri (nest cli), brace-expansion (eslint),
+# fast-copy (pino-pretty); vite (vitest's peer) is a devDependency of apps/api instead
 overrides:
-  '@nestjs/platform-express>multer': '^2.4.0'
+  '@nestjs/platform-express>multer': '^2.5.0'
+  'body-parser': '^2.4.0'
+  'proxy-addr': '^2.0.8'
+  'sharp': '^0.35.5'
+  'source-map-js': '^1.2.2'
+  'deepmerge-ts': '^8.0.2'
+  'qs': '^6.16.0'
+  'fast-uri': '^3.1.7'
+  'fast-copy': '^4.1.1'
+  'brace-expansion@^1.0.0': '^1.1.20'
+  'brace-expansion@^5.0.0': '^5.0.11'
