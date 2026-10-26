@@ -56,9 +56,11 @@ export async function setPassword(_state: FormState, form: FormData): Promise<Fo
   redirect(`/users/${id}`);
 }
 
-export async function setStatus(id: string, status: 'ACTIVE' | 'DISABLED'): Promise<void> {
-  await api.patch(`/users/${id}`, { status });
-  await refresh(`/users/${id}`);
+export async function setStatus(id: string, status: 'ACTIVE' | 'DISABLED'): Promise<FormState> {
+  return runAction(async () => {
+    await api.patch(`/users/${id}`, { status });
+    await refresh(`/users/${id}`);
+  });
 }
 
 export async function assignRole(_state: FormState, form: FormData): Promise<FormState> {
@@ -74,7 +76,9 @@ export async function assignRole(_state: FormState, form: FormData): Promise<For
   redirect(`/users/${id}`);
 }
 
-export async function removeRole(id: string, roleCode: string): Promise<void> {
-  await api.delete(`/users/${id}/roles/${roleCode}`);
-  await refresh(`/users/${id}`);
+export async function removeRole(id: string, roleCode: string): Promise<FormState> {
+  return runAction(async () => {
+    await api.delete(`/users/${id}/roles/${roleCode}`);
+    await refresh(`/users/${id}`);
+  });
 }

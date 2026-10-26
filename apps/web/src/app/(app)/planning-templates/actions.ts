@@ -34,7 +34,9 @@ export async function updateTemplateItem(_state: FormState, form: FormData): Pro
 }
 
 /** Retires an entry. Projects that already used it are unaffected. */
-export async function archiveTemplateItem(id: string): Promise<void> {
-  await api.delete(`/planning-templates/${id}`);
-  await refresh('/planning-templates');
+export async function archiveTemplateItem(id: string): Promise<FormState> {
+  return runAction(async () => {
+    await api.delete(`/planning-templates/${id}`);
+    await refresh('/planning-templates');
+  });
 }

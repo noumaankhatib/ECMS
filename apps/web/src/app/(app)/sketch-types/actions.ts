@@ -38,7 +38,9 @@ export async function updateSketchType(_state: FormState, form: FormData): Promi
 
 /** Retires an entry. The API never hard-deletes — a proposal already using
  *  it must keep displaying it (docs/phase-5-plan.md §9). */
-export async function archiveSketchType(id: string): Promise<void> {
-  await api.delete(`/proposal-sketch-types/${id}`);
-  await refresh('/sketch-types');
+export async function archiveSketchType(id: string): Promise<FormState> {
+  return runAction(async () => {
+    await api.delete(`/proposal-sketch-types/${id}`);
+    await refresh('/sketch-types');
+  });
 }

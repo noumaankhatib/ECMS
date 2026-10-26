@@ -4863,6 +4863,46 @@ input[type='radio'] {
   width: 4.8ch;
 }
 
+/* Form errors ---------------------------------------------------------------- */
+
+/* The message under the box it is about; the banner above lists them all. */
+.field-error {
+  color: var(--danger-text);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+.field input[aria-invalid='true'],
+.field select[aria-invalid='true'],
+.field textarea[aria-invalid='true'],
+.date-field--invalid {
+  border-color: var(--danger);
+}
+.field input[aria-invalid='true']:focus-visible,
+.field select[aria-invalid='true']:focus-visible,
+.field textarea[aria-invalid='true']:focus-visible {
+  outline-color: var(--danger);
+}
+.alert:focus {
+  outline: 2px solid var(--danger);
+  outline-offset: 2px;
+}
+/* A field's name in the banner is a control: it moves focus to that box. */
+.alert__field {
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.alert a {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
 /* Utilities — replace one-off inline styles. Kept last so they win. -------- */
 .u-w-auto {
   width: auto;

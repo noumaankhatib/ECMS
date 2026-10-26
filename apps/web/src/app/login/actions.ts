@@ -27,7 +27,16 @@ export async function signIn(_state: FormState, form: FormData): Promise<FormSta
   });
 
   if (!parsed.success) {
-    return { error: 'Enter your username or email, and your password.' };
+    const hasIdentifier = String(form.get('identifier') ?? '').trim() !== '';
+    const hasPassword = String(form.get('password') ?? '') !== '';
+    return {
+      error:
+        !hasIdentifier && hasPassword
+          ? 'Enter your username or email.'
+          : hasIdentifier && !hasPassword
+            ? 'Enter your password.'
+            : 'Enter your username or email, and your password.',
+    };
   }
 
   let setCookie: string | null;
@@ -35,10 +44,24 @@ export async function signIn(_state: FormState, form: FormData): Promise<FormSta
     ({ setCookie } = await login(parsed.data.identifier, parsed.data.password));
   } catch (error) {
     if (error instanceof ApiError) {
-      if (error.code === 'RATE_LIMITED') {
-        return { error: 'Too many attempts. Wait a few minutes and try again.' };
+      // Only a genuine refusal of the credentials is allowed to say they are
+      // wrong. A stopped API, a proxy error or a rate limit says what it is,
+      // otherwise a person retypes a correct password and blames themselves.
+      switch (error.code) {
+        case 'RATE_LIMITED':
+          return { error: 'Too many attempts. Wait a few minutes and try again.' };
+        case 'UNREACHABLE':
+          return { error: 'Could not reach the server. Check your connection and try again.' };
+        case 'UNAVAILABLE':
+          return { error: 'The server is busy or restarting. Wait a moment and try again.' };
+        case 'INTERNAL':
+          return {
+            error: 'Something went wrong on our side. Try again shortly.',
+            ...(error.requestId ? { requestId: error.requestId } : {}),
+          };
+        default:
+          return { error: 'Username, email or password is incorrect.' };
       }
-      return { error: 'Username, email or password is incorrect.' };
     }
     return { error: 'Could not reach the server. Try again shortly.' };
   }

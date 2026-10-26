@@ -2,8 +2,12 @@
 
 import Link from 'next/link';
 import {
+  createContext,
+  startTransition,
   useActionState,
+  useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -12,7 +16,7 @@ import {
 } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { describeIssue } from '@/lib/field-messages';
+import { describeIssue, plainReason } from '@/lib/field-messages';
 import type { FormState } from '@/lib/form-state';
 
 import { CalendarIcon } from './icons';
@@ -25,6 +29,46 @@ import { CalendarIcon } from './icons';
  * the pending state and the error display on top of a form that was already
  * functional.
  */
+
+/**
+ * What the API said about each field of the form being submitted.
+ *
+ * The banner at the top lists every problem; this lets the field itself turn
+ * red and say what is wrong right under the box, so on a long form the person
+ * does not have to scroll back and forth to find which box a message means.
+ */
+const FormIssuesContext = createContext<ReadonlyMap<string, string>>(new Map());
+
+export function FormIssues({ state, children }: { state: FormState; children: ReactNode }) {
+  const issues = useMemo(() => {
+    const byField = new Map<string, string>();
+    for (const issue of state.fields ?? []) {
+      const text = plainReason(issue.reason);
+      const earlier = byField.get(issue.field);
+      byField.set(issue.field, earlier ? `${earlier} ${text}` : text);
+    }
+    return byField;
+  }, [state]);
+  return <FormIssuesContext value={issues}>{children}</FormIssuesContext>;
+}
+
+function useFieldIssue(name: string): string | undefined {
+  return useContext(FormIssuesContext).get(name);
+}
+
+/** `aria-describedby` for a control: its hint and, when present, its error. */
+function describedBy(fieldId: string, hint: string | undefined, issue: string | undefined) {
+  const ids = [hint ? `${fieldId}-hint` : '', issue ? `${fieldId}-error` : ''].filter(Boolean);
+  return ids.length > 0 ? { 'aria-describedby': ids.join(' ') } : {};
+}
+
+function FieldError({ id, issue }: { id: string; issue: string | undefined }) {
+  return issue ? (
+    <span className="field-error" id={`${id}-error`}>
+      {issue}
+    </span>
+  ) : null;
+}
 
 export function Field({
   label,
@@ -58,6 +102,7 @@ export function Field({
   disabled?: boolean;
 }) {
   const fieldId = id ?? name;
+  const issue = useFieldIssue(name);
   return (
     <div className={`field${wide ? ' field--wide' : ''}${narrow ? ' field--narrow' : ''}`}>
       <label htmlFor={fieldId}>
@@ -71,9 +116,11 @@ export function Field({
         defaultValue={defaultValue ?? ''}
         required={required ?? false}
         disabled={disabled ?? false}
-        {...(hint ? { 'aria-describedby': `${fieldId}-hint` } : {})}
+        {...describedBy(fieldId, hint, issue)}
+        {...(issue ? { 'aria-invalid': true } : {})}
         {...(autoComplete ? { autoComplete } : {})}
       />
+      <FieldError id={fieldId} issue={issue} />
       {hint ? (
         <span className="hint" id={`${fieldId}-hint`}>
           {hint}
@@ -122,6 +169,7 @@ export function DateField({
   onChange?: (iso: string) => void;
 }) {
   const fieldId = id ?? name;
+  const issue = useFieldIssue(name);
   const initial = splitIsoDate(defaultValue);
   const [day, setDay] = useState(initial.day);
   const [month, setMonth] = useState(initial.month);
@@ -177,7 +225,10 @@ export function DateField({
         {label}
         {required ? <span aria-hidden="true"> *</span> : null}
       </label>
-      <div className="date-field" {...(hint ? { 'aria-describedby': `${fieldId}-hint` } : {})}>
+      <div
+        className={`date-field${issue ? ' date-field--invalid' : ''}`}
+        {...describedBy(fieldId, hint, issue)}
+      >
         <input
           id={`${fieldId}-day`}
           className="date-field__part"
@@ -259,6 +310,7 @@ export function DateField({
         />
       </div>
       <input type="hidden" name={name} value={iso} />
+      <FieldError id={fieldId} issue={issue} />
       {hint ? (
         <span className="hint" id={`${fieldId}-hint`}>
           {hint}
@@ -440,13 +492,22 @@ export function FileField({
   required?: boolean;
   hint?: string;
 }) {
+  const issue = useFieldIssue(name);
   return (
     <div className="field field--wide">
       <label htmlFor={name}>
         {label}
         {required ? <span aria-hidden="true"> *</span> : null}
       </label>
-      <input id={name} name={name} type="file" required={required ?? false} />
+      <input
+        id={name}
+        name={name}
+        type="file"
+        required={required ?? false}
+        {...(issue ? { 'aria-invalid': true } : {})}
+        {...describedBy(name, undefined, issue)}
+      />
+      <FieldError id={name} issue={issue} />
       {hint ? <span className="hint">{hint}</span> : null}
     </div>
   );
@@ -465,6 +526,7 @@ export function TextArea({
   required?: boolean;
   hint?: string;
 }) {
+  const issue = useFieldIssue(name);
   return (
     <div className="field field--wide">
       <label htmlFor={name}>
@@ -476,7 +538,10 @@ export function TextArea({
         name={name}
         defaultValue={defaultValue ?? ''}
         required={required ?? false}
+        {...(issue ? { 'aria-invalid': true } : {})}
+        {...describedBy(name, undefined, issue)}
       />
+      <FieldError id={name} issue={issue} />
       {hint ? <span className="hint">{hint}</span> : null}
     </div>
   );
@@ -507,6 +572,7 @@ export function Select({
   onChange?: (value: string) => void;
 }) {
   const fieldId = id ?? name;
+  const issue = useFieldIssue(name);
   return (
     <div className={`field${wide ? ' field--wide' : ''}`}>
       <label htmlFor={fieldId}>
@@ -518,6 +584,8 @@ export function Select({
         name={name}
         defaultValue={defaultValue ?? ''}
         required={required ?? false}
+        {...(issue ? { 'aria-invalid': true } : {})}
+        {...describedBy(fieldId, undefined, issue)}
         {...(onChange ? { onChange: (e) => onChange(e.target.value) } : {})}
       >
         {required ? null : <option value="">—</option>}
@@ -527,6 +595,7 @@ export function Select({
           </option>
         ))}
       </select>
+      <FieldError id={fieldId} issue={issue} />
       {hint ? <span className="hint">{hint}</span> : null}
     </div>
   );
@@ -559,6 +628,7 @@ export function CategoryField({
   hint?: string;
 }) {
   const knownValues = options.map((o) => o.value);
+  const issue = useFieldIssue(name);
   const startsAsOther = Boolean(defaultValue) && !knownValues.includes(defaultValue as string);
   const [choice, setChoice] = useState(startsAsOther ? OTHER : (defaultValue ?? ''));
 
@@ -574,6 +644,8 @@ export function CategoryField({
         onChange={(event) => setChoice(event.target.value)}
         required={required ?? false}
         aria-label={label}
+        {...(issue ? { 'aria-invalid': true } : {})}
+        {...describedBy(name, undefined, issue)}
       >
         {/* Always rendered, even when required — a controlled <select> whose
             current value matches no <option> makes the browser silently
@@ -601,6 +673,7 @@ export function CategoryField({
       ) : (
         <input type="hidden" name={name} value={choice} />
       )}
+      <FieldError id={name} issue={issue} />
       {hint ? <span className="hint">{hint}</span> : null}
     </div>
   );
@@ -613,10 +686,32 @@ export function CategoryField({
  * a screen reader would otherwise submit the form and hear nothing at all.
  */
 export function ErrorBanner({ state }: { state: FormState }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  // On a long form the banner is above the fold when Save is pressed. Moving
+  // focus to it scrolls it into view and makes a screen reader read it out.
+  useEffect(() => {
+    if (state.error) ref.current?.focus();
+  }, [state]);
+
   if (!state.error) return null;
 
+  /** Takes the person to the box a message is about. */
+  function focusField(field: string): void {
+    const form = ref.current?.closest('form');
+    const name = CSS.escape(field);
+    form
+      ?.querySelector<HTMLElement>(
+        `[name="${name}"]:not([type="hidden"]), #${name}, #${name}-day, #${name}-search`,
+      )
+      ?.focus();
+  }
+
+  const mayReload =
+    state.code === 'STALE_RECORD' || state.code === 'CONFLICT' || state.code === 'NOT_FOUND';
+
   return (
-    <div className="alert" role="alert">
+    <div className="alert" role="alert" tabIndex={-1} ref={ref}>
       {state.error}
       {state.fields && state.fields.length > 0 ? (
         <ul>
@@ -624,28 +719,44 @@ export function ErrorBanner({ state }: { state: FormState }) {
             const { label, text } = describeIssue(issue);
             return (
               <li key={`${issue.field}-${issue.reason}`}>
-                {label ? <strong>{label}: </strong> : null}
+                {label ? (
+                  <button type="button" className="alert__field" onClick={() => focusField(issue.field)}>
+                    {label}
+                  </button>
+                ) : null}
+                {label ? ': ' : null}
                 {text}
               </li>
             );
           })}
         </ul>
       ) : null}
-      {state.requestId ? (
-        <div className="hint mono u-mt-2" >
-          Reference {state.requestId}
+      {state.code === 'UNAUTHENTICATED' ? (
+        <div className="u-mt-2">
+          <a href="/login">Sign in again</a>
         </div>
+      ) : null}
+      {mayReload ? (
+        <div className="u-mt-2">
+          <button type="button" className="alert__field" onClick={() => window.location.reload()}>
+            Reload this page
+          </button>
+        </div>
+      ) : null}
+      {state.requestId ? (
+        <div className="hint mono u-mt-2">Reference {state.requestId}</div>
       ) : null}
     </div>
   );
 }
 
 /** Disabled while submitting, so nobody double-creates a record by clicking twice. */
-export function SubmitButton({ children }: { children: string }) {
-  const { pending } = useFormStatus();
+export function SubmitButton({ children, pending }: { children: string; pending?: boolean }) {
+  const status = useFormStatus();
+  const busy = pending ?? status.pending;
   return (
-    <button type="submit" className="button" disabled={pending}>
-      {pending ? 'Working…' : children}
+    <button type="submit" className="button" disabled={busy} aria-busy={busy}>
+      {busy ? 'Working…' : children}
     </button>
   );
 }
@@ -681,24 +792,42 @@ export function ActionForm({
   layout?: 'inline' | 'compact';
   children: ReactNode;
 }) {
-  const [state, formAction] = useActionState<FormState, FormData>(action, {});
+  const [state, formAction, pending] = useActionState<FormState, FormData>(action, NO_STATE);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // React clears a form after its action finishes, error or not — so a
+  // refusal used to wipe everything the person had typed. The form is
+  // submitted by hand instead (as `DuplicateForm` already does), which leaves
+  // the fields alone, and is cleared here only when the save succeeded.
+  useEffect(() => {
+    if (state === NO_STATE || state.error || state.duplicates) return;
+    formRef.current?.reset();
+  }, [state]);
 
   return (
     <form
+      ref={formRef}
       action={formAction}
+      onSubmit={(event) => {
+        event.preventDefault();
+        const data = new FormData(event.currentTarget, (event.nativeEvent as SubmitEvent).submitter);
+        startTransition(() => formAction(data));
+      }}
       className={
         layout === 'inline' ? 'form--inline' : layout === 'compact' ? 'form--inline form--compact' : 'stack'
       }
     >
       <ErrorBanner state={state} />
-      {children}
+      <FormIssues state={state}>{children}</FormIssues>
       <div className="form-actions">
-        <SubmitButton>{submitLabel}</SubmitButton>
+        <SubmitButton pending={pending}>{submitLabel}</SubmitButton>
         {cancelHref ? <CancelLink href={cancelHref} /> : null}
       </div>
     </form>
   );
 }
+
+const NO_STATE: FormState = {};
 
 /**
  * A single button that performs one action — archive, activate, close.
@@ -770,11 +899,19 @@ export function ActionButton({
           <strong>{state.error}</strong>
           {state.fields && state.fields.length > 0 && state.fields[0]?.reason !== state.error ? (
             <ul>
-              {state.fields.map((field) => (
-                <li key={field.field}>{field.reason}</li>
-              ))}
+              {state.fields.map((issue) => {
+                const { label, text } = describeIssue(issue);
+                return (
+                  <li key={`${issue.field}-${issue.reason}`}>
+                    {label ? <strong>{label}: </strong> : null}
+                    {text}
+                  </li>
+                );
+              })}
             </ul>
           ) : null}
+          {state.code === 'UNAUTHENTICATED' ? <a href="/login">Sign in again</a> : null}
+          {state.requestId ? <div className="hint mono">Reference {state.requestId}</div> : null}
         </div>
       ) : null}
     </div>

@@ -3,7 +3,7 @@
 import type { DuplicateMatch } from '@ecms/contracts';
 import { redirect } from 'next/navigation';
 
-import { nullableText, refresh, text } from '@/lib/actions';
+import { nullableText, refresh, runAction, text } from '@/lib/actions';
 import { api } from '@/lib/api';
 import { changed, checkThenSave } from '@/lib/duplicate-check';
 import type { FormState } from '@/lib/form-state';
@@ -59,11 +59,12 @@ export async function createProperty(_state: FormState, form: FormData): Promise
   if (!result.ok) return result.state;
 
   await refresh('/properties');
-  await returnToProposal(form, {
+  const backToProposal = await returnToProposal(form, {
     clientId,
     propertyId: result.value.id,
     property: result.value,
   });
+  if (backToProposal) return backToProposal;
   redirect(`/properties/${result.value.id}`);
 }
 
@@ -105,8 +106,10 @@ export async function updateProperty(_state: FormState, form: FormData): Promise
   redirect(`/properties/${id}`);
 }
 
-export async function archiveProperty(id: string): Promise<void> {
-  await api.delete(`/properties/${id}`);
-  await refresh('/properties');
-  redirect('/properties');
+export async function archiveProperty(id: string): Promise<FormState> {
+  return runAction(async () => {
+    await api.delete(`/properties/${id}`);
+    await refresh('/properties');
+    redirect('/properties');
+  });
 }

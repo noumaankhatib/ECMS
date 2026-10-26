@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation';
 
-import { refresh } from './actions';
+import { attempt, refresh } from './actions';
 import { api } from './api';
+import type { FormState } from './form-state';
 import type { Property, Proposal } from './types';
 
 /**
@@ -15,10 +16,32 @@ import type { Property, Proposal } from './types';
 export async function returnToProposal(
   form: FormData,
   attach: { clientId: string; propertyId?: string; property?: Property },
-): Promise<void> {
+): Promise<FormState | undefined> {
   const proposalId = String(form.get('forProposal') ?? '');
-  if (!proposalId) return;
+  if (!proposalId) return undefined;
 
+  // The client or property was ALREADY saved when this runs. A failure here
+  // must say so — a generic error would invite saving the form a second time.
+  const linked = await attempt(() => link(proposalId, attach));
+  if (!linked.ok) {
+    return {
+      ...linked.state,
+      error:
+        `Saved, but it could not be attached to the proposal. ${linked.state.error ?? ''} Open the proposal and attach it there — do not save this form again.`.replace(
+          /\s+/g,
+          ' ',
+        ),
+    };
+  }
+
+  await refresh(`/proposals/${proposalId}`);
+  redirect(`/proposals/${proposalId}`);
+}
+
+async function link(
+  proposalId: string,
+  attach: { clientId: string; propertyId?: string; property?: Property },
+): Promise<void> {
   const proposal = await api.get<Proposal>(`/proposals/${proposalId}`);
   const p = attach.property;
   await api.patch(`/proposals/${proposalId}`, {
@@ -37,6 +60,4 @@ export async function returnToProposal(
         }
       : { clientId: attach.clientId }),
   });
-  await refresh(`/proposals/${proposalId}`);
-  redirect(`/proposals/${proposalId}`);
 }

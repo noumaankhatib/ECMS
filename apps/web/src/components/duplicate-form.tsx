@@ -15,7 +15,7 @@ import {
 import type { FormState } from '@/lib/form-state';
 
 import styles from './duplicate-form.module.css';
-import { CancelLink, ErrorBanner } from './form';
+import { CancelLink, ErrorBanner, FormIssues } from './form';
 
 /** How each matched field is described to the person. */
 const MATCHED_ON: Record<string, string> = {
@@ -98,7 +98,7 @@ export function DuplicateAwareForm({
       className="stack"
     >
       <ErrorBanner state={state} />
-      {children}
+      <FormIssues state={state}>{children}</FormIssues>
       {matches.length > 0 ? (
         <DuplicatePanel
           matches={matches}

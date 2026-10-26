@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import { lookupFailure } from '@/lib/lookup-error';
+
 export interface ComboboxOption {
   id: string;
   label: string;
@@ -53,6 +55,7 @@ export function EntityCombobox({
   const [options, setOptions] = useState<ComboboxOption[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -69,14 +72,25 @@ export function EntityCombobox({
     const trimmed = text.trim();
     if (trimmed.length < 2 && !(browseOnFocus && open && trimmed.length === 0)) {
       setOptions([]);
+      setFailure(null);
       return;
     }
     const handle = setTimeout(() => {
       setLoading(true);
       fetch(`${searchUrl}${searchUrl.includes('?') ? '&' : '?'}q=${encodeURIComponent(trimmed)}`)
-        .then((res) => (res.ok ? (res.json() as Promise<ComboboxOption[]>) : []))
+        .then((res) => {
+          if (!res.ok) {
+            setFailure(lookupFailure(res.status));
+            return [];
+          }
+          setFailure(null);
+          return res.json() as Promise<ComboboxOption[]>;
+        })
         .then(setOptions)
-        .catch(() => setOptions([]))
+        .catch(() => {
+          setFailure(lookupFailure(null));
+          setOptions([]);
+        })
         .finally(() => setLoading(false));
     }, 200);
     return () => clearTimeout(handle);
@@ -152,7 +166,12 @@ export function EntityCombobox({
           {loading ? (
             <li style={{ padding: 8, color: 'var(--text-muted)', fontSize: 14 }}>Searching...</li>
           ) : options.length === 0 ? (
-            <li style={{ padding: 8, color: 'var(--text-muted)', fontSize: 14 }}>No matches.</li>
+            <li
+              role={failure ? 'alert' : undefined}
+              style={{ padding: 8, color: failure ? 'var(--danger-text)' : 'var(--text-muted)', fontSize: 14 }}
+            >
+              {failure ?? 'No matches.'}
+            </li>
           ) : (
             options.map((option) => (
               <li key={option.id} role="option" aria-selected={option.id === selectedId}>

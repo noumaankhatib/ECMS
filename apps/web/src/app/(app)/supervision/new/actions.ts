@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 
-import { attempt, nullableText, refresh, text } from '@/lib/actions';
+import { attempt, nullableText, refresh, runAction, text } from '@/lib/actions';
 import { api } from '@/lib/api';
 import type { FormState } from '@/lib/form-state';
 import type { Project } from '@/lib/types';
@@ -12,10 +12,12 @@ import type { Project } from '@/lib/types';
  * upgrades that project to BOTH in place, same code, same row. Bound with
  * the project's id and version from the search results row that called it.
  */
-export async function upgradeExistingProject(projectId: string, version: number): Promise<void> {
-  await api.post<Project>(`/projects/${projectId}/upgrade-to-supervision`, { version });
-  await refresh('/supervision');
-  redirect(`/projects/${projectId}/supervision`);
+export async function upgradeExistingProject(projectId: string, version: number): Promise<FormState> {
+  return runAction(async () => {
+    await api.post<Project>(`/projects/${projectId}/upgrade-to-supervision`, { version });
+    await refresh('/supervision');
+    redirect(`/projects/${projectId}/supervision`);
+  });
 }
 
 /**

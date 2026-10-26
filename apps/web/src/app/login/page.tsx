@@ -1,11 +1,11 @@
-import type { CSSProperties } from 'react';
 import { redirect } from 'next/navigation';
+import type { CSSProperties } from 'react';
 
 import { ClientsIcon, ProjectsIcon, ProposalsIcon, ReportsIcon } from '@/components/icons';
 import { currentSession } from '@/lib/session';
 
-import { LoginForm } from './login-form';
 import background from './login-bg.webp';
+import { LoginForm } from './login-form';
 
 export const metadata = { title: 'Sign in — ECMS' };
 

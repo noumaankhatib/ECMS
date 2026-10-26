@@ -47,7 +47,8 @@ export async function createClient(_state: FormState, form: FormData): Promise<F
   if (!result.ok) return result.state;
 
   await refresh('/clients');
-  await returnToProposal(form, { clientId: result.value.id });
+  const backToProposal = await returnToProposal(form, { clientId: result.value.id });
+  if (backToProposal) return backToProposal;
   redirect(`/clients/${result.value.id}`);
 }
 
@@ -99,10 +100,12 @@ export async function updateClient(_state: FormState, form: FormData): Promise<F
  * which. That refusal is allowed to reach the person: "it did not work" with no
  * reason is the most frustrating thing an interface can say.
  */
-export async function archiveClient(id: string): Promise<void> {
-  await api.delete(`/clients/${id}`);
-  await refresh('/clients');
-  redirect('/clients');
+export async function archiveClient(id: string): Promise<FormState> {
+  return runAction(async () => {
+    await api.delete(`/clients/${id}`);
+    await refresh('/clients');
+    redirect('/clients');
+  });
 }
 
 export async function addContact(_state: FormState, form: FormData): Promise<FormState> {
@@ -151,7 +154,9 @@ export async function updateContact(_state: FormState, form: FormData): Promise<
   redirect(`/clients/${clientId}`);
 }
 
-export async function archiveContact(id: string, clientId: string): Promise<void> {
-  await api.delete(`/contacts/${id}`);
-  await refresh(`/clients/${clientId}`);
+export async function archiveContact(id: string, clientId: string): Promise<FormState> {
+  return runAction(async () => {
+    await api.delete(`/contacts/${id}`);
+    await refresh(`/clients/${clientId}`);
+  });
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { ErrorBanner } from '@/components/form';
@@ -23,6 +23,14 @@ export function LoginForm() {
   const [identifier, setIdentifier] = useState('');
   const [reveal, setReveal] = useState(false);
   const invalid = Boolean(state.error);
+
+  // After a refusal, put the cursor where the next attempt starts: the
+  // username if it is empty, otherwise the password (which is always cleared).
+  useEffect(() => {
+    if (!state.error) return;
+    document.getElementById(identifier.trim() === '' ? 'identifier' : 'password')?.focus();
+    // Only when a new result arrives, not on every keystroke.
+  }, [state]);
 
   return (
     <form action={formAction} className="login-form">

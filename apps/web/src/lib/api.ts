@@ -71,10 +71,19 @@ async function parseResponse<T>(response: Response): Promise<T> {
   const text = await response.text();
 
   if (!response.ok) {
-    const payload = (text === '' ? {} : JSON.parse(text)) as ErrorBody;
+    // A proxy in front of the API (a 413 for an oversized upload, a 502 while
+    // the API restarts) answers with an HTML page, not our error shape.
+    // Reading that as JSON used to throw a SyntaxError, which surfaced as a
+    // generic failure with no clue what actually happened.
+    let payload: ErrorBody = {};
+    try {
+      payload = (text === '' ? {} : JSON.parse(text)) as ErrorBody;
+    } catch {
+      payload = {};
+    }
     throw new ApiError(
       response.status,
-      payload.error?.code ?? 'INTERNAL',
+      payload.error?.code ?? codeForStatus(response.status),
       payload.error?.message ?? 'Something went wrong.',
       payload.error?.fields ?? [],
       payload.requestId,
@@ -87,7 +96,50 @@ async function parseResponse<T>(response: Response): Promise<T> {
   // successful response is genuinely absent rather than always some object.
   if (text === '') return null as T;
 
-  return JSON.parse(text) as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    // A success status with a body that is not JSON is a proxy answering in
+    // the API's place, not a result.
+    throw new ApiError(502, 'UNAVAILABLE', 'The server sent a reply that could not be read.');
+  }
+}
+
+/** The code for a failure whose body did not say (see `parseResponse`). */
+function codeForStatus(status: number): string {
+  switch (status) {
+    case 401:
+      return 'UNAUTHENTICATED';
+    case 403:
+      return 'FORBIDDEN';
+    case 404:
+      return 'NOT_FOUND';
+    case 413:
+      return 'PAYLOAD_TOO_LARGE';
+    case 429:
+      return 'RATE_LIMITED';
+    case 502:
+    case 503:
+    case 504:
+      return 'UNAVAILABLE';
+    default:
+      return 'INTERNAL';
+  }
+}
+
+/**
+ * `fetch` that reports "the server could not be reached" as an `ApiError`.
+ *
+ * A dropped connection or a stopped API rejects with a bare TypeError. Left
+ * alone it reached the forms as an unknown failure, indistinguishable from a
+ * bug, and the sign-in form even read it as a wrong password.
+ */
+async function send(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch {
+    throw new ApiError(0, 'UNREACHABLE', 'Could not reach the server.');
+  }
 }
 
 async function request<T>(
@@ -98,7 +150,7 @@ async function request<T>(
   const store = await cookies();
   const session = store.get(SESSION_COOKIE)?.value;
 
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await send(`${API_URL}${path}`, {
     method,
     headers: {
       ...(body === undefined ? {} : { 'content-type': 'application/json' }),
@@ -125,7 +177,7 @@ async function requestForm<T>(method: 'POST' | 'PATCH', path: string, form: Form
   const store = await cookies();
   const session = store.get(SESSION_COOKIE)?.value;
 
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await send(`${API_URL}${path}`, {
     method,
     headers: { ...(session ? { cookie: `${SESSION_COOKIE}=${session}` } : {}) },
     body: form,
@@ -168,7 +220,7 @@ export async function login(
   identifier: string,
   password: string,
 ): Promise<{ setCookie: string | null }> {
-  const response = await fetch(`${API_URL}/auth/login`, {
+  const response = await send(`${API_URL}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ identifier, password }),

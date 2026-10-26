@@ -32,7 +32,9 @@ export async function updateWilayat(_state: FormState, form: FormData): Promise<
 }
 
 /** Retires an entry. Properties already placed in it keep what was written. */
-export async function archiveWilayat(id: string): Promise<void> {
-  await api.delete(`/wilayats/${id}`);
-  await refresh('/wilayats');
+export async function archiveWilayat(id: string): Promise<FormState> {
+  return runAction(async () => {
+    await api.delete(`/wilayats/${id}`);
+    await refresh('/wilayats');
+  });
 }

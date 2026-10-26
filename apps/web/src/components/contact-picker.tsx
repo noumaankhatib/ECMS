@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import { lookupFailure } from '@/lib/lookup-error';
+
 interface SavedContact {
   id: string;
   name: string;
@@ -32,6 +34,7 @@ export function ContactPicker({
 }) {
   const marker = useRef<HTMLSpanElement>(null);
   const [contacts, setContacts] = useState<SavedContact[]>([]);
+  const [failure, setFailure] = useState<string | null>(null);
 
   useEffect(() => {
     const form = marker.current?.closest('form');
@@ -47,12 +50,22 @@ export function ContactPicker({
         return;
       }
       fetch(`/lookup/contacts?clientId=${encodeURIComponent(option.id)}`)
-        .then((res) => (res.ok ? (res.json() as Promise<SavedContact[]>) : []))
+        .then((res) => {
+          if (!res.ok) {
+            if (ticket === latest) setFailure(lookupFailure(res.status));
+            return [];
+          }
+          if (ticket === latest) setFailure(null);
+          return res.json() as Promise<SavedContact[]>;
+        })
         .then((list) => {
           if (ticket === latest) setContacts(list);
         })
         .catch(() => {
-          if (ticket === latest) setContacts([]);
+          if (ticket === latest) {
+            setFailure(lookupFailure(null));
+            setContacts([]);
+          }
         });
     };
     form.addEventListener('entity-selected', onSelected);
@@ -72,6 +85,11 @@ export function ContactPicker({
   return (
     <>
       <span ref={marker} hidden />
+      {failure ? (
+        <p className="hint" role="alert">
+          Saved contacts could not be loaded. {failure}
+        </p>
+      ) : null}
       {contacts.length > 0 ? (
         <div className="field field--wide">
           <label htmlFor="saved-contact">Saved contacts for this client</label>

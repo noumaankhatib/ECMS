@@ -11,6 +11,9 @@ import type { FieldIssue } from './api';
  */
 export interface FormState {
   readonly error?: string;
+  /** The API's error code, when there was one, so the form can offer the
+   *  right next step (for example a sign-in link when the session ended). */
+  readonly code?: string;
   readonly fields?: readonly FieldIssue[];
   /** Quoted by the person when asking for help, and searchable in the logs. */
   readonly requestId?: string;

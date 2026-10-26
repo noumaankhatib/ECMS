@@ -52,7 +52,9 @@ export async function updateDocument(_state: FormState, form: FormData): Promise
   return result;
 }
 
-export async function archiveDocument(projectId: string, id: string): Promise<void> {
-  await api.delete(`/projects/${projectId}/documents/${id}`);
-  await refresh(`/projects/${projectId}/documents`);
+export async function archiveDocument(projectId: string, id: string): Promise<FormState> {
+  return runAction(async () => {
+    await api.delete(`/projects/${projectId}/documents/${id}`);
+    await refresh(`/projects/${projectId}/documents`);
+  });
 }

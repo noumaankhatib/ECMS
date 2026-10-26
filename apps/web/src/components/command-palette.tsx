@@ -4,6 +4,8 @@ import type { SearchResult, SearchResultType } from '@ecms/contracts';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
+import { lookupFailure } from '@/lib/lookup-error';
+
 import { CloseIcon, SearchIcon } from './icons';
 
 const TYPE_LABEL: Record<SearchResultType, string> = {
@@ -35,6 +37,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -58,14 +61,25 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   useEffect(() => {
     if (!open || query.trim().length === 0) {
       setResults([]);
+      setFailure(null);
       return;
     }
     const handle = setTimeout(() => {
       setLoading(true);
       fetch(`/api/search?q=${encodeURIComponent(query.trim())}`)
-        .then((res) => (res.ok ? (res.json() as Promise<SearchResult[]>) : []))
+        .then((res) => {
+          if (!res.ok) {
+            setFailure(lookupFailure(res.status));
+            return [];
+          }
+          setFailure(null);
+          return res.json() as Promise<SearchResult[]>;
+        })
         .then((items) => setResults(items))
-        .catch(() => setResults([]))
+        .catch(() => {
+          setFailure(lookupFailure(null));
+          setResults([]);
+        })
         .finally(() => setLoading(false));
     }, 200);
     return () => clearTimeout(handle);
@@ -112,7 +126,9 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           ) : loading ? (
             <p className="command-palette__hint">Searching...</p>
           ) : results.length === 0 ? (
-            <p className="command-palette__hint">No matches for &quot;{trimmed}&quot;.</p>
+            <p className="command-palette__hint" role={failure ? 'alert' : undefined}>
+              {failure ?? <>No matches for &quot;{trimmed}&quot;.</>}
+            </p>
           ) : (
             <ul className="command-palette__results">
               {results.slice(0, 8).map((item) => (

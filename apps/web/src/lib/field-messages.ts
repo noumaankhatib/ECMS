@@ -37,6 +37,7 @@ const LABELS: Readonly<Record<string, string>> = {
   propertyId: 'Property',
   sketchTypeId: 'Sketch type',
   assignedArchitectId: 'Assigned architect',
+  roleCode: 'Role',
 };
 
 /** `(body)` / `(query)` mean the pipe could not name a field; say nothing. */

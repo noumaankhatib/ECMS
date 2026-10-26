@@ -46,7 +46,9 @@ export async function updateRequiredDocument(
 
 /** Retires an entry. The API never hard-deletes — a project's completeness
  *  history must keep meaning what it meant at the time (docs/phase-9-plan.md). */
-export async function archiveRequiredDocument(id: string): Promise<void> {
-  await api.delete(`/required-documents/${id}`);
-  await refresh('/required-documents');
+export async function archiveRequiredDocument(id: string): Promise<FormState> {
+  return runAction(async () => {
+    await api.delete(`/required-documents/${id}`);
+    await refresh('/required-documents');
+  });
 }

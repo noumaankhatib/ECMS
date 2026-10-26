@@ -44,10 +44,12 @@ export async function markInstructionActioned(
   siteVisitId: string,
   id: string,
   version: number,
-): Promise<void> {
-  await api.patch(`${path(projectId, siteVisitId)}/instructions/${id}`, {
-    actionedAt: new Date().toISOString(),
-    version,
+): Promise<FormState> {
+  return runAction(async () => {
+    await api.patch(`${path(projectId, siteVisitId)}/instructions/${id}`, {
+      actionedAt: new Date().toISOString(),
+      version,
+    });
+    await refresh(path(projectId, siteVisitId));
   });
-  await refresh(path(projectId, siteVisitId));
 }
