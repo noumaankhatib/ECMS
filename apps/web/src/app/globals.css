@@ -2560,7 +2560,7 @@ select:disabled {
   --login-muted: #64748b;
   --login-border: #e2e8f0;
   --login-border-strong: #c3cddb;
-  --login-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --login-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --login-pad: clamp(32px, 5vw, 80px);
 
   min-height: 100vh;
@@ -2575,43 +2575,84 @@ select:disabled {
 /* Brand side ---------------------------------------------------------------- */
 .login__aside {
   position: relative;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  isolation: isolate;
   overflow: hidden;
   padding: clamp(32px, 7vh, 80px) var(--login-pad) 0;
   color: #dbe4f3;
-  background:
-    radial-gradient(80% 55% at 0% 100%, rgb(49 87 213 / 30%) 0%, transparent 70%),
-    linear-gradient(165deg, var(--login-navy) 0%, var(--login-deep) 100%);
+  background: #06234a;
 }
-.login__aside-grid {
+/* The photograph. Its height is capped so the roofline of the building stays
+   below the module tiles whatever the window height; the fade at the top
+   blends it into the sky colour above, so no edge shows. */
+.login__aside::before {
+  content: '';
   position: absolute;
-  inset: -64px;
-  background-image:
-    linear-gradient(rgb(255 255 255 / 4%) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 4%) 1px, transparent 1px);
-  background-size: 64px 64px;
-  animation: login-grid-drift 120s linear infinite;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -2;
+  height: min(112%, calc((100dvh - 456px) / 0.516));
+  background: var(--login-photo) left bottom / auto 100% no-repeat;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 30%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 30%);
+  transform-origin: left bottom;
+  animation: login-photo-settle 1600ms var(--login-ease) both;
+}
+/* A light navy wash behind the text keeps it readable without hiding the image. */
+.login__aside::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgb(6 20 48 / 38%) 0%, rgb(6 20 48 / 0%) 55%);
+  pointer-events: none;
 }
 .login__aside-content {
   position: relative;
   max-width: 34rem;
 }
-/* Content arrives in a short stagger, not all at once. */
-.login__aside-content > * {
-  animation: login-slide-in 550ms var(--login-ease) both;
+/* Content arrives in one short sequence (about 1.5s in all): logo, heading
+   line by line, description, then the module tiles. Opacity and transform only. */
+.login__aside-content > *,
+.login__line,
+.login__features li {
+  animation: login-reveal 600ms var(--login-ease) both;
 }
-.login__aside-content > :nth-child(2) {
-  animation-delay: 60ms;
+.login__logo {
+  animation-duration: 500ms;
 }
-.login__aside-content > :nth-child(3) {
-  animation-delay: 120ms;
+.login__rule {
+  animation-delay: 100ms;
 }
-.login__aside-content > :nth-child(4) {
-  animation-delay: 180ms;
+.login__aside-title {
+  animation: none;
 }
-.login__aside-content > :nth-child(5) {
-  animation-delay: 240ms;
+.login__line {
+  display: block;
+  animation-duration: 700ms;
+  animation-delay: 160ms;
+}
+.login__line + .login__line {
+  animation-delay: 260ms;
+}
+.login__aside-lead {
+  animation-delay: 460ms;
+}
+.login__features {
+  animation: none;
+}
+.login__features li {
+  animation-duration: 500ms;
+  animation-delay: calc(640ms + var(--i, 0) * 100ms);
+}
+.login__features li:nth-child(2) {
+  --i: 1;
+}
+.login__features li:nth-child(3) {
+  --i: 2;
+}
+.login__features li:nth-child(4) {
+  --i: 3;
 }
 .login__logo {
   display: inline-flex;
@@ -2688,42 +2729,6 @@ select:disabled {
   height: 22px;
 }
 
-/* The scene owns the last grid row, so it can never run under the content. */
-.login__scene {
-  position: relative;
-  min-height: 0;
-  margin: clamp(16px, 3vh, 40px) calc(-1 * var(--login-pad)) 0;
-  -webkit-mask-image: linear-gradient(to top, #000 62%, transparent 100%);
-  mask-image: linear-gradient(to top, #000 62%, transparent 100%);
-  animation: login-fade 1200ms var(--login-ease) 250ms both;
-}
-.login__scene::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  background: rgb(143 177 255 / 30%);
-}
-.login__scene svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-.login__scene-wire {
-  opacity: 0.4;
-}
-.login__scene-wire .is-dashed {
-  animation: login-dash 60s linear infinite;
-}
-@media (max-height: 700px) {
-  .login__scene {
-    display: none;
-  }
-}
-
 /* Form side ------------------------------------------------------------------ */
 .login__panel {
   position: relative;
@@ -2731,9 +2736,7 @@ select:disabled {
   place-items: center;
   padding: 32px var(--space-4);
   background:
-    radial-gradient(60% 50% at 100% 0%, rgb(49 87 213 / 7%) 0%, transparent 70%),
-    radial-gradient(circle, rgb(23 35 56 / 6%) 1px, transparent 1px) 0 0 / 22px 22px,
-    var(--login-bg);
+    radial-gradient(60% 50% at 100% 0%, rgb(49 87 213 / 7%) 0%, transparent 70%), var(--login-bg);
 }
 /* A shallow, off-centre curve where the two panels meet. */
 .login__panel::before {
@@ -2968,6 +2971,18 @@ select:disabled {
     opacity: 0;
   }
 }
+@keyframes login-photo-settle {
+  from {
+    opacity: 0;
+    transform: scale(1.035);
+  }
+}
+@keyframes login-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
 @keyframes login-slide-in {
   from {
     opacity: 0;
@@ -2978,16 +2993,6 @@ select:disabled {
   from {
     opacity: 0;
     transform: translateY(16px);
-  }
-}
-@keyframes login-grid-drift {
-  to {
-    transform: translate(64px, 64px);
-  }
-}
-@keyframes login-dash {
-  to {
-    stroke-dashoffset: -400;
   }
 }
 @keyframes login-spin {
@@ -3006,19 +3011,38 @@ select:disabled {
   }
 }
 
-/* Mobile and small tablet: just the logo and the form. */
+/* Mobile and small tablet: a compact banner cropped from the same photograph,
+   then the form. The desktop split and its curve are not squeezed in. */
 @media (max-width: 900px) {
   .login {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
   }
-  .login__aside,
-  .login__panel::before {
+  .login__aside {
+    height: clamp(128px, 22vh, 190px);
+    padding: 20px;
+  }
+  .login__aside::before {
+    top: 0;
+    height: auto;
+    background-size: cover;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .login__rule,
+  .login__aside-title,
+  .login__aside-lead,
+  .login__features,
+  .login__panel::before,
+  .login__brand .login__logo {
     display: none;
   }
+  .login__logo {
+    font-size: 22px;
+  }
   .login__panel {
-    min-height: 100vh;
-    min-height: 100dvh;
-    padding: var(--space-4);
+    min-height: 0;
+    padding: 24px var(--space-4) 32px;
   }
   .login__card {
     padding: 28px 24px;
@@ -3029,20 +3053,19 @@ select:disabled {
     padding: 24px 18px;
   }
 }
-/* A short window (landscape phone, on-screen keyboard) starts at the top
-   instead of centring the card off the screen. */
-@media (max-width: 900px) and (max-height: 700px) {
-  .login__panel {
-    place-items: start center;
+/* A very short window (landscape phone) drops the banner so the form has room. */
+@media (max-width: 900px) and (max-height: 520px) {
+  .login__aside {
+    display: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .login,
-  .login__aside-grid,
+  .login__aside::before,
   .login__aside-content > *,
-  .login__scene,
-  .login__scene-wire .is-dashed,
+  .login__line,
+  .login__features li,
   .login__card,
   .login .alert {
     animation: none;
