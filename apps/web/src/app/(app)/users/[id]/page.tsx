@@ -1,6 +1,7 @@
-import { ROLE_DEFINITIONS, type Role } from '@ecms/contracts';
+import { ROLE_DEFINITIONS, type Role, type RoleDetail } from '@ecms/contracts';
 
-import { ActionButton, ActionForm, Field, Select } from '@/components/form';
+import { ActionButton, ActionForm, Field } from '@/components/form';
+import { RoleChooser, RolePermissions } from '@/components/role-guide';
 import { Badge, Breadcrumb, Card, CardBody, CardHead, DateText, DetailGroup, DetailItem, PageHead } from '@/components/ui';
 import { UserWorkSections } from '@/components/user-work';
 import { api } from '@/lib/api';
@@ -16,6 +17,15 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
 
   const user = await api.get<UserRow>(`/users/${id}`);
+  // What each role allows, from the same rows the system enforces. If it cannot
+  // be loaded (or this person may not see roles) the page still works; it just
+  // cannot explain the roles.
+  const roleDetails: RoleDetail[] = session.can('role:view')
+    ? await api
+        .get<{ roles: RoleDetail[] }>('/roles')
+        .then((r) => r.roles)
+        .catch(() => [])
+    : [];
   const roleName = new Map(ROLE_DEFINITIONS.map((r) => [r.code as string, r.name]));
 
   const mayAdminUser = session.can('user:admin');
@@ -80,16 +90,33 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
               {mayAdminRoles && available.length > 0 ? (
                 <ActionForm action={assignRole} submitLabel="Grant role">
                   <input type="hidden" name="id" value={id} />
-                  <Select
+                  <RoleChooser
+                    key={available.map((r) => r.code).join()}
                     label="Add a role"
-                    name="roleCode"
-                    required
-                    options={available.map((r) => ({ value: r.code, label: r.name }))}
+                    roles={
+                      roleDetails.length > 0
+                        ? roleDetails.filter((r) => !held.has(r.code))
+                        : available.map((r) => ({ ...r, permissions: [] }))
+                    }
                   />
                 </ActionForm>
               ) : null}
             </CardBody>
           </Card>
+
+          {roleDetails.length > 0 ? (
+            <Card>
+              <CardHead title="What they can do">
+                <span className="muted u-text-sm">From their role{user.roles.length > 1 ? 's' : ''}</span>
+              </CardHead>
+              <CardBody>
+                <RolePermissions
+                  roles={roleDetails.filter((r) => held.has(r.code))}
+                  emptyText="They have no role, so they can sign in but cannot do anything yet."
+                />
+              </CardBody>
+            </Card>
+          ) : null}
 
           {mayAdminUser ? (
             <>

@@ -1,7 +1,9 @@
-import { ROLE_DEFINITIONS } from '@ecms/contracts';
+import { ROLE_DEFINITIONS, type RoleDetail } from '@ecms/contracts';
 
-import { ActionForm, Field, Select } from '@/components/form';
+import { ActionForm, Field } from '@/components/form';
+import { RoleChooser } from '@/components/role-guide';
 import { Breadcrumb, Card, CardBody, PageHead } from '@/components/ui';
+import { api } from '@/lib/api';
 import { requirePermission } from '@/lib/session';
 
 import { createUser } from '../actions';
@@ -9,7 +11,16 @@ import { createUser } from '../actions';
 export const metadata = { title: 'New user — ECMS' };
 
 export default async function NewUserPage() {
-  await requirePermission('user:admin');
+  const session = await requirePermission('user:admin');
+
+  // The permissions behind each role. Without role:view the picker still works
+  // from the names alone; it just cannot explain them.
+  const roles: RoleDetail[] = session.can('role:view')
+    ? await api
+        .get<{ roles: RoleDetail[] }>('/roles')
+        .then((r) => r.roles)
+        .catch(() => fallbackRoles())
+    : fallbackRoles();
 
   return (
     <>
@@ -44,17 +55,15 @@ export default async function NewUserPage() {
                 autoComplete="new-password"
                 hint="At least 12 characters. Length is what matters — a passphrase beats a short and cryptic one."
               />
-              <Select
-                label="Role"
-                name="roleCode"
-                required
-                hint="What kind of work they do. Where they may do it comes from project membership."
-                options={ROLE_DEFINITIONS.map((r) => ({ value: r.code, label: r.name }))}
-              />
             </div>
+            <RoleChooser roles={roles} />
           </ActionForm>
         </CardBody>
       </Card>
     </>
   );
+}
+
+function fallbackRoles(): RoleDetail[] {
+  return ROLE_DEFINITIONS.map((role) => ({ ...role, permissions: [] }));
 }

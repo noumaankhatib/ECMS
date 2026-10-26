@@ -10,6 +10,8 @@ import {
   type CreateUser,
   type ListQuery,
   type Page,
+  type PermissionScope,
+  type RoleDetail,
   type Role,
   type SetPassword,
   type UpdateUser,
@@ -30,6 +32,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 
+import { PrismaService } from '../../shared/database/prisma.service';
 import { appError } from '../../shared/errors/app-error';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 
@@ -130,16 +133,34 @@ export class UserController {
 
 @Controller('roles')
 export class RoleController {
+  constructor(private readonly prisma: PrismaService) {}
+
   /**
-   * The seven roles, for a picker.
+   * The seven roles, for a picker, each with what it may do.
    *
-   * Served from the shared catalogue rather than the database. The two are kept
-   * honest by a test that asserts every seeded role appears here, so this
-   * cannot quietly drift into offering a role that does not exist.
+   * The names and descriptions come from the shared catalogue (a test keeps
+   * them honest against the seeded roles). The permissions come from the
+   * database — the very rows `AuthorizationService` reads — so the explanation
+   * shown to an administrator is the rule actually enforced, not a copy of it.
    */
   @Get()
   @RequirePermission('role:view')
-  list(): { roles: typeof ROLE_DEFINITIONS } {
-    return { roles: ROLE_DEFINITIONS };
+  async list(): Promise<{ roles: RoleDetail[] }> {
+    const rows = await this.prisma.rolePermission.findMany({
+      select: { roleCode: true, permission: true, scope: true },
+      orderBy: [{ permission: 'asc' }],
+    });
+    const byRole = new Map<string, { permission: string; scope: PermissionScope }[]>();
+    for (const row of rows) {
+      const list = byRole.get(row.roleCode) ?? [];
+      list.push({ permission: row.permission, scope: row.scope as PermissionScope });
+      byRole.set(row.roleCode, list);
+    }
+    return {
+      roles: ROLE_DEFINITIONS.map((role) => ({
+        ...role,
+        permissions: byRole.get(role.code) ?? [],
+      })),
+    };
   }
 }

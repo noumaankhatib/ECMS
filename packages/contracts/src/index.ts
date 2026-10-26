@@ -239,6 +239,16 @@ export const ROLE_DEFINITIONS = [
   },
 ] as const satisfies readonly { code: Role; name: string; description: string }[];
 
+/** A role as the administration screens show it: who it is for, and exactly
+ *  what the database lets it do (the same rows the authorization check reads,
+ *  so this page cannot say something the system does not enforce). */
+export interface RoleDetail {
+  readonly code: Role;
+  readonly name: string;
+  readonly description: string;
+  readonly permissions: readonly { readonly permission: string; readonly scope: PermissionScope }[];
+}
+
 // ---------------------------------------------------------------------------
 // Directory — clients, contacts, properties
 // ---------------------------------------------------------------------------

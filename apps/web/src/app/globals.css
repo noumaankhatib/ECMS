@@ -4903,6 +4903,89 @@ input[type='radio'] {
   text-decoration: underline;
 }
 
+/* Role guide ----------------------------------------------------------------- */
+
+.role-guide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.role-guide__panel {
+  padding: var(--space-4);
+  background: var(--slate-50);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.role-guide__lead {
+  margin: 0 0 var(--space-3);
+}
+.role-guide__groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.role-guide__heading {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.role-guide__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.role-guide__row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 9rem) minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+.role-guide__row:first-child {
+  border-top: 0;
+}
+.role-guide__row dt {
+  font-weight: 600;
+}
+.role-guide__row dd {
+  margin: 0;
+  color: var(--text);
+}
+.role-guide__compare summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--brand-text);
+}
+.role-guide__compare .table-scroll {
+  max-height: none;
+  margin-top: var(--space-2);
+  border: 1px solid var(--border);
+}
+.role-guide__compare tbody th {
+  min-width: 7rem;
+  padding: 10px var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+.role-guide__compare td {
+  min-width: 9rem;
+  vertical-align: top;
+}
+@media (max-width: 520px) {
+  .role-guide__row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}
+
 /* Utilities — replace one-off inline styles. Kept last so they win. -------- */
 .u-w-auto {
   width: auto;

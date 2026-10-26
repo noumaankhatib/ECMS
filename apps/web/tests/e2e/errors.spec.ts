@@ -26,6 +26,7 @@ test.describe('Errors tell the person what to fix', () => {
     await page.getByLabel('Full name').fill(`Short Password ${tag}`);
     await page.getByLabel('Username').fill(`shortpw.${tag.toLowerCase()}`);
     await page.getByLabel('Password').fill('abc123');
+    await page.getByLabel('Role').selectOption('PLANNING');
     await page.getByRole('button', { name: 'Create user' }).click();
 
     const banner = page.locator('div.alert[role="alert"]');

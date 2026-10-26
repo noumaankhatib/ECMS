@@ -4,7 +4,6 @@ import { signInAs } from './auth';
 import { submitCreate } from './duplicates';
 import { pickEntity } from './pickers';
 
-
 /**
  * Phase 1's definition of done, performed through the browser.
  *
@@ -158,7 +157,7 @@ test.describe('Phase 1 through the browser', () => {
       `Sam Surveyor ${tag}`,
       'SUPERVISION',
     );
-    await expect(page.getByText('Supervision Team')).toBeVisible();
+    await expect(page.locator('span.badge', { hasText: 'Supervision Team' })).toBeVisible();
 
     // The two people the rest of the suite needs. Created here, so they start
     // as members of nothing however many times this has been run before.
@@ -168,7 +167,9 @@ test.describe('Phase 1 through the browser', () => {
     // A second role can be granted, and takes effect on the spot.
     await page.getByLabel('Add a role').selectOption('DOCUMENT_CONTROLLER');
     await page.getByRole('button', { name: 'Grant role' }).click();
-    await expect(page.getByText('Document Controller')).toBeVisible();
+    // The role name now also appears in the picker and the role guide, so look
+    // for the badge in the user's own Roles list.
+    await expect(page.locator('span.badge', { hasText: 'Document Controller' })).toBeVisible();
   });
 
   test('THE CRITICAL TEST: a non-member gets nothing for a project', async ({ page }) => {
@@ -195,7 +196,9 @@ test.describe('Phase 1 through the browser', () => {
     await expect(page.getByRole('link', { name: 'Users' })).toHaveCount(0);
     // They may read reference data, so those do appear.
     await expect(
-      page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Clients', exact: true }),
+      page
+        .getByRole('navigation', { name: 'Main' })
+        .getByRole('link', { name: 'Clients', exact: true }),
     ).toBeVisible();
   });
 
