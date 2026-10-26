@@ -14,7 +14,7 @@ import type { DrawingRevision, Prisma } from '@prisma/client';
 import { PrismaService } from '../../shared/database/prisma.service';
 import { DRIVE_ADAPTER, type DriveAdapter } from '../../shared/drive/drive-adapter';
 import { appError } from '../../shared/errors/app-error';
-import { guardSelfApproval } from '../access/self-approval';
+import { guardSelfApproval } from '../access';
 import { AuditService } from '../audit';
 
 import { requireOpenProject } from './project-guard';

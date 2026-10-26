@@ -14,7 +14,7 @@ import type { Modification, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../shared/database/prisma.service';
 import { appError } from '../../shared/errors/app-error';
-import { guardSelfApproval } from '../access/self-approval';
+import { guardSelfApproval } from '../access';
 import { AuditService } from '../audit';
 
 import { requireOpenProject } from './project-guard';
